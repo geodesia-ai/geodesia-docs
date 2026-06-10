@@ -203,3 +203,41 @@
 
 /* Hide MkDocs edit button (no public repo) */
 .md-content__button { display: none; }
+
+/* Header logo a touch larger and crisp */
+.md-header__button.md-logo img,
+.md-header__button.md-logo svg {
+  height: 1.7rem;
+  width: 1.7rem;
+}
+
+/* Mermaid diagrams — framed, centered, breathing room */
+.md-typeset .mermaid {
+  display: flex;
+  justify-content: center;
+  margin: 1.75rem 0;
+  padding: 1.5rem 1rem;
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(63, 81, 181, 0.06) 0%, transparent 70%),
+    var(--md-default-bg-color);
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 14px;
+}
+[data-md-color-scheme="slate"] .md-typeset .mermaid {
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(0, 188, 212, 0.08) 0%, transparent 70%),
+    rgba(255, 255, 255, 0.015);
+}
+.md-typeset .mermaid svg {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Section caption shown under a diagram */
+.md-typeset .diagram-caption {
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--md-default-fg-color--light);
+  margin: -1rem 0 2rem;
+  font-style: italic;
+}
