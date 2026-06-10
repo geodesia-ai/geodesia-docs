@@ -1,25 +1,66 @@
-# Framework Compatibility
+---
+icon: material/server-network
+---
 
-Geodesia G-1 is **model-agnostic and framework-agnostic**. It sits in front of your inference server and validates every request and response — it does not care *how* the tokens are produced, only that the server speaks a protocol it understands.
+# Framework Compatibility & DevOps Guide
 
-In practice this means: **if your serving framework exposes an OpenAI-compatible `/v1/chat/completions` endpoint (or the Ollama API), Geodesia G-1 works with it.** That covers essentially every modern LLM serving stack.
+Geodesia G-1 is **model-agnostic and framework-agnostic**. It sits in front of your inference server as a thin, stateless validation layer and inspects every request and response — it does not care *how* the tokens are produced, only that the server speaks a protocol it understands.
+
+> **The golden rule:** if your serving stack exposes an OpenAI-compatible `/v1/chat/completions` endpoint (or the Ollama API), Geodesia G-1 drops in front of it with zero changes to your application — you only change the `base_url` your client points at.
+
+This page is the operator's reference: the **compatibility matrix**, **per-framework setup**, and the **production deployment, scaling, observability, security, and troubleshooting** playbook.
 
 ---
 
-## The One Rule That Matters: Log-Probabilities
+## At a Glance
 
-There is exactly one capability that changes how many detection axes you get:
+<div class="feature-grid">
+
+<div class="feature-card">
+<span class="feature-icon">🧩</span>
+<h3>Drop-in</h3>
+<p>Stateless proxy on port <code>8800</code>. Point your OpenAI client at it; point it at your model. No retraining, no app changes.</p>
+</div>
+
+<div class="feature-card">
+<span class="feature-icon">📈</span>
+<h3>Horizontally scalable</h3>
+<p>The gateway holds no per-request state. Run N replicas behind a load balancer; share one audit database.</p>
+</div>
+
+<div class="feature-card">
+<span class="feature-icon">🩺</span>
+<h3>Probe-friendly</h3>
+<p><code>/health</code> reports upstream reachability, log-prob support, and active axes — wire it straight into liveness/readiness probes.</p>
+</div>
+
+<div class="feature-card">
+<span class="feature-icon">🔐</span>
+<h3>Hardening-ready</h3>
+<p>API-key passthrough, TLS at the edge, blocking-mode enforcement, and a tamper-evident audit chain out of the box.</p>
+</div>
+
+</div>
+
+---
+
+## The One Rule That Decides Everything: Log-Probabilities
+
+There is exactly one upstream capability that changes how many detection axes you get:
 
 > **Does the upstream return per-token log-probabilities?**
 
-Log-probabilities are a number, attached to each generated token, that expresses how confident the model was when it chose that word. Geodesia uses them for the **closed-book fabrication** axis (detecting confidently-stated but invented facts when there is no grounding context).
+Log-probabilities express how confident the model was when it chose each word. Geodesia uses them for the **closed-book fabrication** axis (catching confidently-invented facts when there is no grounding context).
 
-| Upstream returns log-probs | Active axes |
-|---|---|
-| ✅ Yes | **5 axes** — context faithfulness, closed-book fabrication, prompt safety, answer safety, jailbreak |
-| ❌ No | **4 axes** — the closed-book fabrication axis is disabled automatically; everything else is unaffected |
+| Upstream returns log-probs | Active axes | What you lose without them |
+|---|---|---|
+| ✅ Yes | **5 axes** | nothing |
+| ❌ No | **4 axes** | closed-book fabrication only — context faithfulness, prompt safety, answer safety, and jailbreak all still run |
 
-No configuration is needed to switch between the two — the gateway detects it on the first request and the `/health` endpoint reports which mode is active. You can always enable the 5th axis later (see [Ollama](#ollama) for the sidecar pattern).
+No setting toggles this — the gateway probes it on the first request and `/health` reports the result. You can recover the 5th axis later with a [log-prob sidecar](#ollama).
+
+!!! tip "Make `axes` an alerting signal"
+    Treat an unexpected drop from `axes: 5` to `axes: 4` in `/health` as a **degradation alert** — it means your upstream stopped returning log-probabilities (model change, tier change, flag dropped).
 
 ---
 
@@ -29,17 +70,42 @@ No configuration is needed to switch between the two — the gateway detects it 
 |---|---|---|---|---|---|
 | [vLLM](#vllm) | `vllm` | OpenAI | ✅ | 5 | Production on NVIDIA GPUs |
 | [SGLang](#sglang) | `sglang` | OpenAI | ✅ | 5 | High-throughput production |
-| [TensorRT-LLM](#tensorrt-llm) | `trtllm` | OpenAI | ✅ | 5 | Max NVIDIA performance |
+| [TensorRT-LLM](#tensorrt-llm) | `trtllm` | OpenAI | ✅ | 5 | Maximum NVIDIA performance |
 | [llama.cpp](#llamacpp) | `openai` | OpenAI | ✅ | 5 | CPU / Apple Silicon / GGUF |
-| [Ollama](#ollama) | `ollama` | Ollama | ⚠️ sidecar | 4 (5 w/ sidecar) | Local dev, easy setup |
+| [Ollama](#ollama) | `ollama` | Ollama | ⚠️ sidecar | 4 (5 w/ sidecar) | Local dev, easiest setup |
 | [OpenAI API](#openai-api-and-hosted-services) | `openai` | OpenAI | ✅ | 5 | Managed frontier models |
-| [Azure / Together / Groq / Mistral / Fireworks / OpenRouter](#openai-api-and-hosted-services) | `openai` | OpenAI | ✅* | 5* | Hosted open models |
-| [Text Generation Inference (TGI)](#text-generation-inference-tgi) | `openai` | OpenAI | ✅ | 5 | Hugging Face stack |
+| [Azure · Together · Groq · Mistral · Fireworks · OpenRouter](#openai-api-and-hosted-services) | `openai` | OpenAI | ✅* | 5* | Hosted open models |
+| [TGI (Hugging Face)](#text-generation-inference-tgi) | `openai` | OpenAI | ✅ | 5 | Hugging Face stack |
 | [LM Studio](#lm-studio) | `openai` | OpenAI | ✅ | 5 | Desktop / local GUI |
 | [LocalAI](#localai) | `openai` | OpenAI | ✅ | 5 | Self-hosted drop-in |
 | [Internal (self-managed)](#internal-self-managed-vllm) | `internal` | OpenAI | ✅ | 5 | Single-GPU, gateway owns lifecycle |
 
-<small>* Hosted providers expose log-probabilities on most—but not all—models and tiers. The gateway falls back to 4 axes automatically if they are absent.</small>
+<small>* Hosted providers expose log-probabilities on most—but not all—models and tiers; the gateway falls back to 4 axes automatically when they are absent.</small>
+
+---
+
+## Where Geodesia Sits
+
+```mermaid
+flowchart LR
+    APP([Your application<br/><small>OpenAI client</small>]):::app
+    GW[Geodesia Gateway<br/><small>:8800 · stateless</small>]:::gw
+    LLM[Upstream LLM<br/><small>vLLM · SGLang · TRT-LLM · llama.cpp · Ollama · hosted</small>]:::llm
+    DB[(Audit Database<br/><small>shared</small>)]:::db
+    PROD[Product Backend<br/><small>:8199 · compliance</small>]:::svc
+
+    APP -->|base_url → :8800/v1| GW
+    GW <-->|forward + validate| LLM
+    GW -.->|one audited row<br/>per call| DB
+    PROD -.->|reads| DB
+
+    classDef app fill:#3f51b5,color:#fff,stroke:#283593;
+    classDef gw fill:#1565c0,color:#fff,stroke:#0d47a1;
+    classDef llm fill:#5e35b1,color:#fff,stroke:#311b92;
+    classDef db fill:#37474f,color:#fff,stroke:#263238;
+    classDef svc fill:#00838f,color:#fff,stroke:#005662;
+```
+<p class="diagram-caption">The gateway is the only thing your application talks to. It is stateless; all durable state lives in the shared audit database.</p>
 
 ---
 
@@ -56,7 +122,7 @@ flowchart TD
     A1 -->|vLLM| TV[type: vllm]:::t
     A1 -->|SGLang| TS[type: sglang]:::t
     A1 -->|TensorRT-LLM| TT[type: trtllm]:::t
-    A1 -->|llama.cpp / TGI /<br/>LM Studio / LocalAI| TO[type: openai]:::t
+    A1 -->|llama.cpp · TGI ·<br/>LM Studio · LocalAI| TO[type: openai]:::t
 
     B --> TB[type: ollama<br/>+ optional logprob sidecar]:::t
     C --> TC[type: openai<br/>+ api_key]:::t
@@ -64,187 +130,170 @@ flowchart TD
 
     classDef t fill:#1565c0,color:#fff,stroke:#0d47a1;
 ```
-<p class="diagram-caption">Pick the type that matches how your model is served. Everything OpenAI-compatible that is not vLLM/SGLang/TensorRT-LLM uses <code>type: openai</code>.</p>
+<p class="diagram-caption">Anything OpenAI-compatible that is not vLLM / SGLang / TensorRT-LLM uses <code>type: openai</code>.</p>
 
 ---
 
-## How to Configure (the two ways)
+## Configure It — Three Equivalent Ways
 
-Every framework below is configured the same way — only the values change.
+Every framework below is configured identically; only the values change.
 
-=== "Via the gateway API"
+=== "Gateway API (runtime, hot-reload)"
 
     ```bash
     curl -X POST http://localhost:8800/v1/glad/gateway/config \
       -H "Content-Type: application/json" \
       -d '{
         "upstream_type": "vllm",
-        "upstream_base_url": "http://localhost:8000",
+        "upstream_base_url": "http://generator:8000",
         "upstream_model": "meta-llama/Llama-3-8B-Instruct",
         "upstream_api_key": ""
       }'
     ```
+    Changes take effect on the next request — no restart.
 
-=== "Via environment variables"
+=== "Environment variables (declarative)"
 
     ```bash
-    export GW_UPSTREAM_TYPE=vllm
-    export GW_UPSTREAM_URL=http://localhost:8000
-    export GW_UPSTREAM_MODEL=meta-llama/Llama-3-8B-Instruct
-    export GW_API_KEY=          # only for hosted services
+    GW_UPSTREAM_TYPE=vllm
+    GW_UPSTREAM_URL=http://generator:8000
+    GW_UPSTREAM_MODEL=meta-llama/Llama-3-8B-Instruct
+    GW_API_KEY=                 # only for hosted services
+    GW_BLOCK_INPUT=1            # enforce on input
+    GW_BLOCK_OUTPUT=1           # enforce on output
     ```
+    The canonical way for Docker / Kubernetes — config is reproducible from your manifests.
 
-=== "Via the web UI"
+=== "Web UI"
 
-    **Settings → Service Connection** → choose the type, enter the URL (and API key if hosted), click **Test connection**, pick the model, then **Save**.
-
-After configuring, always run **Test connection** (`POST /upstream/test`) to confirm reachability and whether log-probabilities are available. See [Upstream Backends](backends.md#testing-a-connection) for the test and calibration mechanics.
+    **Settings → Service Connection** → choose type, enter URL (and API key if hosted), **Test connection**, pick the model, **Save**.
 
 | Config field | Env var | Meaning |
 |---|---|---|
-| `upstream_type` | `GW_UPSTREAM_TYPE` | One of `vllm`, `sglang`, `trtllm`, `openai`, `ollama`, `internal` |
+| `upstream_type` | `GW_UPSTREAM_TYPE` | `vllm` · `sglang` · `trtllm` · `openai` · `ollama` · `internal` |
 | `upstream_base_url` | `GW_UPSTREAM_URL` | Base URL of the server (no trailing `/v1`) |
 | `upstream_model` | `GW_UPSTREAM_MODEL` | Model name as the upstream knows it |
-| `upstream_api_key` | `GW_API_KEY` | Bearer token; leave empty for local servers |
+| `upstream_api_key` | `GW_API_KEY` | Bearer token; empty for local servers |
+| — | `GW_MAXLEN` | Max tokens the detector reads (latency vs recall) |
+| — | `GW_BLOCK_INPUT` / `GW_BLOCK_OUTPUT` | `1` = block flagged content, `0` = annotate only |
+
+!!! info "Always verify after configuring"
+    Run `POST /upstream/test` (or the **Test connection** button) — it reports reachability, latency, the model list, and whether log-probabilities are available. See [Upstream Backends](backends.md#testing-a-connection).
 
 ---
 
-## vLLM
+## Per-Framework Setup
 
-The recommended backend for production on NVIDIA GPUs. Returns log-probabilities natively → all 5 axes.
+### vLLM
 
-**Start vLLM:**
-```bash
-python -m vllm.entrypoints.openai.api_server \
-  --model meta-llama/Llama-3-8B-Instruct \
-  --port 8000
-```
+The recommended production backend on NVIDIA GPUs. Returns log-probabilities natively → 5 axes.
 
-**Point Geodesia at it:**
+=== "Bare process"
+
+    ```bash
+    python -m vllm.entrypoints.openai.api_server \
+      --model meta-llama/Llama-3-8B-Instruct --port 8000
+    ```
+
+=== "Docker"
+
+    ```bash
+    docker run --gpus all -p 8000:8000 \
+      vllm/vllm-openai:latest \
+      --model meta-llama/Llama-3-8B-Instruct
+    ```
+
+**Configure:**
 ```bash
 curl -X POST http://localhost:8800/v1/glad/gateway/config \
-  -d '{"upstream_type":"vllm",
-       "upstream_base_url":"http://localhost:8000",
+  -d '{"upstream_type":"vllm","upstream_base_url":"http://localhost:8000",
        "upstream_model":"meta-llama/Llama-3-8B-Instruct"}'
 ```
 
-No special flags are required — vLLM returns log-probabilities whenever the gateway requests them.
+### SGLang
 
----
+OpenAI-compatible, log-probabilities supported → 5 axes. Default port `30000`.
 
-## SGLang
-
-Fully OpenAI-compatible, log-probabilities supported → 5 axes. SGLang typically serves on port `30000`.
-
-**Start SGLang:**
 ```bash
 python -m sglang.launch_server \
-  --model-path meta-llama/Llama-3-8B-Instruct \
-  --port 30000
-```
+  --model-path meta-llama/Llama-3-8B-Instruct --port 30000
 
-**Configure:**
-```bash
 curl -X POST http://localhost:8800/v1/glad/gateway/config \
-  -d '{"upstream_type":"sglang",
-       "upstream_base_url":"http://localhost:30000",
+  -d '{"upstream_type":"sglang","upstream_base_url":"http://localhost:30000",
        "upstream_model":"meta-llama/Llama-3-8B-Instruct"}'
 ```
 
----
+### TensorRT-LLM
 
-## TensorRT-LLM
+NVIDIA's maximum-performance engine, fronted by an OpenAI-compatible server (TensorRT-LLM serving frontend or Triton). Log-probabilities supported → 5 axes.
 
-NVIDIA's maximum-performance engine. It is fronted by an OpenAI-compatible server (the TensorRT-LLM serving frontend or NVIDIA Triton with the OpenAI endpoint). Log-probabilities are supported → 5 axes.
-
-**Configure:**
 ```bash
 curl -X POST http://localhost:8800/v1/glad/gateway/config \
-  -d '{"upstream_type":"trtllm",
-       "upstream_base_url":"http://localhost:8000",
+  -d '{"upstream_type":"trtllm","upstream_base_url":"http://localhost:8000",
        "upstream_model":"llama-3-8b"}'
 ```
 
-!!! tip "Build with log-probs enabled"
-    When building the TensorRT-LLM engine, make sure the engine is built to return generation log-probabilities (the serving frontend must be allowed to request `logprobs`). If they are absent, the gateway runs in 4-axis mode.
+!!! warning "Build with log-probs enabled"
+    Ensure the engine is built so the serving frontend can request `logprobs`. If absent, the gateway runs in 4-axis mode.
 
----
+### llama.cpp
 
-## llama.cpp
+`llama-server` is OpenAI-compatible **and returns log-probabilities** → 5 axes, even on CPU or Apple Silicon. Use `type: openai`.
 
-`llama.cpp` ships an OpenAI-compatible server (`llama-server`) that **does** return log-probabilities — so you get all 5 axes, even on CPU or Apple Silicon. Use `upstream_type: openai`.
-
-**Start the server:**
 ```bash
-# from a llama.cpp build
-./llama-server \
-  -m ./models/llama-3-8b-instruct.Q4_K_M.gguf \
+./llama-server -m ./models/llama-3-8b-instruct.Q4_K_M.gguf \
   --host 0.0.0.0 --port 8080
+
+curl -X POST http://localhost:8800/v1/glad/gateway/config \
+  -d '{"upstream_type":"openai","upstream_base_url":"http://localhost:8080",
+       "upstream_model":"llama-3-8b-instruct","upstream_api_key":""}'
 ```
 
-**Configure (note the `/v1` is added by the gateway, point at the base):**
+!!! info "Why `openai` and not a `llamacpp` type"
+    `llama.cpp` speaks the OpenAI protocol, so it uses the generic `openai` type — the same as TGI, LM Studio, and LocalAI. Anything OpenAI-compatible you host yourself is `openai` with an empty API key.
+
+### Ollama
+
+The easiest local runtime. Its chat API does **not** expose log-probabilities → **4-axis mode** by default (everything except closed-book fabrication).
+
 ```bash
 curl -X POST http://localhost:8800/v1/glad/gateway/config \
-  -d '{"upstream_type":"openai",
-       "upstream_base_url":"http://localhost:8080",
-       "upstream_model":"llama-3-8b-instruct",
-       "upstream_api_key":""}'
-```
-
-!!! info "Why type `openai` and not a `llamacpp` type"
-    `llama.cpp` speaks the OpenAI protocol, so it uses the generic `openai` type. The same applies to TGI, LM Studio, and LocalAI below. There is no separate type to remember — anything OpenAI-compatible that you host yourself is `openai` with an empty API key.
-
----
-
-## Ollama
-
-Ollama is the easiest way to run open models locally. Its chat API does **not** expose per-token log-probabilities, so the gateway runs in **4-axis mode** by default. Everything except closed-book fabrication detection works.
-
-**Configure:**
-```bash
-curl -X POST http://localhost:8800/v1/glad/gateway/config \
-  -d '{"upstream_type":"ollama",
-       "upstream_base_url":"http://localhost:11434",
+  -d '{"upstream_type":"ollama","upstream_base_url":"http://localhost:11434",
        "upstream_model":"llama3.2"}'
 ```
 
-### Enabling the 5th axis (log-prob sidecar)
+#### Recover the 5th axis with a log-prob sidecar
 
-To get closed-book fabrication detection with Ollama, run a **second server for the same model that does expose log-probabilities** — the most common choice is `llama.cpp`'s `llama-server` pointing at the same GGUF file. The gateway re-derives the answer through the sidecar to recover the missing signal.
+Run a **second server for the same model that does expose log-probabilities** — typically `llama.cpp` on the same GGUF. The gateway re-derives the answer through the sidecar to recover the signal.
+
+```mermaid
+flowchart LR
+    GW[Geodesia Gateway]:::gw -->|generate| OLL[Ollama<br/><small>:11434 · no logprobs</small>]:::o
+    GW -.->|re-derive for<br/>closed-book signal| SC[llama.cpp sidecar<br/><small>:8080 · same GGUF · logprobs</small>]:::s
+    classDef gw fill:#1565c0,color:#fff,stroke:#0d47a1;
+    classDef o fill:#5e35b1,color:#fff,stroke:#311b92;
+    classDef s fill:#00838f,color:#fff,stroke:#005662;
+```
 
 ```bash
-# 1. Run a llama.cpp sidecar on the same GGUF, WITH logprobs
-./llama-server -m ./models/llama3.2.gguf --port 8080
+./llama-server -m ./models/llama3.2.gguf --port 8080   # the sidecar
 
-# 2. Tell the gateway about it
 curl -X POST http://localhost:8800/v1/glad/gateway/config \
-  -d '{"upstream_type":"ollama",
-       "upstream_base_url":"http://localhost:11434",
+  -d '{"upstream_type":"ollama","upstream_base_url":"http://localhost:11434",
        "upstream_model":"llama3.2",
        "ollama_logprob_sidecar_url":"http://localhost:8080",
        "ollama_logprob_sidecar_model":"llama3.2"}'
 ```
 
-| Field | Description |
-|---|---|
-| `ollama_logprob_sidecar_url` | Base URL of an OpenAI-compatible server serving the same model **with** log-probabilities. |
-| `ollama_logprob_sidecar_model` | Model name on the sidecar. Defaults to `upstream_model`. |
+### OpenAI API and Hosted Services
 
----
-
-## OpenAI API and Hosted Services
-
-Use `upstream_type: openai` for the real OpenAI API and for any hosted OpenAI-compatible provider — **Azure OpenAI, Together AI, Groq, Mistral AI, Fireworks, OpenRouter, Anyscale, DeepInfra**, and others.
+Use `type: openai` for the OpenAI API and any hosted OpenAI-compatible provider.
 
 ```bash
 curl -X POST http://localhost:8800/v1/glad/gateway/config \
-  -d '{"upstream_type":"openai",
-       "upstream_base_url":"https://api.openai.com",
-       "upstream_api_key":"sk-...",
-       "upstream_model":"gpt-4o"}'
+  -d '{"upstream_type":"openai","upstream_base_url":"https://api.openai.com",
+       "upstream_api_key":"sk-...","upstream_model":"gpt-4o"}'
 ```
-
-**Examples of base URLs:**
 
 | Provider | `upstream_base_url` |
 |---|---|
@@ -256,54 +305,42 @@ curl -X POST http://localhost:8800/v1/glad/gateway/config \
 | Fireworks | `https://api.fireworks.ai/inference` |
 | OpenRouter | `https://openrouter.ai/api` |
 
-!!! warning "Log-probabilities on hosted APIs"
-    The gateway requests `logprobs: true` automatically. Most models support it and you get 5 axes; a few models or tiers do not, and the gateway transparently falls back to 4 axes. Check the `/health` endpoint or the **Test connection** result to see which mode you are in.
+!!! warning "Secrets belong in a secret store"
+    Never bake `upstream_api_key` into an image or commit it. Inject it via `GW_API_KEY` from a Kubernetes `Secret`, Docker secret, or your vault. See [Security Hardening](#security-hardening).
 
----
+### Text Generation Inference (TGI)
 
-## Text Generation Inference (TGI)
-
-Hugging Face's TGI exposes an OpenAI-compatible route and returns log-probabilities → 5 axes. Use `type: openai`.
+Hugging Face TGI exposes an OpenAI route and returns log-probabilities → 5 axes. `type: openai`, default port `8080`.
 
 ```bash
-# TGI default port is 8080
 curl -X POST http://localhost:8800/v1/glad/gateway/config \
-  -d '{"upstream_type":"openai",
-       "upstream_base_url":"http://localhost:8080",
+  -d '{"upstream_type":"openai","upstream_base_url":"http://localhost:8080",
        "upstream_model":"tgi"}'
 ```
 
----
+### LM Studio
 
-## LM Studio
-
-LM Studio's local server is OpenAI-compatible (default port `1234`) and returns log-probabilities → 5 axes.
+Local OpenAI-compatible server (default port `1234`) with log-probabilities → 5 axes.
 
 ```bash
 curl -X POST http://localhost:8800/v1/glad/gateway/config \
-  -d '{"upstream_type":"openai",
-       "upstream_base_url":"http://localhost:1234",
+  -d '{"upstream_type":"openai","upstream_base_url":"http://localhost:1234",
        "upstream_model":"local-model"}'
 ```
 
----
+### LocalAI
 
-## LocalAI
-
-LocalAI is a self-hosted, OpenAI drop-in replacement (default port `8080`). Use `type: openai`.
+Self-hosted OpenAI drop-in (default port `8080`). `type: openai`.
 
 ```bash
 curl -X POST http://localhost:8800/v1/glad/gateway/config \
-  -d '{"upstream_type":"openai",
-       "upstream_base_url":"http://localhost:8080",
+  -d '{"upstream_type":"openai","upstream_base_url":"http://localhost:8080",
        "upstream_model":"gpt-3.5-turbo"}'
 ```
 
----
+### Internal (self-managed vLLM)
 
-## Internal (self-managed vLLM)
-
-With `upstream_type: internal`, the gateway **launches and manages its own vLLM subprocess**. It starts vLLM when selected and frees the GPU when you switch away — ideal for single-GPU machines where you want the gateway to own the whole lifecycle.
+The gateway **launches and manages its own vLLM subprocess**, starting it on selection and freeing the GPU when you switch away — ideal for single-GPU hosts.
 
 ```bash
 curl -X POST http://localhost:8800/v1/glad/gateway/config \
@@ -313,23 +350,310 @@ curl -X POST http://localhost:8800/v1/glad/gateway/config \
        "upstream_model":"my-model"}'
 ```
 
-| Field | Description |
-|---|---|
-| `internal_vllm_cmd` | Full shell command the gateway runs to start vLLM. |
-| `internal_vllm_url` | URL where the internal vLLM becomes reachable after startup. |
+---
+
+## Production Topologies
+
+### 1 · Single node — Docker Compose
+
+The simplest production unit: the model server and the gateway side by side.
+
+```mermaid
+flowchart TB
+    subgraph HOST [" Single host (GPU) "]
+        direction LR
+        GEN[generator<br/><small>vllm/vllm-openai · :8000</small>]:::llm
+        GWC[glad-gateway<br/><small>:8800</small>]:::gw
+        VOL[(volume:<br/>audit + config + RAG)]:::db
+        GWC --> GEN
+        GWC --- VOL
+    end
+    EDGE[Reverse proxy / TLS<br/><small>nginx · :443</small>]:::edge --> GWC
+    CLIENT([Clients]):::app --> EDGE
+    classDef app fill:#3f51b5,color:#fff,stroke:#283593;
+    classDef edge fill:#455a64,color:#fff,stroke:#263238;
+    classDef gw fill:#1565c0,color:#fff,stroke:#0d47a1;
+    classDef llm fill:#5e35b1,color:#fff,stroke:#311b92;
+    classDef db fill:#37474f,color:#fff,stroke:#263238;
+    style HOST fill:#1565c00d,stroke:#1565c0,stroke-width:2px;
+```
+
+The repository ships `deploy/docker-compose.gateway.yml` with two services — `generator` (the model) and `glad-gateway` (the validator) — and two profiles:
+
+```bash
+# Pre-calibrated checkpoint
+docker compose -f deploy/docker-compose.gateway.yml --profile fixed up -d
+
+# First-boot auto-calibration (new model / new customer)
+docker compose -f deploy/docker-compose.gateway.yml --profile customer up -d
+```
+
+A minimal `.env` to drive it:
+
+```bash
+# .env
+GW_UPSTREAM_TYPE=vllm
+GW_UPSTREAM_URL=http://generator:8000
+GW_UPSTREAM_MODEL=meta-llama/Llama-3-8B-Instruct
+GW_BLOCK_INPUT=1
+GW_BLOCK_OUTPUT=1
+GW_MAXLEN=2048
+```
+
+### 2 · Kubernetes
+
+The gateway is stateless → run it as a `Deployment` with `N` replicas behind a `Service`, mount the upstream as another `Service`, keep secrets in a `Secret`, and wire `/health` to probes.
+
+```mermaid
+flowchart TB
+    ING[Ingress / TLS]:::edge --> SVC[Service: geodesia-gw<br/><small>ClusterIP :8800</small>]:::svc
+    SVC --> P1[Pod gw-1]:::gw
+    SVC --> P2[Pod gw-2]:::gw
+    SVC --> P3[Pod gw-N]:::gw
+    P1 & P2 & P3 --> GSVC[Service: model<br/><small>vLLM Deployment on GPU nodes</small>]:::llm
+    P1 & P2 & P3 -.-> PVC[(PVC / managed DB<br/><small>shared audit store</small>)]:::db
+    HPA{{HPA<br/><small>scales on CPU / RPS</small>}}:::hpa -.->|replicas| SVC
+    classDef edge fill:#455a64,color:#fff,stroke:#263238;
+    classDef svc fill:#00838f,color:#fff,stroke:#005662;
+    classDef gw fill:#1565c0,color:#fff,stroke:#0d47a1;
+    classDef llm fill:#5e35b1,color:#fff,stroke:#311b92;
+    classDef db fill:#37474f,color:#fff,stroke:#263238;
+    classDef hpa fill:#ef6c00,color:#fff,stroke:#e65100;
+```
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: geodesia-gateway
+spec:
+  replicas: 3
+  selector: { matchLabels: { app: geodesia-gateway } }
+  template:
+    metadata: { labels: { app: geodesia-gateway } }
+    spec:
+      containers:
+        - name: gateway
+          image: registry.geodesia.ai/gateway:1.0   # your licensed image
+          ports: [{ containerPort: 8800 }]
+          env:
+            - { name: GW_UPSTREAM_TYPE,  value: "vllm" }
+            - { name: GW_UPSTREAM_URL,   value: "http://model:8000" }
+            - { name: GW_UPSTREAM_MODEL, value: "meta-llama/Llama-3-8B-Instruct" }
+            - { name: GW_BLOCK_INPUT,    value: "1" }
+            - { name: GW_BLOCK_OUTPUT,   value: "1" }
+            - name: GW_API_KEY
+              valueFrom: { secretKeyRef: { name: geodesia-secrets, key: upstream-api-key } }
+          readinessProbe:
+            httpGet: { path: /health, port: 8800 }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet: { path: /health, port: 8800 }
+            initialDelaySeconds: 30
+            periodSeconds: 20
+---
+apiVersion: v1
+kind: Service
+metadata: { name: geodesia-gw }
+spec:
+  selector: { app: geodesia-gateway }
+  ports: [{ port: 8800, targetPort: 8800 }]
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: { name: geodesia-gateway }
+spec:
+  scaleTargetRef: { apiVersion: apps/v1, kind: Deployment, name: geodesia-gateway }
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource: { name: cpu, target: { type: Utilization, averageUtilization: 70 } }
+```
+
+!!! tip "Keep the GPU pool separate"
+    Run the **gateway** on cheap CPU nodes and the **model** on GPU nodes. The validator is lightweight; only the upstream needs a GPU. This lets you scale the two independently and pack GPUs efficiently.
+
+### 3 · systemd (bare metal / VM)
+
+```ini
+# /etc/systemd/system/geodesia-gateway.service
+[Unit]
+Description=Geodesia G-1 Gateway
+After=network-online.target
+
+[Service]
+Environment=GW_UPSTREAM_TYPE=vllm
+Environment=GW_UPSTREAM_URL=http://127.0.0.1:8000
+Environment=GW_UPSTREAM_MODEL=my-model
+Environment=GW_BLOCK_INPUT=1
+EnvironmentFile=-/etc/geodesia/gateway.env       # secrets here
+ExecStart=/opt/geodesia/bin/start-gateway --host 0.0.0.0 --port 8800
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+```
+
+```bash
+systemctl enable --now geodesia-gateway
+systemctl status geodesia-gateway
+```
 
 ---
 
-## After Switching Frameworks
+## Health, Readiness & Probes
 
-Two things to remember when you point Geodesia at a new framework or model:
-
-1. **Test the connection** — `POST /upstream/test` (or the **Test connection** button) confirms reachability and log-prob support.
-2. **Recalibrate the closed-book axis** — the fabrication detector is tuned to a model's vocabulary and style. Recalibrate when you switch to a *different base model* (e.g., Llama → Qwen). Different quantizations of the *same* model can share a calibration. See [Closed-Book Calibration](backends.md#closed-book-calibration).
+The gateway's `/health` is designed to be both a **liveness** and a **readiness** signal.
 
 ```bash
-# one call, streams progress until done
-curl -X POST http://localhost:8800/calibrate
+curl http://localhost:8800/health
 ```
 
-The gateway hot-reloads the new configuration and calibration on the next request — no restart required.
+```json
+{
+  "ok": true,
+  "upstream_type": "vllm",
+  "upstream": "http://localhost:8000",
+  "internal_vllm": "stopped",
+  "logprobs": true,
+  "axes": 5
+}
+```
+
+| Field | Use it for |
+|---|---|
+| `ok` | Liveness — process is up and serving |
+| `upstream` / `upstream_type` | Confirm the configured backend |
+| `logprobs` | Readiness for full validation — `false` means 4-axis mode |
+| `axes` | Capability gauge — alert on an unexpected `5 → 4` drop |
+| `internal_vllm` | Lifecycle state when `type: internal` (`running` / `stopped`) |
+
+The product backend exposes its own lightweight check at `GET /v1/glad/health` for the compliance plane.
+
+| Probe | Endpoint | Recommended timing |
+|---|---|---|
+| Readiness | `GET :8800/health` | `initialDelay 10s · period 10s` |
+| Liveness | `GET :8800/health` | `initialDelay 30s · period 20s` |
+| Compliance plane | `GET :8199/v1/glad/health` | `period 30s` |
+
+---
+
+## Observability
+
+Every response carries a `geodesia{}` block — your richest telemetry source. Ship it to your logging pipeline and build dashboards on it.
+
+| Source | What you get | How |
+|---|---|---|
+| **`geodesia{}` payload** | Per-call axis scores, brake decision, dominant axis, latency | Parse from each API response (see [Response Format](../reference/response-format.md)) |
+| **`/health`** | Liveness, upstream, log-prob mode, active axes | Poll on an interval; alert on `ok=false` or `axes` drop |
+| **Compliance dashboard** | Aggregated pass / block / flag counts, per-axis rates | `GET :8199/v1/glad/dashboard` |
+| **Audit chain** | Tamper-evident per-call ledger | `GET :8199/v1/glad/chain/entries` |
+| **Container logs** | Startup, calibration progress, upstream errors | `docker logs` / `kubectl logs` |
+
+**Alerts worth wiring:**
+
+- `/health` `ok=false` for > 1 probe → gateway down
+- `axes` drops `5 → 4` unexpectedly → upstream stopped returning log-probs
+- block rate spikes on `prompt_safety` or `jailbreak` → possible attack / misconfig
+- block rate spikes on `halluc_context` → upstream model or RAG regression
+- audit-chain verification failing (`GET /v1/glad/chain/verify`) → integrity incident
+
+---
+
+## Security Hardening
+
+```mermaid
+flowchart LR
+    NET([Public]):::pub --> TLS[TLS termination<br/><small>nginx / ingress</small>]:::edge
+    TLS --> GW[Gateway :8800<br/><small>private network only</small>]:::gw
+    GW --> LLM[Model :8000<br/><small>never exposed</small>]:::llm
+    SEC[(Secret store<br/><small>GW_API_KEY</small>)]:::sec -.-> GW
+    classDef pub fill:#c62828,color:#fff,stroke:#8e0000;
+    classDef edge fill:#455a64,color:#fff,stroke:#263238;
+    classDef gw fill:#1565c0,color:#fff,stroke:#0d47a1;
+    classDef llm fill:#5e35b1,color:#fff,stroke:#311b92;
+    classDef sec fill:#00838f,color:#fff,stroke:#005662;
+```
+
+- **Terminate TLS at the edge** (nginx / ingress); keep the gateway and the model on a private network. Never expose the model port publicly — the gateway is the only intended entry point.
+- **Inject secrets, never bake them.** `GW_API_KEY` and any license token come from a Kubernetes `Secret`, Docker secret, or vault — not from the image or git.
+- **Turn on enforcement in production:** `GW_BLOCK_INPUT=1` and `GW_BLOCK_OUTPUT=1`. In `passthrough` mode the gateway annotates but does not withhold — appropriate for monitoring, not for protection.
+- **Lock down the compliance plane** (`:8199`) to operators only; it exposes the kill switch, FRIA, and audit exports.
+- **Verify the audit chain on a schedule** (`GET /v1/glad/chain/verify`) and alert on any failure.
+
+---
+
+## Scaling & Performance
+
+| Lever | Effect | Guidance |
+|---|---|---|
+| **Gateway replicas** | Throughput, HA | Stateless — add replicas freely behind a load balancer |
+| **`GW_MAXLEN`** | Detector latency vs recall | `2048` for long-context RAG faithfulness; drop to `512` to cut latency on short prompts |
+| **Blocking vs streaming** | Time-to-first-token | Streaming with the mid-stream brake adds minimal overhead; the brake halts at token-cadence boundaries |
+| **Log-prob sidecar (Ollama)** | +1 axis, +1 re-derivation | Costs one extra generation per call — size the sidecar accordingly or accept 4-axis mode |
+| **GPU placement** | Cost | Gateway on CPU nodes, model on GPU nodes — scale independently |
+| **Shared audit DB** | Consistency | All replicas point at one database (managed Postgres-class store or shared volume) so the dashboard and chain stay coherent |
+
+!!! note "The gateway is not the bottleneck"
+    The validator is small and fast relative to the upstream LLM. Capacity planning should start from your **model server's** throughput; the gateway scales horizontally and cheaply to match it.
+
+---
+
+## Zero-Downtime Model / Framework Switch
+
+The gateway hot-reloads configuration — you can repoint it without dropping traffic.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Op as Operator
+    participant GW as Gateway
+    participant New as New upstream
+    Op->>GW: POST /upstream/test (new backend)
+    GW->>New: probe reachability + logprobs
+    New-->>GW: ok · models · logprobs
+    Op->>GW: POST /v1/glad/gateway/config (switch)
+    Op->>GW: POST /calibrate  (if base model changed)
+    GW-->>Op: streams calibration progress
+    Note over GW: next request uses the new config + calibration
+```
+
+1. **Test** the new backend first (`/upstream/test`) — confirm reachability and log-prob support.
+2. **Switch** (`POST /v1/glad/gateway/config` or roll new env vars).
+3. **Recalibrate the closed-book axis** if you changed the *base model* (Llama → Qwen, etc.). Different quantizations of the *same* model can share a calibration.
+
+```bash
+curl -X POST http://localhost:8800/calibrate   # streams until done
+```
+
+In Kubernetes, prefer a rolling update of the `Deployment` with the new env vars; the readiness probe keeps traffic on healthy pods throughout.
+
+---
+
+## Troubleshooting Runbook
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| `/health` `ok=false` | Upstream unreachable | Check `upstream_base_url`, network policy, and that the model server is up |
+| `axes: 4` when you expected 5 | Upstream returns no log-probs | Use a [log-prob sidecar](#ollama) (Ollama) or a model/tier that supports `logprobs` |
+| `connection refused` on switch | Wrong port or `/v1` appended | Use the **base** URL (no trailing `/v1`); the gateway adds the path |
+| Hosted API → 4 axes | Provider/model omits log-probs | Try another model on the provider, or accept 4-axis mode |
+| Closed-book flags correct facts | Calibration stale after model change | Re-run `POST /calibrate` for the new base model |
+| First request very slow (Docker `customer` profile) | First-boot calibration | Expected once per model; subsequent boots reuse the cached calibration |
+| `internal_vllm: stopped` with `type: internal` | Subprocess failed to start | Check `internal_vllm_cmd` and GPU availability in container logs |
+| 5xx from the gateway under load | Upstream saturated | Scale the **model server**; the gateway itself is rarely the limit |
+| Benign prompts blocked | Thresholds too aggressive | Tune per-axis thresholds — see [Detection Thresholds](../reference/thresholds.md) |
+
+---
+
+## See Also
+
+- [Upstream Backends](backends.md) — the connection test and closed-book calibration mechanics
+- [Gateway Configuration](configuration.md) — every `GatewayConfig` field
+- [Environment Variables](../configuration/env-vars.md) — the full `GW_*` reference
+- [Enforcement Modes](enforcement-modes.md) — blocking vs passthrough
+- [Detection Thresholds](../reference/thresholds.md) — per-axis tuning
+- [API Response Format](../reference/response-format.md) — the `geodesia{}` payload
