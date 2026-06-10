@@ -15,7 +15,7 @@ The Geodesia G-1 Compliance Platform provides the complete toolchain to operate,
 | [Audit Chain](audit-chain.md) | `/v1/glad/chain` | HMAC-linked append-only log; cryptographic integrity verification |
 | [Watermark](watermark.md) | `/v1/glad/watermark` | HMAC-SHA256 latent AI watermark; verification endpoint |
 | [Reports](reports.md) | `/v1/glad/report`, `/v1/glad/deployer-manual` | PDF/DOCX audit bundles and deployer transparency manuals |
-| [Models](../models/index.md) | `/v1/glad/models` | Available checkpoint catalog; model switching |
+| Models | `/v1/glad/models` | Available checkpoint catalog; model switching |
 | [Threshold Prefs](../reference/thresholds.md) | `/v1/glad/threshold-prefs` | Deployer-specific detection thresholds stored in the database |
 | Retention | `/v1/glad/retention` | Data retention policy status and management |
 | Provider Identity | `/v1/glad/provider-identity` | Machine-readable provider identity (for AI Act Article 13) |

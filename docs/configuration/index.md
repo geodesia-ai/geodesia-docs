@@ -36,7 +36,7 @@ notifications:   # Alert and notification settings
 
 ## `models` Section
 
-Defines the catalog of available model checkpoints. Each entry can be selected by name through the [Model Switcher API](../models/index.md).
+Defines the catalog of available model checkpoints. Each entry can be selected by name through the model switcher API (`GET /v1/glad/models/available`, `POST /v1/glad/models/switch`).
 
 ```yaml
 models:

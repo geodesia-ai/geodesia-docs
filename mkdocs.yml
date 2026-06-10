@@ -126,6 +126,7 @@ nav:
     - Introduction: gateway/index.md
     - Configuration: gateway/configuration.md
     - Upstream Backends: gateway/backends.md
+    - Framework Compatibility: gateway/compatibility.md
     - Chat API: gateway/chat-api.md
     - Enforcement Modes: gateway/enforcement-modes.md
     - Detection Axes: gateway/detection-axes.md
@@ -148,8 +149,6 @@ nav:
     - Supported Laws: regulatory/index.md
     - EU AI Act: regulatory/eu-ai-act.md
     - Global Laws: regulatory/global-laws.md
-  - Models:
-    - Model Catalog: models/index.md
   - Agent Flow:
     - Multi-Agent Pipeline: agent-flow/index.md
   - Configuration:
