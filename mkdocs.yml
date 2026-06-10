@@ -1,0 +1,160 @@
+site_name: Geodesia G-1 Documentation
+site_url: https://docs.geodesia.ai
+site_description: Complete developer reference for Geodesia G-1 — the AI validation gateway with hallucination detection, safety enforcement, and regulatory compliance built in.
+site_author: Geodesia S.R.L.
+copyright: "Copyright &copy; 2026 Geodesia S.R.L. All rights reserved."
+
+repo_url: https://github.com/geodesia-ai/
+repo_name: geodesia-ai
+
+theme:
+  name: material
+  logo: https://geodesia.ai/favicon.ico
+  favicon: https://geodesia.ai/favicon.ico
+  font:
+    text: Inter
+    code: JetBrains Mono
+  palette:
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: cyan
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: cyan
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+  features:
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.expand
+    - navigation.path
+    - navigation.indexes
+    - navigation.top
+    - toc.follow
+    - toc.integrate
+    - search.suggest
+    - search.highlight
+    - search.share
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+    - content.tooltips
+    - announce.dismiss
+
+plugins:
+  - search:
+      separator: '[\s\-,:!=\[\]()"`/]+|\.(?!\d)|&[lg]t;|(?!\b)(?=[A-Z][a-z])'
+  - minify:
+      minify_html: true
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - toc:
+      permalink: true
+      title: On this page
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.magiclink:
+      normalize_issue_symbols: true
+      repo_url_shorthand: true
+      user: geodesia-ai
+      repo: geodesia-docs
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.snippets:
+      auto_append:
+        - includes/mkdocs.md
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+      combine_header_slug: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/geodesia-ai
+    - icon: fontawesome/solid/globe
+      link: https://geodesia.ai
+  analytics:
+    provider: google
+    property: !ENV [GOOGLE_ANALYTICS_KEY, '']
+  version:
+    provider: mike
+    alias: true
+
+extra_css:
+  - stylesheets/extra.css
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Overview: quickstart.md
+    - Architecture: architecture.md
+  - Gateway:
+    - Introduction: gateway/index.md
+    - Configuration: gateway/configuration.md
+    - Upstream Backends: gateway/backends.md
+    - Chat API: gateway/chat-api.md
+    - Enforcement Modes: gateway/enforcement-modes.md
+    - Detection Axes: gateway/detection-axes.md
+    - Knowledge Base (RAG): rag/index.md
+    - Causal XAI: gateway/causal-xai.md
+  - Product API:
+    - Introduction: product-api/index.md
+    - Evaluate Endpoint: product-api/evaluate.md
+    - Explainability: product-api/explainability.md
+  - Compliance Platform:
+    - Overview: compliance/index.md
+    - Dashboard: compliance/dashboard.md
+    - FRIA (Impact Assessment): compliance/fria.md
+    - Human Oversight: compliance/oversight.md
+    - Kill Switch: compliance/kill-switch.md
+    - Audit Chain: compliance/audit-chain.md
+    - AI Watermark: compliance/watermark.md
+    - Reports & Manuals: compliance/reports.md
+  - Regulatory Coverage:
+    - Supported Laws: regulatory/index.md
+    - EU AI Act: regulatory/eu-ai-act.md
+    - Global Laws: regulatory/global-laws.md
+  - Models:
+    - Model Catalog: models/index.md
+  - Agent Flow:
+    - Multi-Agent Pipeline: agent-flow/index.md
+  - Configuration:
+    - config.yaml Reference: configuration/index.md
+    - Environment Variables: configuration/env-vars.md
+  - Reference:
+    - API Response Format: reference/response-format.md
+    - Detection Thresholds: reference/thresholds.md

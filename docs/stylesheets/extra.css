@@ -1,0 +1,205 @@
+/* Geodesia G-1 Documentation — Custom Styles */
+
+:root {
+  --md-primary-fg-color: #3f51b5;
+  --md-accent-fg-color:  #00bcd4;
+}
+
+/* Hero section on homepage */
+.md-typeset .hero-banner {
+  background: linear-gradient(135deg, #1a1f6e 0%, #0d1138 50%, #071025 100%);
+  border-radius: 16px;
+  padding: 3rem 2rem;
+  margin-bottom: 2rem;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.md-typeset .hero-banner::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 0%, rgba(63, 81, 181, 0.3) 0%, transparent 70%);
+}
+
+.md-typeset .hero-banner h1 {
+  font-size: 3rem;
+  font-weight: 800;
+  color: #ffffff;
+  margin: 0 0 1rem;
+  line-height: 1.1;
+}
+
+.md-typeset .hero-banner .subtitle {
+  font-size: 1.25rem;
+  color: rgba(255,255,255,0.75);
+  margin: 0 0 2rem;
+}
+
+.md-typeset .hero-banner .hero-badges {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  margin-bottom: 2rem;
+}
+
+.md-typeset .hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: rgba(255,255,255,0.1);
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 999px;
+  padding: 0.35rem 0.85rem;
+  font-size: 0.8rem;
+  color: rgba(255,255,255,0.9);
+  font-weight: 500;
+}
+
+/* Feature grid */
+.md-typeset .feature-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.5rem;
+  margin: 2rem 0;
+}
+
+.md-typeset .feature-card {
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 12px;
+  padding: 1.5rem;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.md-typeset .feature-card:hover {
+  border-color: var(--md-accent-fg-color);
+  box-shadow: 0 4px 20px rgba(0, 188, 212, 0.1);
+}
+
+.md-typeset .feature-card .feature-icon {
+  font-size: 2rem;
+  margin-bottom: 0.75rem;
+  display: block;
+}
+
+.md-typeset .feature-card h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.md-typeset .feature-card p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--md-default-fg-color--light);
+}
+
+/* Parameter tables */
+.md-typeset .param-table th:first-child {
+  width: 22%;
+}
+.md-typeset .param-table th:nth-child(2) {
+  width: 12%;
+}
+.md-typeset .param-table th:nth-child(3) {
+  width: 15%;
+}
+
+/* Axis cards */
+.md-typeset .axis-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+
+.md-typeset .axis-card {
+  border-radius: 10px;
+  padding: 1.25rem 1.5rem;
+  border-left: 4px solid;
+}
+
+.md-typeset .axis-card.context  { border-color: #4fc3f7; background: rgba(79,195,247,0.06); }
+.md-typeset .axis-card.closedbook { border-color: #a5d6a7; background: rgba(165,214,167,0.06); }
+.md-typeset .axis-card.prompt  { border-color: #f48fb1; background: rgba(244,143,177,0.06); }
+.md-typeset .axis-card.answer  { border-color: #ffcc80; background: rgba(255,204,128,0.06); }
+.md-typeset .axis-card.jailbreak { border-color: #ef9a9a; background: rgba(239,154,154,0.06); }
+
+.md-typeset .axis-card .axis-name {
+  font-weight: 700;
+  font-size: 0.9rem;
+  margin-bottom: 0.4rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.md-typeset .axis-card .axis-key {
+  font-family: var(--md-code-font-family);
+  font-size: 0.8rem;
+  opacity: 0.7;
+  margin-bottom: 0.75rem;
+}
+
+/* Status badges */
+.md-typeset .badge {
+  display: inline-block;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1.5;
+}
+.md-typeset .badge-green  { background: rgba(76,175,80,0.15);  color: #4caf50; }
+.md-typeset .badge-red    { background: rgba(244,67,54,0.15);  color: #f44336; }
+.md-typeset .badge-blue   { background: rgba(33,150,243,0.15); color: #2196f3; }
+.md-typeset .badge-orange { background: rgba(255,152,0,0.15);  color: #ff9800; }
+.md-typeset .badge-grey   { background: rgba(158,158,158,0.15);color: #9e9e9e; }
+
+/* Law tags */
+.md-typeset .law-tag {
+  display: inline-block;
+  background: rgba(63,81,181,0.15);
+  color: #7986cb;
+  border: 1px solid rgba(63,81,181,0.3);
+  border-radius: 6px;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.75rem;
+  font-family: var(--md-code-font-family);
+  font-weight: 600;
+  margin: 0.15rem;
+}
+
+/* Endpoint cards */
+.md-typeset .endpoint {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  background: var(--md-code-bg-color);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  margin: 0.75rem 0;
+  font-family: var(--md-code-font-family);
+}
+
+.md-typeset .method {
+  font-weight: 700;
+  font-size: 0.8rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 5px;
+  min-width: 50px;
+  text-align: center;
+}
+.md-typeset .method-get    { background: rgba(76,175,80,0.2);  color: #66bb6a; }
+.md-typeset .method-post   { background: rgba(33,150,243,0.2); color: #42a5f5; }
+.md-typeset .method-put    { background: rgba(255,152,0,0.2);  color: #ffa726; }
+.md-typeset .method-delete { background: rgba(244,67,54,0.2);  color: #ef5350; }
+
+.md-typeset .endpoint .path {
+  font-size: 0.95rem;
+  flex: 1;
+}
+
+/* Hide MkDocs edit button (no public repo) */
+.md-content__button { display: none; }
