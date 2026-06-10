@@ -8,20 +8,27 @@ When a detection score exceeds the configured oversight threshold, the call is q
 
 ## How Oversight Works
 
+```mermaid
+flowchart TD
+    C([Inference call]):::io --> S[Detection scores computed]:::proc
+    S --> Q{Score &gt; oversight<br/>threshold?}
+    Q -->|no| N[No review required]:::pass
+    Q -->|yes| QU[(Oversight queue<br/>status: pending_review)]:::queue
+    QU --> RV[Human reviewer opens<br/>/oversight/pending]:::human
+    RV --> DE[POST /oversight/decide]:::human
+    DE --> O1[confirm]:::pass
+    DE --> O2[override]:::block
+    DE --> O3[escalate]:::esc
+
+    classDef io fill:#3f51b5,color:#fff,stroke:#283593;
+    classDef proc fill:#1565c0,color:#fff,stroke:#0d47a1;
+    classDef queue fill:#00838f,color:#fff,stroke:#005662;
+    classDef human fill:#5e35b1,color:#fff,stroke:#311b92;
+    classDef pass fill:#2e7d32,color:#fff,stroke:#1b5e20;
+    classDef block fill:#c62828,color:#fff,stroke:#8e0000;
+    classDef esc fill:#ef6c00,color:#fff,stroke:#e65100;
 ```
-Inference call
-    │
-    ├── Detection scores computed
-    │
-    ├── Score > oversight threshold?
-    │   ├── YES → Write call to oversight queue (status: pending_review)
-    │   └── NO  → No review required
-    │
-    └── Reviewer sees call in /oversight/pending
-            │
-            ├── Review the prompt, response, and scores
-            └── POST /oversight/decide → records decision
-```
+<p class="diagram-caption">Calls that exceed the oversight threshold are queued for a human, who confirms, overrides, or escalates — every decision is recorded in the audit chain.</p>
 
 The oversight threshold is independent from the blocking threshold. You can configure the system to:
 

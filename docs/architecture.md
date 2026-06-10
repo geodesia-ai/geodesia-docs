@@ -3,22 +3,34 @@
 Geodesia G-1 is composed of two independent services that work together: the **Gateway** and the **Product Backend**. Both expose REST APIs; the web UI communicates with both.
 
 ```mermaid
-graph TB
-    UI[Web UI\nVue.js SPA]
-    GW[Geodesia Gateway\n:8800\nOpenAI-compatible proxy]
-    PROD[Product Backend\n:8199\nCompliance & Evaluate API]
-    LLM[Upstream LLM\nvLLM · Ollama · OpenAI · SGLang · TRT-LLM]
-    DB[(SQLite\nAudit DB)]
-    CKPT[GLAD-BERT Checkpoint\n.pt file]
+flowchart TB
+    UI[Web UI<br/><small>single-page app</small>]:::ui
+
+    subgraph CORE [" Geodesia G-1 "]
+        GW[Geodesia Gateway<br/><small>:8800 · OpenAI-compatible proxy</small>]:::svc
+        PROD[Product Backend<br/><small>:8199 · Compliance &amp; Evaluate API</small>]:::svc
+        ENGINE[[Geodesia Detection Engine<br/><small>model-agnostic validator</small>]]:::engine
+    end
+
+    LLM[Upstream LLM<br/><small>vLLM · Ollama · OpenAI · SGLang · TRT-LLM</small>]:::llm
+    DB[(Audit Database<br/><small>calls · FRIA · oversight</small>)]:::db
 
     UI -->|/gw/* proxy| GW
     UI -->|/v1/* proxy| PROD
-    GW -->|forward requests| LLM
-    GW -->|detection| CKPT
+    GW -->|forward request| LLM
+    GW -->|score| ENGINE
+    PROD -->|evaluate| ENGINE
     GW -->|log calls| DB
-    PROD -->|evaluate| CKPT
     PROD -->|audit / compliance| DB
+
+    classDef ui fill:#3f51b5,color:#fff,stroke:#283593;
+    classDef svc fill:#1565c0,color:#fff,stroke:#0d47a1;
+    classDef engine fill:#00838f,color:#fff,stroke:#005662;
+    classDef llm fill:#5e35b1,color:#fff,stroke:#311b92;
+    classDef db fill:#37474f,color:#fff,stroke:#263238;
+    style CORE fill:#3f51b50d,stroke:#3f51b5,stroke-width:2px;
 ```
+<p class="diagram-caption">Two cooperating services share one detection engine and one audit database. The web UI talks to both through a reverse proxy.</p>
 
 ---
 
@@ -72,9 +84,9 @@ The Product Backend can run without a loaded language model. Compliance pages, d
 
 ---
 
-## The Detection Model (GLAD-BERT Companion)
+## The Detection Engine
 
-Both services share a single **GLAD-BERT** checkpoint — a compact (~307 M parameter) model that runs entirely separately from the upstream LLM. It reads the prompt, context, and generated answer as plain text and produces five independent detection scores.
+Both services share a single **Geodesia detection engine** — a compact, model-agnostic validator that runs entirely separately from the upstream LLM. It reads the prompt, context, and generated answer as plain text and produces five independent detection scores.
 
 Because it operates on text alone (not on hidden states or logits from the LLM), it is **model-agnostic**: the same checkpoint works against any upstream, from a locally hosted 7B model to the OpenAI API.
 
@@ -84,33 +96,40 @@ The one exception is the **closed-book fabrication axis**, which additionally us
 
 ## Data Flow: A Single Chat Request
 
+```mermaid
+sequenceDiagram
+    autonumber
+    participant App as Your Application
+    participant GW as Geodesia Gateway
+    participant ENG as Detection Engine
+    participant RAG as Knowledge Base
+    participant LLM as Upstream LLM
+    participant DB as Audit DB
+
+    App->>GW: POST /v1/chat/completions
+    GW->>ENG: score prompt (safety · jailbreak)
+    alt prompt flagged & blocking mode
+        GW-->>App: block notice (no LLM call)
+    else prompt safe
+        opt RAG collection provided
+            GW->>RAG: retrieve top-K chunks
+            RAG-->>GW: grounding context
+        end
+        GW->>LLM: forward (enriched) request
+        LLM-->>GW: response (stream or full)
+        GW->>ENG: score answer (faithfulness · fabrication · safety)
+        opt RAG active
+            GW->>RAG: verify each claim cites a chunk
+        end
+        alt answer flagged & blocking mode
+            GW-->>App: block notice
+        else answer passed
+            GW-->>App: response + geodesia{} payload
+        end
+    end
+    GW->>DB: insert one audited row
 ```
-1. User → Gateway: POST /v1/chat/completions
-   {messages, model, stream, context?, rag?, mode?, threshold_overrides?}
-
-2. Gateway → GLAD-BERT: score prompt for prompt_safety and jailbreak
-   → If flagged AND blocking mode: return block notice immediately (no LLM call)
-
-3. Gateway → RAG (if rag.collection_id provided):
-   → Retrieve top-K document chunks for the user's question
-   → Append retrieved context to the request
-
-4. Gateway → Upstream LLM: forward the (optionally enriched) request
-   → If streaming: monitor each cadence_tokens chunk for early stopping
-
-5. Upstream LLM → Gateway: stream / non-stream response
-
-6. Gateway → GLAD-BERT: score answer for
-   halluc_context, halluc_closedbook, answer_safety
-   → If any axis flagged AND blocking mode: replace answer with block notice
-
-7. Gateway → RAG claim verification (if RAG active):
-   → Verify each claim in the answer against retrieved chunks
-   → If all claims verified: suppress halluc_context flag regardless of score
-
-8. Gateway → Audit DB: insert one row
-9. Gateway → Caller: return OpenAI-compatible response + geodesia{} payload
-```
+<p class="diagram-caption">The full lifecycle of one chat request: input screening, optional retrieval, generation, output validation, and audit logging.</p>
 
 ---
 
@@ -118,10 +137,10 @@ The one exception is the **closed-book fabrication axis**, which additionally us
 
 | Store | Purpose | Location |
 |---|---|---|
-| **SQLite database** | Calls, sessions, human reviews, FRIA records, watermarks, kill-switch state | `./var/glad.sqlite3` (configurable via `database_path` in `config.yaml`) |
-| **Gateway config JSON** | Upstream backend selection, thresholds, model — persisted across restarts | `runs/gateway_config.json` (configurable via `GW_CONFIG_FILE`) |
-| **GLAD-BERT checkpoint** | Detection model weights | `.pt` file, path via `GW_V5_CKPT` |
-| **RAG store** | Document embeddings (LanceDB) | `runs/rag_store/` (configurable via `GW_RAG_DIR`) |
+| **SQLite database** | Calls, sessions, human reviews, FRIA records, watermarks, kill-switch state | configurable via `database_path` in `config.yaml` |
+| **Gateway config** | Upstream backend selection, thresholds, model — persisted across restarts | JSON file, path via `GW_CONFIG_FILE` |
+| **Detection engine** | Validator weights | bundled with the deployment |
+| **RAG store** | Document embeddings (vector index) | configurable via the knowledge-base directory setting |
 
 ---
 

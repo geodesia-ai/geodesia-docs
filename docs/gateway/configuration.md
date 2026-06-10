@@ -80,8 +80,8 @@ The gateway stores all runtime configuration in a single `GatewayConfig` object.
 
 | Field | Env var | Default | Description |
 |---|---|---|---|
-| `v5_ckpt` | `GW_V5_CKPT` | `runs/glad_bert/glad_bert_v5_ep2.pt` | Path to the GLAD-BERT detection model checkpoint (`.pt` file). The active checkpoint determines detection quality. |
-| `v5_model_id` | `GW_V5_MODEL` | `jhu-clsp/mmBERT-base` | Hugging Face model ID of the backbone encoder that the checkpoint was trained on. Normally not changed unless you have a custom checkpoint. |
+| `v5_ckpt` | `GW_V5_CKPT` | bundled | Path to the Geodesia detection engine checkpoint. The active checkpoint determines detection quality; the bundled default is used unless you are issued a custom one. |
+| `v5_model_id` | `GW_V5_MODEL` | bundled | Identifier of the backbone encoder the checkpoint was built for. Set automatically from the checkpoint; normally never changed. |
 | `v5_maxlen` | `GW_MAXLEN` | `2048` | Maximum token length for the detection model. The faithfulness axis (`halluc_context`) benefits from the full 2048 when long documents are in the context. Reduce to `512` to decrease latency on short prompts at the cost of recall on long contexts. |
 
 ### Numeric solver (optional advanced feature)

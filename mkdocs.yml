@@ -9,8 +9,8 @@ repo_name: geodesia-ai
 
 theme:
   name: material
-  logo: https://geodesia.ai/favicon.ico
-  favicon: https://geodesia.ai/favicon.ico
+  logo: assets/logo.svg
+  favicon: assets/favicon.svg
   font:
     text: Inter
     code: JetBrains Mono

@@ -54,7 +54,7 @@ python3.11 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
 # 3. Start the gateway (Ollama example)
-GW_V5_CKPT=runs/glad_bert/glad_bert_v8_unified.pt \
+GW_V5_CKPT="$GEODESIA_CKPT" \
 GW_BLOCK_INPUT=1 \
   python -m glad_minimal.gateway.geodesia_gateway \
     --host 0.0.0.0 --port 8800 \
@@ -63,7 +63,7 @@ GW_BLOCK_INPUT=1 \
     --upstream-model llama3.2
 
 # vLLM example
-GW_V5_CKPT=runs/glad_bert/glad_bert_v8_unified.pt \
+GW_V5_CKPT="$GEODESIA_CKPT" \
 GW_BLOCK_INPUT=1 \
   python -m glad_minimal.gateway.geodesia_gateway \
     --host 0.0.0.0 --port 8800 \
