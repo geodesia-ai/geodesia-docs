@@ -294,12 +294,17 @@ The forecast is deterministic and numpy-only. `run_rate` (the default) extrapola
 
 ## Data-plane routing header
 
-The control plane defines Applications; the data plane selects one **per request**. A chat or RAG request picks its Application via either:
+The control plane defines Applications; the data plane selects one **per request** (`_resolve_app`). A chat or RAG request picks its Application via either an **explicit** identifier or an **Application API key**, in this order:
 
-- the **`X-Geodesia-App: <app_id>`** request header, or
-- the body field **`application_id`** (alias **`app_id`**).
+1. **Explicit id / header** — the body field **`application_id`** (alias **`app_id`**), or the **`X-Geodesia-App: <app_id>`** request header. An explicit id **always wins**, including an explicit `default`.
+2. **Application API key** — an `invoke` (or `admin`) key sent as **`Authorization: Bearer g1k_live_…`**, used **only as a fallback** when no explicit id/header is present. The gateway verifies the key and routes the request to the Application that key belongs to.
 
 The gateway resolves that identifier to the Application's config — its upstream binding, `block_input`, and per-axis thresholds are merged into the request. An **unknown** identifier, or the literal `default`, falls back to the global / `default` configuration, so existing single-upstream integrations keep working unchanged.
+
+!!! note "Only `g1k_`-prefixed bearers are looked up"
+    When resolving from a Bearer token, the gateway considers **only** tokens that begin with `g1k_`. Any other Bearer — including the gateway's own `GW_API_TOKEN` — is ignored for app resolution, so it does not accidentally route a request. A **revoked, expired, or unknown** `g1k_` key does not error: it simply falls through to the `default` Application.
+
+**Route via the header (or `application_id` in the body):**
 
 ```bash
 curl -s http://localhost:8080/v1/chat/completions \
@@ -308,7 +313,16 @@ curl -s http://localhost:8080/v1/chat/completions \
   -d '{"model":"llama3.1:8b","stream":false,"messages":[{"role":"user","content":"Is this NDA mutual?"}]}'
 ```
 
-An `invoke` API key passed as `Authorization: Bearer` resolves the Application implicitly (the key belongs to exactly one Application), so you do not need to also send the header. For the full chat request/response contract, see the [Chat API](../gateway/chat-api.md).
+**Route via an Application API key (no header needed):**
+
+```bash
+curl -s http://localhost:8080/v1/chat/completions \
+  -H "Authorization: Bearer g1k_live_8sQ3...x8Qv" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"llama3.1:8b","stream":false,"messages":[{"role":"user","content":"Is this NDA mutual?"}]}'
+```
+
+The key belongs to exactly one Application, so it resolves the Application implicitly — a raw API client that authenticates with just `Authorization: Bearer g1k_live_…` is still routed to, scoped to, and billed against its own Application. If you send **both** an explicit id/header **and** a `g1k_` key, the explicit id/header wins. For the full chat request/response contract, see the [Chat API](../gateway/chat-api.md).
 
 ---
 

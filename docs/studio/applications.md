@@ -149,7 +149,7 @@ The `human_oversight` object controls when a call is auto-escalated for human re
 
 ## API keys
 
-Each Application has its own API keys. A key is the Application's runtime identity: it routes the request to the Application and scopes its cost, quota, and compliance.
+Each Application has its own API keys. A key is the Application's **runtime identity on the data plane**: an `invoke` key sent as `Authorization: Bearer g1k_live_…` on a chat or RAG request now **routes that request to its Application and scopes** the request's policy, cost, quota, and compliance to it — even when no `X-Geodesia-App` header or `application_id` is supplied. (Previously an `invoke` key was control-plane-only — a read-only credential; it is now also the data-plane routing identity.) An explicit `application_id` / `X-Geodesia-App` still wins over the key. See [Data-plane routing](control-plane-api.md#data-plane-routing-header).
 
 | Property | Value |
 |---|---|
@@ -184,13 +184,15 @@ Open **Applications** (`ApplicationsView`) and click **New Application** to open
 | Bedrock | Curated AWS Bedrock model catalog |
 | Vertex | Curated Google Vertex model catalog |
 
+Discovery is served by the control-plane endpoint **`POST /v1/glad/apps/upstream/models`**, which returns the model list and its `source` (or an `error` you can act on).
+
 In the same modal you set the **cost** for the Application — `€/Mtok` for input and output tokens — so the cost center is configured from the start.
 
 Once created, the Application opens to its detail view, organised into tabs:
 
 | Tab | What you configure |
 |---|---|
-| **Overview / Binding** | Upstream type, base URL, model, region, `logprobs`, and credential reference. |
+| **Model** | Upstream type, base URL, model, region, `logprobs`, and credential reference — with **live model discovery**, a **Test connection** probe, and **Calibrate closed-book** (see below). |
 | **Policy** | The six-axis threshold sliders plus per-axis enforcement (`block` / `annotate` / `off`), `block_input`, CI injection, and the streaming brake. |
 | **Cost & Budget** | Per-Mtok rates, monthly budget, alert percentages, and the budget-exceeded action. See [Cost & Budget](cost.md). |
 | **Governance** | Applicable laws, risk classification, retention, FRIA link, and human-oversight thresholds. |
@@ -203,6 +205,35 @@ Saving any tab validates the full `AppConfig`, bumps `config_version`, and takes
 The detail view opens on a **read-only Overview tab** — a safe summary of the Application's binding, policy, cost, and governance that you can't change by accident. To make changes, click **Modifica**, which switches to the editable settings tabs: **Model**, **Policy**, **Cost & Budget**, **Governance**, and **API Keys**.
 
 There is **no "Save" button**. Every change in those tabs is **saved automatically**, debounced shortly after you stop editing — adjust a threshold slider, change the budget, edit `alert_recipients`, and it persists on its own. An inline status indicator shows where each edit stands: **"Saving…"** while the debounced write is in flight, then **"Saved ✓"** once it lands (and the underlying `config_version` bumps). Because saving is automatic, dependent UI — such as the Cost & Budget projection chart — redraws immediately against the new values.
+
+### The Model tab: discover, test, calibrate
+
+The editable **Model** tab (under **Modifica**) does more than hold the binding fields — it lets you bind to a real upstream model with confidence:
+
+- **Live model discovery.** The **Model** field is an input backed by a `datalist`, so you can **pick a discovered model or type your own**. Models are discovered from the chosen upstream — Ollama (`/api/tags`), vLLM / OpenAI-compatible (`/v1/models`), or the curated Bedrock / Vertex catalogs — via `POST /v1/glad/apps/upstream/models`. Discovery runs **automatically and debounced** whenever you change the upstream type or the base URL (so a URL typed character-by-character only fires one query when you pause), and a **↻ discover** button re-runs it on demand. An inline hint shows how many models were found, the source, or an actionable error if the upstream couldn't be listed.
+
+- **Test connection.** A **Test connection** button probes the bound upstream for **reachability** (with a latency reading) and runs a **logprob probe** that reports whether the **closed-book** axis is *available* or *unavailable* for that model — since `halluc_closedbook` depends on per-token log-probabilities. A reachable upstream also refreshes the discovered-model list.
+
+- **Calibrate closed-book.** A **Calibrate closed-book** button re-fits the closed-book detector for *this specific generator model* (quick, logprob-based mode), streaming its progress log into the panel. Use it after binding to a new model so the closed-book threshold reflects that model's logprob behaviour.
+
+!!! note "These controls are now per-Application"
+    Test connection, model discovery, and closed-book calibration used to live in the **global** Settings → Gateway card. In Studio they are **per-Application**, on the Model tab, so each Application is discovered, tested, and calibrated against its own bound upstream.
+
+### Where each setting lives: Applications vs. Settings
+
+Studio splits configuration cleanly between the **per-Application** detail view and the **platform-wide** Settings page:
+
+| Configured **per-Application** (Applications → **Modifica**, auto-saved) | Configured **platform-wide** (the **Settings** page) |
+|---|---|
+| Model binding (upstream, base URL, model, region, `logprobs`, credential ref) | Plan & license |
+| Detection policy & per-axis thresholds, enforcement, `block_input`, CI injection, streaming brake | The platform **Gateway card** — the exposed API bind (host / port) and the numeric solver |
+| Closed-book calibration | Appearance (theme) |
+| RAG knowledge base | Provider identity |
+| Cost rates, budget & governance | System (server health / version) |
+| | Demo reset |
+
+!!! info "Settings is platform-only"
+    Anything specific to one Application — model, detection policy & thresholds, calibration, RAG, cost & governance — is set on that Application (and saved automatically). The global **Settings** page now keeps only **platform-wide** settings: plan & license, the platform gateway card (exposed API bind + numeric solver), appearance, provider identity, system, and demo reset.
 
 ---
 

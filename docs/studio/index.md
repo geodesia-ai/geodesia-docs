@@ -133,10 +133,10 @@ The Studio topbar carries an **App switcher** that selects the **active Applicat
 
 On the **data plane**, the Application for a chat request is resolved from, in order:
 
-1. an `application_id` (or `app_id`) field in the request body, or
-2. the `X-Geodesia-App` request header.
+1. an **explicit** `application_id` (or `app_id`) field in the request body, or the `X-Geodesia-App` request header — this **always wins**;
+2. failing that, an **Application API key** sent as `Authorization: Bearer g1k_live_…` — the gateway looks up the key and routes the request to the Application it belongs to.
 
-If neither is supplied, the request resolves to the `default` Application — which is why an existing single-upstream deployment keeps working unchanged.
+Only `g1k_`-prefixed bearers are looked up (other bearers, including `GW_API_TOKEN`, are ignored); a revoked, expired, or unknown key, and an unknown `application_id`, all fall back to the `default` Application — which is why an existing single-upstream deployment keeps working unchanged.
 
 ---
 
