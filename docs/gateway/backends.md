@@ -106,6 +106,20 @@ curl -X POST http://localhost:8800/v1/glad/gateway/config \
 !!! warning "Log-probability access"
     Log-probabilities are available from the OpenAI API when you set `logprobs: true` in the request. The gateway does this automatically. Some models or pricing tiers may not support them — the gateway detects this on the first request and falls back to 4-axis mode.
 
+## Cloud upstreams (Bedrock / Vertex / Azure)
+
+Beyond the local OpenAI-compatible servers above, an Application can bind directly to a managed cloud LLM:
+
+| Upstream type | Provider | Auth |
+|---|---|---|
+| `bedrock` | AWS Bedrock | IAM role / credentials |
+| `vertex` | Google Vertex AI | Application Default Credentials (ADC) |
+| `azure-openai` | Azure OpenAI | API key + endpoint |
+
+The gateway ships native adapters for each, so no OpenAI-compatible shim is required. One caveat: Bedrock and Vertex do not return per-token log-probabilities, so the `halluc_closedbook` axis is automatically disabled for Applications bound to those upstreams (the remaining axes run normally).
+
+See **[Cloud Upstreams](../studio/cloud-upstreams.md)** for the full per-provider configuration — adapter setup, IAM/ADC authentication, region binding, and the logprobs caveat in detail.
+
 ### Ollama
 
 Ollama is a popular tool for running open-source models locally. It does not natively expose per-token log-probabilities in its chat API. The gateway therefore operates in 4-axis mode by default.

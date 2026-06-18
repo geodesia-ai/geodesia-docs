@@ -122,6 +122,13 @@ nav:
   - Getting Started:
     - Overview: quickstart.md
     - Architecture: architecture.md
+  - G-1 Studio:
+    - Overview: studio/index.md
+    - Managing Applications: studio/applications.md
+    - Cost & FinOps: studio/cost.md
+    - Control Plane API: studio/control-plane-api.md
+    - Licensing & Entitlements: studio/licensing.md
+    - Cloud Upstreams & Scale-Out: studio/cloud-upstreams.md
   - Gateway:
     - Introduction: gateway/index.md
     - Configuration: gateway/configuration.md
