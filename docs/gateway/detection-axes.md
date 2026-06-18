@@ -115,7 +115,7 @@ flowchart LR
 
 **When it applies:** Fact-seeking closed-book questions (no context provided). The axis computes a set of signals from the per-token log-probabilities of the generated answer — including vocabulary surprisal, entropy variance, and consistency across similar queries.
 
-**Requirements:** This axis requires per-token log-probabilities from the upstream LLM. If the upstream does not provide them (e.g., standard Ollama), the axis is automatically disabled and shown as `available: false` in the response.
+**Requirements:** This axis requires per-token log-probabilities from the upstream LLM. Most OpenAI-compatible servers — and **Ollama ≥ 0.12** — provide them, so the axis is on by default. If the upstream does not (e.g., Ollama < 0.12, or cloud providers such as Bedrock / Vertex), the axis is automatically disabled and shown as `available: false` in the response.
 
 **Example triggering scenario:** A user asks *"Who wrote The Great Gatsby?"* The answer *"F. Scott Fitzgerald"* is correct and low-surprisal → low score. But if asked *"What did Fitzgerald say in his 1923 Paris Review interview?"* and the model invents a detailed quote, the signal patterns suggest confabulation → high score.
 

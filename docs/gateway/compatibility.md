@@ -72,7 +72,7 @@ No setting toggles this — the gateway probes it on the first request and `/hea
 | [SGLang](#sglang) | `sglang` | OpenAI | ✅ | 5 | High-throughput production |
 | [TensorRT-LLM](#tensorrt-llm) | `trtllm` | OpenAI | ✅ | 5 | Maximum NVIDIA performance |
 | [llama.cpp](#llamacpp) | `openai` | OpenAI | ✅ | 5 | CPU / Apple Silicon / GGUF |
-| [Ollama](#ollama) | `ollama` | Ollama | ⚠️ sidecar | 4 (5 w/ sidecar) | Local dev, easiest setup |
+| [Ollama](#ollama) | `ollama` | Ollama | ✅ native (≥ 0.12) | 5 (older: 4, or sidecar) | Local dev, easiest setup |
 | [OpenAI API](#openai-api-and-hosted-services) | `openai` | OpenAI | ✅ | 5 | Managed frontier models |
 | [Azure · Together · Groq · Mistral · Fireworks · OpenRouter](#openai-api-and-hosted-services) | `openai` | OpenAI | ✅* | 5* | Hosted open models |
 | [TGI (Hugging Face)](#text-generation-inference-tgi) | `openai` | OpenAI | ✅ | 5 | Hugging Face stack |
@@ -124,7 +124,7 @@ flowchart TD
     A1 -->|TensorRT-LLM| TT[type: trtllm]:::t
     A1 -->|llama.cpp · TGI ·<br/>LM Studio · LocalAI| TO[type: openai]:::t
 
-    B --> TB[type: ollama<br/>+ optional logprob sidecar]:::t
+    B --> TB[type: ollama<br/>native logprobs ≥ 0.12]:::t
     C --> TC[type: openai<br/>+ api_key]:::t
     D --> TD[type: internal]:::t
 
@@ -254,7 +254,7 @@ curl -X POST http://localhost:8800/v1/glad/gateway/config \
 
 ### Ollama
 
-The easiest local runtime. Its chat API does **not** expose log-probabilities → **4-axis mode** by default (everything except closed-book fabrication).
+The easiest local runtime. **Ollama ≥ 0.12 exposes per-token log-probabilities** on its OpenAI-compatible `/v1/chat/completions` endpoint, so Geodesia runs in **full 5-axis mode automatically** — the gateway probes that endpoint on the first request and turns the closed-book fabrication axis on with no extra configuration.
 
 ```bash
 curl -X POST http://localhost:8800/v1/glad/gateway/config \
@@ -262,13 +262,16 @@ curl -X POST http://localhost:8800/v1/glad/gateway/config \
        "upstream_model":"llama3.2"}'
 ```
 
-#### Recover the 5th axis with a log-prob sidecar
+!!! tip "Check the probe result"
+    `GET /health` reports `axes: 5` once the log-prob probe succeeds. If you see `axes: 4` on a recent Ollama, make sure you're on **0.12 or newer** (older builds did not expose log-probs).
 
-Run a **second server for the same model that does expose log-probabilities** — typically `llama.cpp` on the same GGUF. The gateway re-derives the answer through the sidecar to recover the signal.
+#### Older Ollama — recover the closed-book axis with a log-prob sidecar
+
+On **Ollama < 0.12** (no native log-probs) you stay in 4-axis mode. You can recover the closed-book axis by running a **second server for the same model that does expose log-probabilities** — typically `llama.cpp` on the same GGUF. The gateway re-derives the answer through the sidecar to recover the signal (only used when native log-probs are absent).
 
 ```mermaid
 flowchart LR
-    GW[Geodesia Gateway]:::gw -->|generate| OLL[Ollama<br/><small>:11434 · no logprobs</small>]:::o
+    GW[Geodesia Gateway]:::gw -->|generate| OLL[Ollama < 0.12<br/><small>:11434 · no logprobs</small>]:::o
     GW -.->|re-derive for<br/>closed-book signal| SC[llama.cpp sidecar<br/><small>:8080 · same GGUF · logprobs</small>]:::s
     classDef gw fill:#1565c0,color:#fff,stroke:#0d47a1;
     classDef o fill:#5e35b1,color:#fff,stroke:#311b92;
@@ -593,7 +596,7 @@ flowchart LR
 | **Gateway replicas** | Throughput, HA | Stateless — add replicas freely behind a load balancer |
 | **`GW_MAXLEN`** | Detector latency vs recall | `2048` for long-context RAG faithfulness; drop to `512` to cut latency on short prompts |
 | **Blocking vs streaming** | Time-to-first-token | Streaming with the mid-stream brake adds minimal overhead; the brake halts at token-cadence boundaries |
-| **Log-prob sidecar (Ollama)** | +1 axis, +1 re-derivation | Costs one extra generation per call — size the sidecar accordingly or accept 4-axis mode |
+| **Log-prob sidecar (older Ollama < 0.12)** | +1 axis, +1 re-derivation | Only needed pre-0.12 (≥ 0.12 has native log-probs). Costs one extra generation per call — size the sidecar accordingly or accept 4-axis mode |
 | **GPU placement** | Cost | Gateway on CPU nodes, model on GPU nodes — scale independently |
 | **Shared audit DB** | Consistency | All replicas point at one database (managed Postgres-class store or shared volume) so the dashboard and chain stay coherent |
 
@@ -638,7 +641,7 @@ In Kubernetes, prefer a rolling update of the `Deployment` with the new env vars
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | `/health` `ok=false` | Upstream unreachable | Check `upstream_base_url`, network policy, and that the model server is up |
-| `axes: 4` when you expected 5 | Upstream returns no log-probs | Use a [log-prob sidecar](#ollama) (Ollama) or a model/tier that supports `logprobs` |
+| `axes: 4` when you expected 5 | Upstream returns no log-probs | Upgrade to **Ollama ≥ 0.12** (native log-probs), use a model/tier that supports `logprobs`, or add a [log-prob sidecar](#ollama) for older Ollama |
 | `connection refused` on switch | Wrong port or `/v1` appended | Use the **base** URL (no trailing `/v1`); the gateway adds the path |
 | Hosted API → 4 axes | Provider/model omits log-probs | Try another model on the provider, or accept 4-axis mode |
 | Closed-book flags correct facts | Calibration stale after model change | Re-run `POST /calibrate` for the new base model |
