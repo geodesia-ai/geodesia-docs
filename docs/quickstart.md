@@ -74,6 +74,89 @@ GW_BLOCK_INPUT=1 \
 
 ---
 
+## Option C — Prebuilt images (NVIDIA · amd64)
+
+The fastest path on a connected GPU host is to pull the **prebuilt, signed** Geodesia G-1 images from the private registry — no source code, no build step. Two images make up the platform:
+
+| Image | Role | Default tag |
+|---|---|---|
+| `g1-proxy` | The gateway (GLAD-Hummingbird detector + optional GLAD-Tapestry deep scan). **Needs the GPU.** | `cuda` |
+| `g1-studio` | The G-1 Studio web UI / control plane. CPU-only. | `wolfi` |
+
+### 1. Host prerequisites (amd64 + NVIDIA)
+
+The `g1-proxy` image is built for **linux/amd64** and needs the GPU passed through via the **NVIDIA Container Toolkit**:
+
+```bash
+# Recent NVIDIA driver already installed; then install the container toolkit:
+curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey \
+  | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+curl -fsSL https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list \
+  | sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' \
+  | sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+sudo apt-get update && sudo apt-get install -y nvidia-container-toolkit
+sudo nvidia-ctk runtime configure --runtime=docker && sudo systemctl restart docker
+
+# Verify the GPU is visible inside containers:
+docker run --rm --gpus all nvidia/cuda:12.4.0-base-ubuntu22.04 nvidia-smi
+```
+
+### 2. Authenticate to the registry
+
+The vendor issues a **read-only, revocable** pull key per customer (never an admin account). Log in once:
+
+```bash
+export REG=ghcr.io/geodesia-ai                       # or the registry path your vendor gave you
+
+# GitHub Container Registry (read:packages PAT):
+echo "$GH_PAT" | docker login ghcr.io -u "$GH_USER" --password-stdin
+
+# …or a Google Artifact Registry JSON pull-key:
+docker login -u _json_key --password-stdin "https://${REG%%/*}" < pull-key.json
+```
+
+### 3. Pull and start
+
+Use the customer compose file, which already wires the two services and passes the GPU through to `g1-proxy`:
+
+```bash
+REG=$REG \
+GEODESIA_UPSTREAM_MODEL=qwen2.5:0.5b \
+GEODESIA_UPSTREAM_URL=http://host.docker.internal:11434 \
+  docker compose -f docker-compose.customer-registry.yml up -d
+```
+
+This pulls `${REG}/g1-proxy:cuda` and `${REG}/g1-studio:wolfi`, then starts:
+
+- **G-1 Studio UI** → `http://localhost:8080`
+- **Gateway (OpenAI-compatible)** → `http://localhost:8800/v1`
+
+!!! tip "Verify signatures first (recommended)"
+    The images are **cosign-signed**. With `cosign` installed and the vendor's public key, verify authenticity before running — the bundled `install-registry.sh` does this for you:
+    ```bash
+    REG=$REG PULL_KEY=pull-key.json COSIGN_PUB=cosign.pub \
+    GEODESIA_UPSTREAM_MODEL=qwen2.5:0.5b ./install-registry.sh
+    ```
+
+!!! note "Pulling images individually"
+    If you prefer not to use Compose, pull the images directly — the `:cuda` proxy tag is the amd64 + NVIDIA build:
+    ```bash
+    docker pull $REG/g1-proxy:cuda
+    docker pull $REG/g1-studio:wolfi
+    ```
+
+### 4. Enable Deep Scan on the proxy (optional)
+
+To turn on the [GLAD-Tapestry](gateway/deep-scan.md) deep-scan tier, add its env vars to the `g1-proxy` service (it needs ~5 GB of extra VRAM in 4-bit):
+
+```bash
+GW_DEEP_SCAN=on \
+GW_DEEP_SCAN_MODEL=ibm-granite/granite-guardian-4.1-8b \
+  docker compose -f docker-compose.customer-registry.yml up -d
+```
+
+---
+
 ## Sending Your First Request
 
 The gateway exposes an OpenAI-compatible `/v1/chat/completions` endpoint. Any client that works with OpenAI will work here unchanged — just change the `base_url`:

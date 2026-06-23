@@ -14,7 +14,7 @@
 
 **Geodesia G-1** is a **validating gateway** that sits in front of any large language model (LLM) and provides a comprehensive quality and compliance layer. It is fully **OpenAI-compatible** — your existing application sends requests to Geodesia G-1 exactly as it would to OpenAI, and the gateway forwards them to your chosen underlying model (vLLM, Ollama, SGLang, OpenAI, TensorRT-LLM, and others) after enriching both the input and output with safety and reliability signals.
 
-The platform is now **Application-oriented** — with **G-1 Studio**, one shared LLM and GLAD-BERT detector can serve many isolated Applications, each with its own policy, calibration, RAG collection, compliance posture, and cost center.
+The platform is now **Application-oriented** — with **G-1 Studio**, one shared LLM and GLAD-Hummingbird detector can serve many isolated Applications, each with its own policy, calibration, RAG collection, compliance posture, and cost center.
 
 You do not need to retrain your model. You do not need to change your application code. You plug Geodesia G-1 in, and your LLM immediately gains:
 
@@ -34,7 +34,13 @@ You do not need to retrain your model. You do not need to change your applicatio
 <div class="feature-card">
 <span class="feature-icon">🔬</span>
 <h3>6-Axis Detection</h3>
-<p>Context faithfulness, closed-book fabrication, prompt safety, answer safety, jailbreak, and <code>rag_jailbreak</code> (RAG / context-injection firewall) — each scored independently with calibrated thresholds.</p>
+<p><strong>GLAD-Hummingbird</strong> scores context faithfulness, closed-book fabrication, prompt safety, answer safety, jailbreak, and <code>rag_jailbreak</code> (RAG / context-injection firewall) — each scored independently with calibrated thresholds.</p>
+</div>
+
+<div class="feature-card">
+<span class="feature-icon">🪡</span>
+<h3>Deep Scan (GLAD-Tapestry)</h3>
+<p>Opt-in 8B guardian second opinion for high-stakes Applications — blended confidently into the safety and hallucination axes. Off by default; zero overhead until enabled.</p>
 </div>
 
 <div class="feature-card">
@@ -46,7 +52,7 @@ You do not need to retrain your model. You do not need to change your applicatio
 <div class="feature-card">
 <span class="feature-icon">🏢</span>
 <h3>G-1 Studio</h3>
-<p>Multi-Application platform — one LLM + GLAD-BERT serves many isolated Applications, each with its own policy, calibration, RAG, compliance posture, and <strong>cost center / FinOps</strong> budget.</p>
+<p>Multi-Application platform — one LLM + GLAD-Hummingbird serves many isolated Applications, each with its own policy, calibration, RAG, compliance posture, and <strong>cost center / FinOps</strong> budget.</p>
 </div>
 
 <div class="feature-card">

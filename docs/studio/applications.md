@@ -1,6 +1,6 @@
 # Managing Applications
 
-In Geodesia G-1 **Studio**, an **Application** is the unit you manage: one upstream LLM with GLAD-BERT in the middle, owning its own **policy** (6-axis thresholds + enforcement), **calibration profile**, **RAG knowledge base**, **cost center**, and **governance** record. You select the active Application from the topbar App switcher, and every other surface — Dashboard, Oversight, FRIA, Reports, Knowledge Base, Cost — scopes to it.
+In Geodesia G-1 **Studio**, an **Application** is the unit you manage: one upstream LLM with GLAD-Hummingbird in the middle, owning its own **policy** (6-axis thresholds + enforcement), **calibration profile**, **RAG knowledge base**, **cost center**, and **governance** record. You select the active Application from the topbar App switcher, and every other surface — Dashboard, Oversight, FRIA, Reports, Knowledge Base, Cost — scopes to it.
 
 Studio is a backward-compatible evolution of the single-upstream gateway: an existing deployment surfaces as a single Application named `default`, with zero behaviour change.
 
@@ -73,7 +73,7 @@ The `logprobs` setting governs the closed-book fabrication axis: `require` force
 
 ### `policy` — detection thresholds and enforcement
 
-The policy is scored across the **six** GLAD-BERT axes. Each axis has its own threshold (probability space, `0.0`–`1.0`) and its own enforcement mode.
+The policy is scored across the **six** GLAD-Hummingbird axes. Each axis has its own threshold (probability space, `0.0`–`1.0`) and its own enforcement mode.
 
 | Field | Type | Default | Meaning |
 |---|---|---|---|

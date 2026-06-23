@@ -1,6 +1,6 @@
 # Cloud Upstreams & Scale-Out
 
-Geodesia G-1 Studio runs unchanged from a developer laptop to a multi-replica cloud deployment. The same artifact talks to **managed cloud LLMs** (AWS Bedrock, Google Vertex, Azure OpenAI), resolves provider credentials through a **pluggable secret provider**, stores its control-plane and cost state on **SQLite or Postgres**, offloads GLAD-BERT detection to a **remote scoring pool**, and ingests RAG documents through an **exactly-once claim queue** that is safe across replicas.
+Geodesia G-1 Studio runs unchanged from a developer laptop to a multi-replica cloud deployment. The same artifact talks to **managed cloud LLMs** (AWS Bedrock, Google Vertex, Azure OpenAI), resolves provider credentials through a **pluggable secret provider**, stores its control-plane and cost state on **SQLite or Postgres**, offloads GLAD-Hummingbird detection to a **remote scoring pool**, and ingests RAG documents through an **exactly-once claim queue** that is safe across replicas.
 
 This page documents each of those scale-out surfaces. For a full step-by-step walkthrough of taking a PC deployment to AWS, see the section ["PC → AWS deployment guide"](#pc-aws-deployment-guide) at the bottom.
 
@@ -93,9 +93,9 @@ The SQLite backend opens connections in WAL mode; the Postgres backend strips th
 
 ---
 
-## Remote GLAD-BERT scoring pool
+## Remote GLAD-Hummingbird scoring pool
 
-By default the GLAD-BERT detector runs **embedded** inside the gateway as an in-process singleton monitor. For horizontal scale you can offload detection to a separate GPU pool so that engine replicas can be CPU-only and the GPU scales independently.
+By default the GLAD-Hummingbird detector runs **embedded** inside the gateway as an in-process singleton monitor. For horizontal scale you can offload detection to a separate GPU pool so that engine replicas can be CPU-only and the GPU scales independently.
 
 | `GEODESIA_SCORING_MODE` | Behaviour | Extra config |
 |---|---|---|
@@ -139,4 +139,4 @@ The claim succeeds only if exactly one row was updated (`rowcount == 1`); a repl
 
 ## PC → AWS deployment guide
 
-A complete, step-by-step guide for taking a Geodesia G-1 Studio deployment from a developer PC to a running AWS deployment — an **EC2 g5** instance for the GLAD-BERT detector plus **AWS Bedrock** as the LLM upstream — lives in the repository as `DEPLOY_PC_TO_AWS_BEDROCK.md`. It walks through the three env vars that change between PC and cloud (DB location, secret provider, AWS region) and the single Application binding switch (`upstream_type: bedrock`).
+A complete, step-by-step guide for taking a Geodesia G-1 Studio deployment from a developer PC to a running AWS deployment — an **EC2 g5** instance for the GLAD-Hummingbird detector plus **AWS Bedrock** as the LLM upstream — lives in the repository as `DEPLOY_PC_TO_AWS_BEDROCK.md`. It walks through the three env vars that change between PC and cloud (DB location, secret provider, AWS region) and the single Application binding switch (`upstream_type: bedrock`).

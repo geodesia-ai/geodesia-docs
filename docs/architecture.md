@@ -86,11 +86,18 @@ The Product Backend can run without a loaded language model. Compliance pages, d
 
 ## The Detection Engine
 
-Both services share a single **Geodesia detection engine** — a compact, model-agnostic validator that runs entirely separately from the upstream LLM. It reads the prompt, context, and generated answer as plain text and produces five independent detection scores.
+Both services share a single **Geodesia detection engine**, which comes in two cooperating tiers:
 
-Because it operates on text alone (not on hidden states or logits from the LLM), it is **model-agnostic**: the same checkpoint works against any upstream, from a locally hosted 7B model to the OpenAI API.
+| Tier | Name | What it is | When it runs |
+|---|---|---|---|
+| **Always-on** | **GLAD-Hummingbird** | A compact (~300M-parameter) model-agnostic validator. Reads the prompt, context, and answer as plain text and produces the six independent [detection axes](gateway/detection-axes.md). Fast and lightweight — milliseconds per request on a small GPU (or CPU). | Every request |
+| **Opt-in** | **GLAD-Tapestry** | A heavyweight 8B Apache-2.0 guardian (default IBM Granite Guardian 4.1 8B) loaded in-process in 4-bit. Reads the *full geometry* of the exchange and returns a confident second opinion that is blended into the safety and hallucination axes. Off by default — never loaded, zero overhead. | When **Deep Scan** is enabled (see [Deep Scan](gateway/deep-scan.md)) |
+
+Because GLAD-Hummingbird operates on text alone (not on hidden states or logits from the LLM), it is **model-agnostic**: the same checkpoint works against any upstream, from a locally hosted 7B model to the OpenAI API.
 
 The one exception is the **closed-book fabrication axis**, which additionally uses per-token log-probabilities from the upstream LLM to compute uncertainty signals. If the upstream does not expose log-probabilities (e.g., Ollama < 0.12, or cloud providers such as Bedrock/Vertex), this axis is automatically disabled and the gateway operates with 4 axes. Most OpenAI-compatible servers — and Ollama ≥ 0.12 — do expose them, so this axis is on by default.
+
+GLAD-Tapestry is a **second opinion**, not a replacement: it can only *raise* risk, and only when it is confident. A confident Tapestry verdict dominates the blended axis; an unsure one barely moves the GLAD-Hummingbird score. This keeps the always-on path fast while letting high-stakes deployments pay for extra assurance only where they want it.
 
 ---
 

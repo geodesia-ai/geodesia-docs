@@ -137,12 +137,25 @@ An admin can alternatively authenticate with a control-plane API key (`Authoriza
 
 See [Cost & Budget](../studio/cost.md) for the FinOps engine, budget bands, and the projection chart.
 
-### Remote GLAD-BERT scoring
+### Remote GLAD-Hummingbird scoring
 
 | Variable | Default | Description |
 |---|---|---|
-| `GEODESIA_SCORING_MODE` | `"embedded"` | `embedded` runs the GLAD-BERT monitor **in-process** (zero behaviour change). `remote` swaps it for a thin HTTP client that talks to a separate scoring pool — for horizontal scale-out of detection compute. (`src/glad_minimal/scoring/`) |
+| `GEODESIA_SCORING_MODE` | `"embedded"` | `embedded` runs the GLAD-Hummingbird monitor **in-process** (zero behaviour change). `remote` swaps it for a thin HTTP client that talks to a separate scoring pool — for horizontal scale-out of detection compute. (`src/glad_minimal/scoring/`) |
 | `GEODESIA_SCORING_URL` | — | Base URL of the remote scoring server (`python -m glad_minimal.scoring.server`, e.g. `http://host:8810`). **Required** when `GEODESIA_SCORING_MODE=remote`. |
+
+### Deep Scan (GLAD-Tapestry)
+
+Opt-in 8B guardian second opinion, blended into the safety and hallucination axes. **Off by default → never loaded, zero overhead.** See [Deep Scan](../gateway/deep-scan.md).
+
+| Variable | Default | Description |
+|---|---|---|
+| `GW_DEEP_SCAN` | `off` | Platform availability switch. `on` makes GLAD-Tapestry loadable (still lazy-loaded on first use); also requires `deep_scan: true` per request. |
+| `GW_DEEP_SCAN_DIR` | — | Path to a **trained GLAD-Tapestry export** directory (preferred — geometry-head continuous scorer). |
+| `GW_DEEP_SCAN_MODEL` | `ibm-granite/granite-guardian-4.1-8b` | Guardian model id for the zero-shot fallback (when `GW_DEEP_SCAN_DIR` is unset). |
+| `GW_DEEP_SCAN_QUANT` | `4bit` | `4bit` (bnb nf4, ~5 GB VRAM, needs CUDA) or empty for bf16 (~16 GB). |
+| `GW_DEEP_SCAN_DEVICE` | `auto` | `auto` → CUDA → MPS → CPU. Pin to e.g. `cuda:0`. |
+| `GW_DEEP_SCAN_LORA` | — | Optional QLoRA symbiont adapter directory for the zero-shot guardian. |
 
 ### Cloud upstreams & secrets
 

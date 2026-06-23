@@ -9,7 +9,7 @@
 
 ## What is an Application?
 
-An **Application** is **1 LLM + GLAD-BERT in the middle**, owning everything that makes that LLM safe, compliant, and accountable:
+An **Application** is **1 LLM + GLAD-Hummingbird in the middle**, owning everything that makes that LLM safe, compliant, and accountable:
 
 <div class="feature-grid">
 
@@ -72,7 +72,7 @@ Applications are grouped under **Organizations**. An organization carries the li
 G-1 Studio cleanly separates **management** from **serving**:
 
 - **Control plane** — `/v1/glad/apps/*`. Create and configure Applications and Organizations, mint API keys, edit policy, read cost / metrics / forecast. See [Control-Plane API](control-plane-api.md).
-- **Data plane** — the chat path. Each request resolves its Application, GLAD-BERT scores the 6 axes, the request is routed to that app's LLM, and the call is logged with its cost.
+- **Data plane** — the chat path. Each request resolves its Application, GLAD-Hummingbird scores the 6 axes, the request is routed to that app's LLM, and the call is logged with its cost.
 
 ```mermaid
 flowchart TB
@@ -84,7 +84,7 @@ flowchart TB
     subgraph DATA [" Data plane — chat "]
         direction LR
         REQ([Chat request]):::io --> RES{Resolve<br/>application_id}:::res
-        RES --> GB[GLAD-BERT<br/>scores 6 axes]:::gb
+        RES --> GB[GLAD-Hummingbird<br/>scores 6 axes]:::gb
         GB --> LLM[Route to the app's LLM]:::llm
         LLM --> LOG[Log call + cost]:::log
         LOG --> OUT([Validated response]):::io
@@ -111,7 +111,7 @@ flowchart TB
 
 ## The 6 detection axes
 
-GLAD-BERT scores every request across **six** independent axes, grouped by **where** in the request lifecycle they run. Each axis has its own threshold and enforcement mode in the app's policy.
+GLAD-Hummingbird scores every request across **six** independent axes, grouped by **where** in the request lifecycle they run. Each axis has its own threshold and enforcement mode in the app's policy.
 
 | Region | Axes | Runs |
 |---|---|---|

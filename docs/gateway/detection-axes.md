@@ -2,8 +2,10 @@
 
 Geodesia G-1 scores every request across **six independent detection axes**. Each axis is scored separately, has its own calibrated threshold, and can be individually configured. Understanding what each axis detects helps you tune thresholds appropriately for your use case.
 
-!!! note "GLAD-BERT v10"
-    These six axes are produced by the **GLAD-BERT v10** detection generation — a model-agnostic companion that scores text (and, where available, upstream log-probabilities) outside the served LLM. The sixth axis, `rag_jailbreak`, was introduced in v10 to harden retrieval-augmented and tool-using deployments against context-injection attacks.
+!!! note "GLAD-Hummingbird"
+    These six axes are produced by **GLAD-Hummingbird** — Geodesia's fast, model-agnostic companion detector that scores text (and, where available, upstream log-probabilities) *outside* the served LLM. It is a compact ~300M-parameter validator: low latency, runs on a small GPU, and adds the `rag_jailbreak` axis to harden retrieval-augmented and tool-using deployments against context-injection attacks.
+
+    For high-stakes deployments you can layer **GLAD-Tapestry** on top — an opt-in 8B guardian that reads the full geometry of the exchange and acts as a confident second opinion on the safety and hallucination axes. See [Deep Scan (GLAD-Tapestry)](deep-scan.md).
 
 ---
 

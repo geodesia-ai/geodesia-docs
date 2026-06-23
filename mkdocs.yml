@@ -137,6 +137,7 @@ nav:
     - Chat API: gateway/chat-api.md
     - Enforcement Modes: gateway/enforcement-modes.md
     - Detection Axes: gateway/detection-axes.md
+    - Deep Scan (GLAD-Tapestry): gateway/deep-scan.md
     - Knowledge Base (RAG): rag/index.md
     - Causal XAI: gateway/causal-xai.md
   - Product API:
