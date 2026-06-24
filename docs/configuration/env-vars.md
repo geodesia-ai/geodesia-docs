@@ -157,6 +157,23 @@ Opt-in 8B guardian second opinion, blended into the safety and hallucination axe
 | `GW_DEEP_SCAN_DEVICE` | `auto` | `auto` → CUDA → MPS → CPU. Pin to e.g. `cuda:0`. |
 | `GW_DEEP_SCAN_LORA` | — | Optional QLoRA symbiont adapter directory for the zero-shot guardian. |
 
+### Live Web Search
+
+On by default; the chat searches the live web, screens every page through the GLAD-BERT firewall, and grounds the answer in the safe pages. A **Tavily** API key gives reliable, rate-limit-free results; without one, the key-less DuckDuckGo engine is used as a fallback. See [Live Web Search](../gateway/web-search.md).
+
+| Variable | Default | Description |
+|---|---|---|
+| `GW_WEBSEARCH_ENABLED` | `1` | Master switch. `1` = available; `0` → the per-request `web_search` flag is a no-op. |
+| `GW_WEBSEARCH_API_KEY` | — | Tavily API key. **Takes precedence over a UI/file-set key.** `TAVILY_API_KEY` is an accepted alias. |
+| `GW_WEBSEARCH_KEY_FILE` | `/app/var/websearch_tavily.key` | Path to the out-of-band key file the Studio UI writes (mode `0600`, never baked into the image). |
+| `GW_WEBSEARCH_PROVIDER` | auto | Force `tavily` or `duckduckgo`. Default: `tavily` if a key is present, else `duckduckgo`. |
+| `GW_WEBSEARCH_MAX_RESULTS` | `5` | Number of search results requested. |
+| `GW_WEBSEARCH_MAX_READ` | `6` | Maximum number of safe pages used as grounding context. |
+| `GW_WEBSEARCH_TIMEOUT` | `12` | Per-request HTTP timeout (seconds) for the search + page fetches. |
+| `GW_WEBSEARCH_SCREEN_CHARS` | `4000` | Chars of each page screened by the firewall. |
+| `GW_WEBSEARCH_GROUND_CHARS` | `2200` | Chars of each safe page kept as grounding context. |
+| `GW_WEBSEARCH_RJ_THR` | calibrated | Override the `rag_jailbreak` firewall threshold for page screening. Unset → per-axis calibrated default. |
+
 ### Cloud upstreams & secrets
 
 | Variable | Default | Description |

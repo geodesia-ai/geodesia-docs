@@ -12,6 +12,7 @@ The **Geodesia Gateway** is an OpenAI-compatible HTTP proxy that adds real-time 
 | **Enforcement modes** | `blocking` withholds flagged content. `passthrough` returns the answer but annotates the response with the detection verdict. |
 | **Per-request thresholds** | Override detection thresholds on a per-call basis via `threshold_overrides`. |
 | **Knowledge Base** | Built-in RAG: upload documents, retrieve relevant passages, verify citations claim-by-claim. |
+| **Live Web Search** | Optional `web_search` per request: searches the live web, screens every page through the GLAD-BERT firewall, and grounds the answer in the safe pages. Tavily key → reliable results; DuckDuckGo key-less fallback. See [Live Web Search](web-search.md). |
 | **Causal XAI** | Token-level attribution — entirely black-box, no access to model internals or GPU memory required. |
 | **Config persistence** | Backend selection, model, and thresholds are written to a JSON file. Setup survives restarts and container rebuilds. |
 | **Compliance logging** | Every request is written to the shared SQLite audit database so the compliance dashboard stays current. |
