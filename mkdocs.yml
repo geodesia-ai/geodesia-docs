@@ -139,6 +139,7 @@ nav:
     - Detection Axes: gateway/detection-axes.md
     - Deep Scan (GLAD-Tapestry): gateway/deep-scan.md
     - Live Web Search: gateway/web-search.md
+    - Human Feedback Loop: gateway/feedback.md
     - Knowledge Base (RAG): rag/index.md
     - Causal XAI: gateway/causal-xai.md
   - Product API:

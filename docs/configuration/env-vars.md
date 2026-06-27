@@ -174,6 +174,17 @@ On by default; the chat searches the live web, screens every page through the GL
 | `GW_WEBSEARCH_GROUND_CHARS` | `2200` | Chars of each safe page kept as grounding context. |
 | `GW_WEBSEARCH_RJ_THR` | calibrated | Override the `rag_jailbreak` firewall threshold for page screening. Unset → per-axis calibrated default. |
 
+### Human Feedback Loop
+
+Opt-in episodic exemplar bank built from approved chat feedback. Off by default → detection is byte-identical. See [Human Feedback Loop](../gateway/feedback.md).
+
+| Variable | Default | Description |
+|---|---|---|
+| `GW_FEEDBACK_BANK` | `off` | Master switch. `on` builds + consults the per-model exemplar bank from approved feedback; `off` → never built, zero overhead. |
+| `GW_BANK_V2` | `off` | Use the **Contrastive Safety Memory** bank (dangerous/benign twins). Requires `GW_FEEDBACK_BANK=on`. |
+| `GW_FEEDBACK_BANK_TAU` | `0.88` | Cosine-similarity floor below which an exemplar is ignored (exact-pattern recall). |
+| `GW_FEEDBACK_BANK_GAIN` | `1.0` | How hard a perfect match pushes the probability (`1.0` = fully to 0/1 at `sim == 1`, `weight == 1`). |
+
 ### Cloud upstreams & secrets
 
 | Variable | Default | Description |
