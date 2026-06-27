@@ -1,6 +1,6 @@
 # Managing Applications
 
-In Geodesia G-1 **Studio**, an **Application** is the unit you manage: one upstream LLM with GLAD-Hummingbird in the middle, owning its own **policy** (6-axis thresholds + enforcement), **calibration profile**, **RAG knowledge base**, **cost center**, and **governance** record. You select the active Application from the topbar App switcher, and every other surface — Dashboard, Oversight, FRIA, Reports, Knowledge Base, Cost — scopes to it.
+In Geodesia G-1 **Studio**, an **Application** is the unit you manage: one upstream LLM with GLAD-Hummingbird in the middle, owning its own **policy** (6-axis thresholds + enforcement), **threshold profile**, **RAG knowledge base**, **cost center**, and **governance** record. You select the active Application from the topbar App switcher, and every other surface — Dashboard, Oversight, FRIA, Reports, Knowledge Base, Cost — scopes to it.
 
 Studio is a backward-compatible evolution of the single-upstream gateway: an existing deployment surfaces as a single Application named `default`, with zero behaviour change.
 
@@ -192,7 +192,7 @@ Once created, the Application opens to its detail view, organised into tabs:
 
 | Tab | What you configure |
 |---|---|
-| **Model** | Upstream type, base URL, model, region, `logprobs`, and credential reference — with **live model discovery**, a **Test connection** probe, and **Calibrate closed-book** (see below). |
+| **Model** | Upstream type, base URL, model, region, `logprobs`, and credential reference — with **live model discovery** and a **Test connection** probe (see below). |
 | **Policy** | The six-axis threshold sliders plus per-axis enforcement (`block` / `annotate` / `off`), `block_input`, CI injection, and the streaming brake. |
 | **Cost & Budget** | Per-Mtok rates, monthly budget, alert percentages, and the budget-exceeded action. See [Cost & Budget](cost.md). |
 | **Governance** | Applicable laws, risk classification, retention, FRIA link, and human-oversight thresholds. |
@@ -206,7 +206,7 @@ The detail view opens on a **read-only Overview tab** — a safe summary of the 
 
 There is **no "Save" button**. Every change in those tabs is **saved automatically**, debounced shortly after you stop editing — adjust a threshold slider, change the budget, edit `alert_recipients`, and it persists on its own. An inline status indicator shows where each edit stands: **"Saving…"** while the debounced write is in flight, then **"Saved ✓"** once it lands (and the underlying `config_version` bumps). Because saving is automatic, dependent UI — such as the Cost & Budget projection chart — redraws immediately against the new values.
 
-### The Model tab: discover, test, calibrate
+### The Model tab: discover and test
 
 The editable **Model** tab (under **Modifica**) does more than hold the binding fields — it lets you bind to a real upstream model with confidence:
 
@@ -214,10 +214,11 @@ The editable **Model** tab (under **Modifica**) does more than hold the binding 
 
 - **Test connection.** A **Test connection** button probes the bound upstream for **reachability** (with a latency reading) and runs a **logprob probe** that reports whether the **closed-book** axis is *available* or *unavailable* for that model — since `halluc_closedbook` depends on per-token log-probabilities. A reachable upstream also refreshes the discovered-model list.
 
-- **Calibrate closed-book.** A **Calibrate closed-book** button re-fits the closed-book detector for *this specific generator model* (quick, logprob-based mode), streaming its progress log into the panel. Use it after binding to a new model so the closed-book threshold reflects that model's logprob behaviour.
+!!! note "The closed-book axis needs no per-model setup"
+    The closed-book fabrication detector is **cross-model** — it works on any bound upstream out of the box, with no calibration or training step. Binding to a new model is just *discover → test → save*.
 
 !!! note "These controls are now per-Application"
-    Test connection, model discovery, and closed-book calibration used to live in the **global** Settings → Gateway card. In Studio they are **per-Application**, on the Model tab, so each Application is discovered, tested, and calibrated against its own bound upstream.
+    Test connection and model discovery used to live in the **global** Settings → Gateway card. In Studio they are **per-Application**, on the Model tab, so each Application is discovered and tested against its own bound upstream.
 
 ### Where each setting lives: Applications vs. Settings
 
@@ -227,13 +228,13 @@ Studio splits configuration cleanly between the **per-Application** detail view 
 |---|---|
 | Model binding (upstream, base URL, model, region, `logprobs`, credential ref) | Plan & license |
 | Detection policy & per-axis thresholds, enforcement, `block_input`, CI injection, streaming brake | The platform **Gateway card** — the exposed API bind (host / port) and the numeric solver |
-| Closed-book calibration | Appearance (theme) |
-| RAG knowledge base | Provider identity |
-| Cost rates, budget & governance | System (server health / version) |
+| RAG knowledge base | Appearance (theme) |
+| Cost rates, budget & governance | Provider identity |
+| | System (server health / version) |
 | | Demo reset |
 
 !!! info "Settings is platform-only"
-    Anything specific to one Application — model, detection policy & thresholds, calibration, RAG, cost & governance — is set on that Application (and saved automatically). The global **Settings** page now keeps only **platform-wide** settings: plan & license, the platform gateway card (exposed API bind + numeric solver), appearance, provider identity, system, and demo reset.
+    Anything specific to one Application — model, detection policy & thresholds, RAG, cost & governance — is set on that Application (and saved automatically). The global **Settings** page now keeps only **platform-wide** settings: plan & license, the platform gateway card (exposed API bind + numeric solver), appearance, provider identity, system, and demo reset.
 
 ---
 

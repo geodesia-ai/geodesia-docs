@@ -1,6 +1,6 @@
 # G-1 Studio
 
-**G-1 Studio** turns the single-upstream Geodesia gateway into an **Application-oriented platform**. Instead of one gateway wrapping one LLM, you now run many self-contained **Applications**, each with its own model, policy, calibration, knowledge base, compliance posture, and cost center — all managed from one control plane and served from one engine.
+**G-1 Studio** turns the single-upstream Geodesia gateway into an **Application-oriented platform**. Instead of one gateway wrapping one LLM, you now run many self-contained **Applications**, each with its own model, policy, thresholds, knowledge base, compliance posture, and cost center — all managed from one control plane and served from one engine.
 
 !!! note "Backward-compatible by design"
     Everything in Studio is **additive**. An existing single-upstream deployment surfaces as the `default` Application with **zero behaviour change** — the same chat endpoint, the same detection, the same compliance ledger. You opt into multi-Application features when you need them.
@@ -27,8 +27,8 @@ An **Application** is **1 LLM + GLAD-Hummingbird in the middle**, owning everyth
 
 <div class="feature-card">
 <span class="feature-icon">🎯</span>
-<h3>Calibration</h3>
-<p>A named <code>calibration_profile</code> binding the app to model-specific thresholds and the closed-book SVR reference.</p>
+<h3>Threshold profile</h3>
+<p>A named <code>calibration_profile</code> binding the app to its model-specific detection thresholds.</p>
 </div>
 
 <div class="feature-card">

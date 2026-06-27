@@ -384,10 +384,10 @@ flowchart TB
 The repository ships `deploy/docker-compose.gateway.yml` with two services — `generator` (the model) and `glad-gateway` (the validator) — and two profiles:
 
 ```bash
-# Pre-calibrated checkpoint
+# Fixed checkpoint
 docker compose -f deploy/docker-compose.gateway.yml --profile fixed up -d
 
-# First-boot auto-calibration (new model / new customer)
+# New model / new customer
 docker compose -f deploy/docker-compose.gateway.yml --profile customer up -d
 ```
 
@@ -554,7 +554,7 @@ Every response carries a `geodesia{}` block — your richest telemetry source. S
 | **`/health`** | Liveness, upstream, log-prob mode, active axes | Poll on an interval; alert on `ok=false` or `axes` drop |
 | **Compliance dashboard** | Aggregated pass / block / flag counts, per-axis rates | `GET :8199/v1/glad/dashboard` |
 | **Audit chain** | Tamper-evident per-call ledger | `GET :8199/v1/glad/chain/entries` |
-| **Container logs** | Startup, calibration progress, upstream errors | `docker logs` / `kubectl logs` |
+| **Container logs** | Startup, log-prob probe, upstream errors | `docker logs` / `kubectl logs` |
 
 **Alerts worth wiring:**
 
@@ -619,18 +619,11 @@ sequenceDiagram
     GW->>New: probe reachability + logprobs
     New-->>GW: ok · models · logprobs
     Op->>GW: POST /v1/glad/gateway/config (switch)
-    Op->>GW: POST /calibrate  (if base model changed)
-    GW-->>Op: streams calibration progress
-    Note over GW: next request uses the new config + calibration
+    Note over GW: next request uses the new config
 ```
 
 1. **Test** the new backend first (`/upstream/test`) — confirm reachability and log-prob support.
-2. **Switch** (`POST /v1/glad/gateway/config` or roll new env vars).
-3. **Recalibrate the closed-book axis** if you changed the *base model* (Llama → Qwen, etc.). Different quantizations of the *same* model can share a calibration.
-
-```bash
-curl -X POST http://localhost:8800/calibrate   # streams until done
-```
+2. **Switch** (`POST /v1/glad/gateway/config` or roll new env vars). The closed-book axis is cross-model and needs no per-model step — it works on the new upstream immediately.
 
 In Kubernetes, prefer a rolling update of the `Deployment` with the new env vars; the readiness probe keeps traffic on healthy pods throughout.
 
@@ -644,8 +637,7 @@ In Kubernetes, prefer a rolling update of the `Deployment` with the new env vars
 | `axes: 4` when you expected 5 | Upstream returns no log-probs | Upgrade to **Ollama ≥ 0.12** (native log-probs), use a model/tier that supports `logprobs`, or add a [log-prob sidecar](#ollama) for older Ollama |
 | `connection refused` on switch | Wrong port or `/v1` appended | Use the **base** URL (no trailing `/v1`); the gateway adds the path |
 | Hosted API → 4 axes | Provider/model omits log-probs | Try another model on the provider, or accept 4-axis mode |
-| Closed-book flags correct facts | Calibration stale after model change | Re-run `POST /calibrate` for the new base model |
-| First request very slow (Docker `customer` profile) | First-boot calibration | Expected once per model; subsequent boots reuse the cached calibration |
+| First request very slow | Model cold-loading on first boot | Expected once per boot — the gateway warms the upstream proactively; subsequent requests are fast |
 | `internal_vllm: stopped` with `type: internal` | Subprocess failed to start | Check `internal_vllm_cmd` and GPU availability in container logs |
 | 5xx from the gateway under load | Upstream saturated | Scale the **model server**; the gateway itself is rarely the limit |
 | Benign prompts blocked | Thresholds too aggressive | Tune per-axis thresholds — see [Detection Thresholds](../reference/thresholds.md) |
@@ -654,7 +646,7 @@ In Kubernetes, prefer a rolling update of the `Deployment` with the new env vars
 
 ## See Also
 
-- [Upstream Backends](backends.md) — the connection test and closed-book calibration mechanics
+- [Upstream Backends](backends.md) — the connection test and upstream-adapter mechanics
 - [Gateway Configuration](configuration.md) — every `GatewayConfig` field
 - [Environment Variables](../configuration/env-vars.md) — the full `GW_*` reference
 - [Enforcement Modes](enforcement-modes.md) — blocking vs passthrough

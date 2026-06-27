@@ -31,8 +31,7 @@ Navigate to **Settings → Service Connection**. You will find:
 3. **API key** — required for OpenAI and hosted services; leave empty for local deployments.
 4. **Test connection** — sends a probe request to the upstream and reports reachability, latency, available models, logprob support, and a sample reply.
 5. **Model** — populated automatically from the upstream's model list after a successful test.
-6. **Calibrate closed-book now** — runs the closed-book calibration for this model. Streams progress inline. Only needed when switching to a new model.
-7. **Save** — persists the configuration to `GW_CONFIG_FILE` so it survives restarts.
+6. **Save** — persists the configuration to `GW_CONFIG_FILE` so it survives restarts.
 
 The **"Exposed API (OpenAI-compatible)"** section shows the gateway's own base URL (`http://host:port/v1`). Point your downstream application here.
 
@@ -220,18 +219,6 @@ curl -s -X POST http://localhost:8800/upstream/test \
 
 ---
 
-## Closed-Book Calibration
+## Closed-Book Fabrication — no per-model setup
 
-The closed-book fabrication detector requires **calibration** to the specific vocabulary and generation style of the upstream model. Calibration runs a set of known-truthful and known-fabricated queries through the model, fits a regression over the log-probability signals, and saves a calibrated checkpoint.
-
-Calibration is **automatic on first boot** in the Docker `customer` profile. You can also trigger it manually:
-
-```bash
-curl -s -X POST http://localhost:8800/calibrate
-# Streams progress text until calibration completes
-```
-
-After calibration, the gateway reloads the new checkpoint on the next request. No restart is required.
-
-!!! tip "When to recalibrate"
-    Recalibrate whenever you switch to a different base model (e.g., from Llama to Qwen). The same checkpoint can be shared across different GGUF quantizations of the same model because the underlying log-probability distribution is stable.
+The closed-book fabrication detector is **cross-model**: it ships ready to use and runs on any upstream out of the box, with no per-model calibration or training step. When you switch to a different base model, nothing to do — point the gateway at the new upstream and the closed-book axis works immediately (provided the upstream returns per-token log-probabilities; otherwise the gateway simply runs in 4-axis mode).

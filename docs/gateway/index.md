@@ -47,10 +47,6 @@ Updates one or more configuration fields at runtime. Changes take effect on the 
 
 Tests a candidate upstream connection: reachability, model list, logprob support, and a sample reply — all in one call.
 
-<div class="endpoint"><span class="method method-post">POST</span><span class="path">/calibrate</span></div>
-
-Runs (or re-runs) the closed-book calibration against the current upstream. Streams progress. Reloads the checkpoint on completion without restarting.
-
 <div class="endpoint"><span class="method method-post">POST</span><span class="path">/v1/glad/causal-explainability/analyze</span></div>
 
 Computes black-box token-level causal attribution (occlusion or MuPAX) for a given prompt/response pair.

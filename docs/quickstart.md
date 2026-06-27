@@ -18,9 +18,9 @@ The `docker-compose.gateway.yml` file in the repository defines two services:
 | `generator` | Official `vllm/vllm-openai` container serving your model |
 | `glad-gateway` | Geodesia G-1 gateway — the validation layer |
 
-### 1. Fixed checkpoint (pre-calibrated)
+### 1. Fixed checkpoint
 
-Use this profile if you have a pre-calibrated Geodesia checkpoint (`.pt` file):
+Use this profile if you have a Geodesia checkpoint (`.pt` file):
 
 ```bash
 # In the project root
@@ -29,18 +29,15 @@ docker compose -f deploy/docker-compose.gateway.yml --profile fixed up
 
 The gateway starts on **port 8800** and proxies requests to the `generator` container on port 8000.
 
-### 2. Customer profile (first-boot calibration)
+### 2. Customer profile (new model / new customer)
 
-Use this when deploying to a new customer or a new model. The gateway automatically calibrates the closed-book detector against the upstream model on first boot:
+Use this when deploying to a new customer or a new model:
 
 ```bash
 docker compose -f deploy/docker-compose.gateway.yml --profile customer up
 ```
 
-During first boot you will see calibration progress in the logs. Once complete, the gateway writes a calibrated checkpoint and reloads without restarting.
-
-!!! note "Closed-book calibration"
-    Calibration is only required once per model. It adapts the closed-book fabrication detector to the specific vocabulary distribution of your LLM. Subsequent restarts skip it and use the cached checkpoint.
+The closed-book fabrication detector is **cross-model** and works out of the box — there is no per-model setup step. On first boot the gateway probes the upstream for log-probability support and enables the closed-book axis automatically (5-axis mode); if the upstream has no log-probabilities it runs in 4-axis mode. Either way the gateway is ready immediately.
 
 ---
 
