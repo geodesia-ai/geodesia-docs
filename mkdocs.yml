@@ -142,6 +142,12 @@ nav:
     - Human Feedback Loop: gateway/feedback.md
     - Knowledge Base (RAG): rag/index.md
     - Causal XAI: gateway/causal-xai.md
+  - MCP Security:
+    - Overview: mcp/index.md
+    - Guard Server: mcp/guard-server.md
+    - Interceptor: mcp/interceptor.md
+    - Tool-aware Chat: mcp/chat-aware.md
+    - Policy (App · Axis · Tool): mcp/policy.md
   - Product API:
     - Introduction: product-api/index.md
     - Evaluate Endpoint: product-api/evaluate.md
