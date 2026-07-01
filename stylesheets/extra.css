@@ -5,6 +5,18 @@
   --md-accent-fg-color:  #00bcd4;
 }
 
+/* Rendered mermaid diagrams (SVG, exported at build time) */
+.md-typeset img.diagram {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 1.5rem auto;
+  padding: 1rem;
+  background: #ffffff;
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 12px;
+}
+
 /* Hero section on homepage */
 .md-typeset .hero-banner {
   background: linear-gradient(135deg, #1a1f6e 0%, #0d1138 50%, #071025 100%);
