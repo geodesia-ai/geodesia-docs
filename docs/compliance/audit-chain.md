@@ -8,17 +8,7 @@ The Audit Chain is a **tamper-evident, append-only log** that records every sign
 
 The audit chain is inspired by blockchain-style ledger design, but implemented as a simple hash-linked list stored in the SQLite database:
 
-```
-Entry N-1                Entry N                  Entry N+1
-┌──────────────┐         ┌──────────────┐         ┌──────────────┐
-│ event_id     │         │ event_id     │         │ event_id     │
-│ timestamp    │         │ timestamp    │         │ timestamp    │
-│ event_type   │  HMAC   │ event_type   │  HMAC   │ event_type   │
-│ payload      │ ──────► │ payload      │ ──────► │ payload      │
-│ prev_hash    │         │ prev_hash    │         │ prev_hash    │
-│ entry_hash ──┼─────────┼──► (copied)  │         │ entry_hash   │
-└──────────────┘         └──────────────┘         └──────────────┘
-```
+![Diagram](../assets/diagrams/compliance-audit-chain.svg){: .diagram }
 
 Each `entry_hash` is computed over: `prev_hash + timestamp + event_type + payload`. If any past entry is modified, the hash chain breaks, and `GET /v1/glad/chain/verify` reports the tampered entry.
 

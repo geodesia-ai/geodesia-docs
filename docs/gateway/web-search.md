@@ -9,22 +9,7 @@ Geodesia G-1 can answer a chat turn from the **live internet**. When web search 
 
 ## How it works
 
-```mermaid
-flowchart LR
-    Q([User question]):::io --> S[Search the web]:::s
-    S --> F[Fetch each page]:::s
-    F --> SC{GLAD-BERT<br/>firewall<br/>per page}:::q
-    SC -- safe --> CTX[Grounding context]:::ok
-    SC -- blocked --> X[Dropped]:::bad
-    CTX --> LLM[Upstream model<br/>answers + cites]:::s
-    LLM --> OUT([Answer + sources]):::io
-
-    classDef io fill:#3f51b5,color:#fff,stroke:#283593;
-    classDef s fill:#00838f,color:#fff,stroke:#005662;
-    classDef q fill:#37474f,color:#fff,stroke:#263238;
-    classDef ok fill:#2e7d32,color:#fff,stroke:#1b5e20;
-    classDef bad fill:#c62828,color:#fff,stroke:#8e0000;
-```
+![Diagram](../assets/diagrams/gateway-web-search.svg){: .diagram }
 
 1. **Search** — the gateway queries a search provider (see below).
 2. **Fetch** — each result page is downloaded and its readable text extracted (scripts/nav/boilerplate stripped).

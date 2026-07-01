@@ -86,50 +86,14 @@ No setting toggles this — the gateway probes it on the first request and `/hea
 
 ## Where Geodesia Sits
 
-```mermaid
-flowchart LR
-    APP([Your application<br/><small>OpenAI client</small>]):::app
-    GW[Geodesia Gateway<br/><small>:8800 · stateless</small>]:::gw
-    LLM[Upstream LLM<br/><small>vLLM · SGLang · TRT-LLM · llama.cpp · Ollama · hosted</small>]:::llm
-    DB[(Audit Database<br/><small>shared</small>)]:::db
-    PROD[Product Backend<br/><small>:8199 · compliance</small>]:::svc
-
-    APP -->|base_url → :8800/v1| GW
-    GW <-->|forward + validate| LLM
-    GW -.->|one audited row<br/>per call| DB
-    PROD -.->|reads| DB
-
-    classDef app fill:#3f51b5,color:#fff,stroke:#283593;
-    classDef gw fill:#1565c0,color:#fff,stroke:#0d47a1;
-    classDef llm fill:#5e35b1,color:#fff,stroke:#311b92;
-    classDef db fill:#37474f,color:#fff,stroke:#263238;
-    classDef svc fill:#00838f,color:#fff,stroke:#005662;
-```
+![Diagram](../assets/diagrams/gateway-compatibility-1.svg){: .diagram }
 <p class="diagram-caption">The gateway is the only thing your application talks to. It is stateless; all durable state lives in the shared audit database.</p>
 
 ---
 
 ## Choosing the Right Type
 
-```mermaid
-flowchart TD
-    Q{How is your<br/>model served?} --> A[Local OpenAI-compatible<br/>server already running]
-    Q --> B[Only the Ollama app]
-    Q --> C[A hosted API<br/>OpenAI / Azure / Groq / …]
-    Q --> D[Nothing yet —<br/>let the gateway run it]
-
-    A --> A1{Which engine?}
-    A1 -->|vLLM| TV[type: vllm]:::t
-    A1 -->|SGLang| TS[type: sglang]:::t
-    A1 -->|TensorRT-LLM| TT[type: trtllm]:::t
-    A1 -->|llama.cpp · TGI ·<br/>LM Studio · LocalAI| TO[type: openai]:::t
-
-    B --> TB[type: ollama<br/>native logprobs ≥ 0.12]:::t
-    C --> TC[type: openai<br/>+ api_key]:::t
-    D --> TD[type: internal]:::t
-
-    classDef t fill:#1565c0,color:#fff,stroke:#0d47a1;
-```
+![Diagram](../assets/diagrams/gateway-compatibility-2.svg){: .diagram }
 <p class="diagram-caption">Anything OpenAI-compatible that is not vLLM / SGLang / TensorRT-LLM uses <code>type: openai</code>.</p>
 
 ---
@@ -269,14 +233,7 @@ curl -X POST http://localhost:8800/v1/glad/gateway/config \
 
 On **Ollama < 0.12** (no native log-probs) you stay in 4-axis mode. You can recover the closed-book axis by running a **second server for the same model that does expose log-probabilities** — typically `llama.cpp` on the same GGUF. The gateway re-derives the answer through the sidecar to recover the signal (only used when native log-probs are absent).
 
-```mermaid
-flowchart LR
-    GW[Geodesia Gateway]:::gw -->|generate| OLL[Ollama < 0.12<br/><small>:11434 · no logprobs</small>]:::o
-    GW -.->|re-derive for<br/>closed-book signal| SC[llama.cpp sidecar<br/><small>:8080 · same GGUF · logprobs</small>]:::s
-    classDef gw fill:#1565c0,color:#fff,stroke:#0d47a1;
-    classDef o fill:#5e35b1,color:#fff,stroke:#311b92;
-    classDef s fill:#00838f,color:#fff,stroke:#005662;
-```
+![Diagram](../assets/diagrams/gateway-compatibility-3.svg){: .diagram }
 
 ```bash
 ./llama-server -m ./models/llama3.2.gguf --port 8080   # the sidecar
@@ -361,25 +318,7 @@ curl -X POST http://localhost:8800/v1/glad/gateway/config \
 
 The simplest production unit: the model server and the gateway side by side.
 
-```mermaid
-flowchart TB
-    subgraph HOST [" Single host (GPU) "]
-        direction LR
-        GEN[generator<br/><small>vllm/vllm-openai · :8000</small>]:::llm
-        GWC[glad-gateway<br/><small>:8800</small>]:::gw
-        VOL[(volume:<br/>audit + config + RAG)]:::db
-        GWC --> GEN
-        GWC --- VOL
-    end
-    EDGE[Reverse proxy / TLS<br/><small>nginx · :443</small>]:::edge --> GWC
-    CLIENT([Clients]):::app --> EDGE
-    classDef app fill:#3f51b5,color:#fff,stroke:#283593;
-    classDef edge fill:#455a64,color:#fff,stroke:#263238;
-    classDef gw fill:#1565c0,color:#fff,stroke:#0d47a1;
-    classDef llm fill:#5e35b1,color:#fff,stroke:#311b92;
-    classDef db fill:#37474f,color:#fff,stroke:#263238;
-    style HOST fill:#1565c00d,stroke:#1565c0,stroke-width:2px;
-```
+![Diagram](../assets/diagrams/gateway-compatibility-4.svg){: .diagram }
 
 The repository ships `deploy/docker-compose.gateway.yml` with two services — `generator` (the model) and `glad-gateway` (the validator) — and two profiles:
 
@@ -407,22 +346,7 @@ GW_MAXLEN=2048
 
 The gateway is stateless → run it as a `Deployment` with `N` replicas behind a `Service`, mount the upstream as another `Service`, keep secrets in a `Secret`, and wire `/health` to probes.
 
-```mermaid
-flowchart TB
-    ING[Ingress / TLS]:::edge --> SVC[Service: geodesia-gw<br/><small>ClusterIP :8800</small>]:::svc
-    SVC --> P1[Pod gw-1]:::gw
-    SVC --> P2[Pod gw-2]:::gw
-    SVC --> P3[Pod gw-N]:::gw
-    P1 & P2 & P3 --> GSVC[Service: model<br/><small>vLLM Deployment on GPU nodes</small>]:::llm
-    P1 & P2 & P3 -.-> PVC[(PVC / managed DB<br/><small>shared audit store</small>)]:::db
-    HPA{{HPA<br/><small>scales on CPU / RPS</small>}}:::hpa -.->|replicas| SVC
-    classDef edge fill:#455a64,color:#fff,stroke:#263238;
-    classDef svc fill:#00838f,color:#fff,stroke:#005662;
-    classDef gw fill:#1565c0,color:#fff,stroke:#0d47a1;
-    classDef llm fill:#5e35b1,color:#fff,stroke:#311b92;
-    classDef db fill:#37474f,color:#fff,stroke:#263238;
-    classDef hpa fill:#ef6c00,color:#fff,stroke:#e65100;
-```
+![Diagram](../assets/diagrams/gateway-compatibility-5.svg){: .diagram }
 
 ```yaml
 apiVersion: apps/v1
@@ -568,18 +492,7 @@ Every response carries a `geodesia{}` block — your richest telemetry source. S
 
 ## Security Hardening
 
-```mermaid
-flowchart LR
-    NET([Public]):::pub --> TLS[TLS termination<br/><small>nginx / ingress</small>]:::edge
-    TLS --> GW[Gateway :8800<br/><small>private network only</small>]:::gw
-    GW --> LLM[Model :8000<br/><small>never exposed</small>]:::llm
-    SEC[(Secret store<br/><small>GW_API_KEY</small>)]:::sec -.-> GW
-    classDef pub fill:#c62828,color:#fff,stroke:#8e0000;
-    classDef edge fill:#455a64,color:#fff,stroke:#263238;
-    classDef gw fill:#1565c0,color:#fff,stroke:#0d47a1;
-    classDef llm fill:#5e35b1,color:#fff,stroke:#311b92;
-    classDef sec fill:#00838f,color:#fff,stroke:#005662;
-```
+![Diagram](../assets/diagrams/gateway-compatibility-6.svg){: .diagram }
 
 - **Terminate TLS at the edge** (nginx / ingress); keep the gateway and the model on a private network. Never expose the model port publicly — the gateway is the only intended entry point.
 - **Inject secrets, never bake them.** `GW_API_KEY` and any license token come from a Kubernetes `Secret`, Docker secret, or vault — not from the image or git.
@@ -609,18 +522,7 @@ flowchart LR
 
 The gateway hot-reloads configuration — you can repoint it without dropping traffic.
 
-```mermaid
-sequenceDiagram
-    autonumber
-    participant Op as Operator
-    participant GW as Gateway
-    participant New as New upstream
-    Op->>GW: POST /upstream/test (new backend)
-    GW->>New: probe reachability + logprobs
-    New-->>GW: ok · models · logprobs
-    Op->>GW: POST /v1/glad/gateway/config (switch)
-    Note over GW: next request uses the new config
-```
+![Diagram](../assets/diagrams/gateway-compatibility-7.svg){: .diagram }
 
 1. **Test** the new backend first (`/upstream/test`) — confirm reachability and log-prob support.
 2. **Switch** (`POST /v1/glad/gateway/config` or roll new env vars). The closed-book axis is cross-model and needs no per-model step — it works on the new upstream immediately.

@@ -8,23 +8,7 @@ Geodesia G-1 turns everyday chat usage into a **continuous improvement flywheel*
 !!! abstract "Why it matters"
     The detector geometry is validated out-of-distribution and must not be disturbed by ad-hoc tweaks. The feedback loop lets a deployment *memorize* rare, deployment-specific incidents — a particular jailbreak phrasing, a domain term the model over-flags — without smearing that validated manifold. **Memorize, don't retrain** for the cases that matter today; fold them into the weights later, deliberately.
 
-```mermaid
-flowchart LR
-    U([User flags a message<br/>in chat]):::io --> Q[(Review queue<br/>status: pending)]:::queue
-    Q --> C{Curator}:::human
-    C -- approve<br/>axis + verdict --> A[(Approved corpus)]:::ok
-    C -- reject --> X[/discarded — trains nothing/]:::no
-    A -->|fast loop, opt-in| BANK[Episodic exemplar bank<br/>live score nudge]:::bank
-    A -->|slow loop| EXP[JSONL export<br/>next fine-tune]:::exp
-
-    classDef io fill:#3f51b5,color:#fff,stroke:#283593;
-    classDef queue fill:#37474f,color:#fff,stroke:#263238;
-    classDef human fill:#00838f,color:#fff,stroke:#005662;
-    classDef ok fill:#2e7d32,color:#fff,stroke:#1b5e20;
-    classDef no fill:#b71c1c,color:#fff,stroke:#7f0000;
-    classDef bank fill:#5e35b1,color:#fff,stroke:#311b92;
-    classDef exp fill:#ef6c00,color:#fff,stroke:#e65100;
-```
+![Diagram](../assets/diagrams/gateway-feedback.svg){: .diagram }
 
 The whole system is **additive and model-agnostic**: flags live in one extra SQLite table on the database the gateway already uses (no new datastore), and the canonical incident record is shared by both detectors — **GLAD-Hummingbird** (6 axes) and **GLAD-Tapestry** (the first 5). A flag whose axis a given model does not have is simply skipped when that model builds its bank.
 

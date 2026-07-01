@@ -238,22 +238,7 @@ curl "http://localhost:8199/v1/glad/fria/auto-prefill?deployer_id=acme-corp"
 
 ## Status Values
 
-```mermaid
-stateDiagram-v2
-    direction LR
-    [*] --> draft: create
-    draft --> submitted: complete and submit
-    submitted --> draft: changes requested
-    submitted --> approved: approve
-    approved --> archived: archive
-    draft --> archived: abandon
-    archived --> [*]
-
-    note right of approved
-        Immutable except for
-        evidence attachments
-    end note
-```
+![Diagram](../assets/diagrams/compliance-fria.svg){: .diagram }
 <p class="diagram-caption">A FRIA dossier moves through four states. Only an approved dossier satisfies the EU AI Act Article 27 pre-deployment requirement.</p>
 
 | Status | Description |

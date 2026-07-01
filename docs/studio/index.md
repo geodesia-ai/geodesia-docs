@@ -74,37 +74,7 @@ G-1 Studio cleanly separates **management** from **serving**:
 - **Control plane** — `/v1/glad/apps/*`. Create and configure Applications and Organizations, mint API keys, edit policy, read cost / metrics / forecast. See [Control-Plane API](control-plane-api.md).
 - **Data plane** — the chat path. Each request resolves its Application, GLAD-Hummingbird scores the 6 axes, the request is routed to that app's LLM, and the call is logged with its cost.
 
-```mermaid
-flowchart TB
-    subgraph CTRL [" Control plane — /v1/glad/apps/* "]
-        direction LR
-        OPS([Operator / Studio UI]):::ops --> API[Applications · Orgs · Keys<br/>Policy · Cost · Metrics · Forecast]:::ctrl
-    end
-
-    subgraph DATA [" Data plane — chat "]
-        direction LR
-        REQ([Chat request]):::io --> RES{Resolve<br/>application_id}:::res
-        RES --> GB[GLAD-Hummingbird<br/>scores 6 axes]:::gb
-        GB --> LLM[Route to the app's LLM]:::llm
-        LLM --> LOG[Log call + cost]:::log
-        LOG --> OUT([Validated response]):::io
-    end
-
-    API -.->|writes config| STORE[(Application store<br/>+ cost ledger)]:::db
-    RES -.->|reads config| STORE
-    LOG -.->|usage row| STORE
-
-    classDef ops fill:#3f51b5,color:#fff,stroke:#283593;
-    classDef ctrl fill:#5e35b1,color:#fff,stroke:#311b92;
-    classDef io fill:#3f51b5,color:#fff,stroke:#283593;
-    classDef res fill:#00838f,color:#fff,stroke:#005662;
-    classDef gb fill:#0277bd,color:#fff,stroke:#01579b;
-    classDef llm fill:#2e7d32,color:#fff,stroke:#1b5e20;
-    classDef log fill:#ef6c00,color:#fff,stroke:#e65100;
-    classDef db fill:#00838f,color:#fff,stroke:#005662;
-    style CTRL fill:#5e35b112,stroke:#5e35b1,stroke-dasharray:4 3;
-    style DATA fill:#0277bd12,stroke:#0277bd,stroke-dasharray:4 3;
-```
+![Diagram](../assets/diagrams/studio-index.svg){: .diagram }
 <p class="diagram-caption">The control plane writes Application config; the data plane reads it on every chat request to score, route, and bill against the right Application.</p>
 
 ---

@@ -403,20 +403,7 @@ The org forecast sums each Application's projection (using each app's own budget
 
 The **Cost & FinOps** view (`CostView`) renders the active Application's spend and the consolidated organization view.
 
-```mermaid
-flowchart LR
-  L[(usage_ledger)] --> S[/cost/summary/]:::api
-  L --> D[(cost_daily)]
-  D --> Y[/cost/daily/]:::api
-  D --> F[/cost/forecast/]:::api
-  S --> K[KPI cards]:::ui
-  Y --> C[Daily bar chart]:::ui
-  F --> K
-  S --> O[/orgs/.../cost/summary/]:::api --> P[Org consolidated]:::ui
-
-  classDef api fill:#5e35b1,color:#fff,stroke:#311b92;
-  classDef ui fill:#3f51b5,color:#fff,stroke:#283593;
-```
+![Diagram](../assets/diagrams/studio-cost.svg){: .diagram }
 
 **KPI cards** (top row):
 

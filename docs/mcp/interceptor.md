@@ -2,16 +2,7 @@
 
 The **Interceptor** is the *enforcing* modality. G1-Proxy sits as a trusted man-in-the-middle between an MCP host and a downstream MCP server. Every JSON-RPC message is scanned **before** its content can re-enter the model's context — so indirect injection and tool poisoning are stopped at the source, not merely reported.
 
-```mermaid
-flowchart LR
-    H([MCP Host]):::io -->|JSON-RPC| IC[G1 Interceptor]:::g
-    IC -->|forward / block| DS([Downstream MCP server<br/>filesystem · github · db]):::io
-    DS -->|results| IC
-    IC -->|scrubbed / annotated / blocked| H
-
-    classDef io fill:#3f51b5,color:#fff,stroke:#283593;
-    classDef g fill:#5e35b1,color:#fff,stroke:#311b92;
-```
+![Diagram](../assets/diagrams/mcp-interceptor.svg){: .diagram }
 
 ---
 

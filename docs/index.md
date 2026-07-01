@@ -79,32 +79,7 @@ You do not need to retrain your model. You do not need to change your applicatio
 
 ## How It Works
 
-```mermaid
-flowchart LR
-    A([Your Application]):::app -->|OpenAI-compatible<br/>request| B[Geodesia Gateway]
-
-    subgraph IN [" Input validation "]
-        C{Prompt safety<br/>& jailbreak}
-    end
-    subgraph OUT [" Output validation "]
-        V{Hallucination<br/>& answer safety}
-    end
-
-    B --> C
-    C -->|safe| E[Upstream LLM<br/>vLLM · Ollama · OpenAI · …]
-    C -->|unsafe| D[/Block or annotate/]:::block
-    E -->|answer| V
-    V -->|flagged| D
-    V -->|passed| F([Return to application]):::pass
-    B -.->|log every call| G[(Compliance DB<br/>Audit · FRIA · Oversight)]:::db
-
-    classDef app fill:#3f51b5,color:#fff,stroke:#283593;
-    classDef block fill:#c62828,color:#fff,stroke:#8e0000;
-    classDef pass fill:#2e7d32,color:#fff,stroke:#1b5e20;
-    classDef db fill:#00838f,color:#fff,stroke:#005662;
-    style IN fill:#3f51b510,stroke:#3f51b5,stroke-dasharray:4 3;
-    style OUT fill:#00bcd410,stroke:#00bcd4,stroke-dasharray:4 3;
-```
+![Diagram](assets/diagrams/index.svg){: .diagram }
 <p class="diagram-caption">Every request flows through input validation → the LLM you choose → output validation, with each call written to the compliance ledger.</p>
 
 Every chat message goes through this pipeline:

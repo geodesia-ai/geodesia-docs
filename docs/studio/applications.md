@@ -19,18 +19,7 @@ Every Application is in exactly one of three states, stored in the `status` colu
 | `paused` | Temporarily halted. | Use to suspend an Application without losing its configuration, keys, or history. |
 | `killed` | Hard-stopped (kill-switch). | The Application is retained for audit but treated as stopped. |
 
-```mermaid
-stateDiagram-v2
-    [*] --> active: create
-    active --> paused: pause
-    paused --> active: resume
-    active --> killed: kill
-    paused --> killed: kill
-    killed --> active: resume
-    active --> [*]: delete
-    paused --> [*]: delete
-    killed --> [*]: delete
-```
+![Diagram](../assets/diagrams/studio-applications.svg){: .diagram }
 
 State transitions go through `set_status`, which only accepts `active`, `paused`, or `killed`. Pausing and resuming are the same operation with a different target state.
 

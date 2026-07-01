@@ -26,19 +26,7 @@ The blend is a **confidence-weighted, risk-only** merge — Tapestry can only ev
 
 This is the same confidence-weighting used by the numeric solver. The net effect: the fast path stays authoritative on the easy cases, and Tapestry decisively catches the hard ones (for example, terse benign-looking prompts whose true intent only the full-geometry read resolves).
 
-```mermaid
-flowchart LR
-    REQ([Prompt / answer]):::io --> HB[GLAD-Hummingbird<br/>6 axes · always-on]:::hb
-    HB --> Q{Deep Scan<br/>enabled?}:::q
-    Q -- no --> OUT([Verdict]):::io
-    Q -- yes --> TP[GLAD-Tapestry<br/>8B guardian · 2nd opinion]:::tp
-    TP -->|confidence-weighted,<br/>risk-only blend| OUT
-
-    classDef io fill:#3f51b5,color:#fff,stroke:#283593;
-    classDef hb fill:#00838f,color:#fff,stroke:#005662;
-    classDef tp fill:#5e35b1,color:#fff,stroke:#311b92;
-    classDef q fill:#37474f,color:#fff,stroke:#263238;
-```
+![Diagram](../assets/diagrams/gateway-deep-scan.svg){: .diagram }
 
 ### Two flavours
 

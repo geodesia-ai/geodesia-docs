@@ -2,17 +2,7 @@
 
 MCP enforcement is configured at **three levels of granularity**, all from G-1 Studio. Platform-wide settings (ports, modalities, deep-scan availability) live in **Settings → MCP**; everything that decides *what gets blocked* is **per Application**, under **Applications → *app* → MCP**.
 
-```mermaid
-flowchart TD
-    APP[Per Application<br/>enabled · deep-scan · surface actions · allowlist]:::a
-    AX[Per Axis<br/>action + threshold for each GLAD axis]:::x
-    TL[Per Tool<br/>trusted · blocked · egress · action]:::t
-    APP --> AX --> TL --> V([Verdict]):::io
-    classDef a fill:#00838f,color:#fff,stroke:#005662;
-    classDef x fill:#5e35b1,color:#fff,stroke:#311b92;
-    classDef t fill:#3949ab,color:#fff,stroke:#283593;
-    classDef io fill:#37474f,color:#fff,stroke:#263238;
-```
+![Diagram](../assets/diagrams/mcp-policy.svg){: .diagram }
 
 Because policy is per Application, scoring uses that Application's **bound model**, so the per-model SLEDGE/axis calibration applies to MCP exactly as it does to chat.
 

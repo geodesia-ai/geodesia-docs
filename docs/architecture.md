@@ -2,34 +2,7 @@
 
 Geodesia G-1 is composed of two independent services that work together: the **Gateway** and the **Product Backend**. Both expose REST APIs; the web UI communicates with both.
 
-```mermaid
-flowchart TB
-    UI[Web UI<br/><small>single-page app</small>]:::ui
-
-    subgraph CORE [" Geodesia G-1 "]
-        GW[Geodesia Gateway<br/><small>:8800 · OpenAI-compatible proxy</small>]:::svc
-        PROD[Product Backend<br/><small>:8199 · Compliance &amp; Evaluate API</small>]:::svc
-        ENGINE[[Geodesia Detection Engine<br/><small>model-agnostic validator</small>]]:::engine
-    end
-
-    LLM[Upstream LLM<br/><small>vLLM · Ollama · OpenAI · SGLang · TRT-LLM</small>]:::llm
-    DB[(Audit Database<br/><small>calls · FRIA · oversight</small>)]:::db
-
-    UI -->|/gw/* proxy| GW
-    UI -->|/v1/* proxy| PROD
-    GW -->|forward request| LLM
-    GW -->|score| ENGINE
-    PROD -->|evaluate| ENGINE
-    GW -->|log calls| DB
-    PROD -->|audit / compliance| DB
-
-    classDef ui fill:#3f51b5,color:#fff,stroke:#283593;
-    classDef svc fill:#1565c0,color:#fff,stroke:#0d47a1;
-    classDef engine fill:#00838f,color:#fff,stroke:#005662;
-    classDef llm fill:#5e35b1,color:#fff,stroke:#311b92;
-    classDef db fill:#37474f,color:#fff,stroke:#263238;
-    style CORE fill:#3f51b50d,stroke:#3f51b5,stroke-width:2px;
-```
+![Diagram](assets/diagrams/architecture-1.svg){: .diagram }
 <p class="diagram-caption">Two cooperating services share one detection engine and one audit database. The web UI talks to both through a reverse proxy.</p>
 
 ---
@@ -103,39 +76,7 @@ GLAD-Tapestry is a **second opinion**, not a replacement: it can only *raise* ri
 
 ## Data Flow: A Single Chat Request
 
-```mermaid
-sequenceDiagram
-    autonumber
-    participant App as Your Application
-    participant GW as Geodesia Gateway
-    participant ENG as Detection Engine
-    participant RAG as Knowledge Base
-    participant LLM as Upstream LLM
-    participant DB as Audit DB
-
-    App->>GW: POST /v1/chat/completions
-    GW->>ENG: score prompt (safety · jailbreak)
-    alt prompt flagged & blocking mode
-        GW-->>App: block notice (no LLM call)
-    else prompt safe
-        opt RAG collection provided
-            GW->>RAG: retrieve top-K chunks
-            RAG-->>GW: grounding context
-        end
-        GW->>LLM: forward (enriched) request
-        LLM-->>GW: response (stream or full)
-        GW->>ENG: score answer (faithfulness · fabrication · safety)
-        opt RAG active
-            GW->>RAG: verify each claim cites a chunk
-        end
-        alt answer flagged & blocking mode
-            GW-->>App: block notice
-        else answer passed
-            GW-->>App: response + geodesia{} payload
-        end
-    end
-    GW->>DB: insert one audited row
-```
+![Diagram](assets/diagrams/architecture-2.svg){: .diagram }
 <p class="diagram-caption">The full lifecycle of one chat request: input screening, optional retrieval, generation, output validation, and audit logging.</p>
 
 ---

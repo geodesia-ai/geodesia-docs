@@ -27,28 +27,7 @@ The Geodesia G-1 Compliance Platform provides the complete toolchain to operate,
 
 Every inference call goes through the following compliance pipeline regardless of whether you use the gateway or the evaluate endpoint:
 
-```mermaid
-flowchart TD
-    C([Inference call]):::io --> K{Kill switch<br/>active?}
-    K -->|yes| X[/Service suspended<br/>503/]:::block
-    K -->|no| G[Generate + score]:::proc --> R[Detection results]:::proc
-
-    R --> W[Watermark injection<br/><small>latent HMAC-SHA256</small>]:::post
-    R --> L[Append-only log<br/><small>hash-chained</small>]:::post
-    R --> T[Retention tagging<br/><small>expiry assigned</small>]:::post
-    R --> O[Oversight trigger<br/><small>if score &gt; threshold</small>]:::post
-
-    W --> D([Response delivered]):::pass
-    L --> D
-    T --> D
-    O --> D
-
-    classDef io fill:#3f51b5,color:#fff,stroke:#283593;
-    classDef proc fill:#1565c0,color:#fff,stroke:#0d47a1;
-    classDef post fill:#00838f,color:#fff,stroke:#005662;
-    classDef block fill:#c62828,color:#fff,stroke:#8e0000;
-    classDef pass fill:#2e7d32,color:#fff,stroke:#1b5e20;
-```
+![Diagram](../assets/diagrams/compliance-index.svg){: .diagram }
 <p class="diagram-caption">Every inference call passes through the same compliance pipeline — whether it arrives via the gateway or the evaluate endpoint.</p>
 
 All data is written to a single SQLite database (`var/glad.sqlite3` by default) that is shared between the gateway and the product backend.

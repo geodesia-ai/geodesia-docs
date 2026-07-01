@@ -57,38 +57,7 @@ Geodesia G-1 scores every request across **six independent detection axes**. Eac
 
 The six axes split into two groups by **where in the request lifecycle** they are evaluated: three screen the **input / context region** (before the LLM is called), three validate the **output** (after the answer is generated).
 
-```mermaid
-flowchart LR
-    P([Incoming prompt]):::io --> IN
-
-    subgraph IN [" Input / context axes — before the LLM "]
-        direction TB
-        PS[prompt_safety]:::prompt
-        JB[jailbreak]:::jail
-        RJ[rag_jailbreak]:::jail
-    end
-
-    IN --> LLM[Upstream LLM<br/>generates answer]:::llm --> OUT
-
-    subgraph OUT [" Output axes — after the answer "]
-        direction TB
-        HC[halluc_context]:::ctx
-        CB[halluc_closedbook]:::cb
-        AS[answer_safety]:::ans
-    end
-
-    OUT --> R([Validated response]):::io
-
-    classDef io fill:#3f51b5,color:#fff,stroke:#283593;
-    classDef llm fill:#5e35b1,color:#fff,stroke:#311b92;
-    classDef prompt fill:#f48fb1,color:#3b1f29,stroke:#c2185b;
-    classDef jail fill:#ef9a9a,color:#3b1f1f,stroke:#c62828;
-    classDef ctx fill:#4fc3f7,color:#06303f,stroke:#0277bd;
-    classDef cb fill:#a5d6a7,color:#10300f,stroke:#2e7d32;
-    classDef ans fill:#ffcc80,color:#3d2a00,stroke:#ef6c00;
-    style IN fill:#f48fb112,stroke:#c2185b,stroke-dasharray:4 3;
-    style OUT fill:#4fc3f712,stroke:#0277bd,stroke-dasharray:4 3;
-```
+![Diagram](../assets/diagrams/gateway-detection-axes.svg){: .diagram }
 <p class="diagram-caption">Input axes can stop a request before it ever reaches the model; output axes validate what the model produced. <code>halluc_closedbook</code> additionally needs log-probabilities from the upstream.</p>
 
 ---

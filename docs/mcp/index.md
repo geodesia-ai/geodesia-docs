@@ -38,27 +38,7 @@ Each MCP message carries untrusted content in a specific *role*. Geodesia places
 
 Geodesia exposes MCP security in three complementary forms. They share one scoring core, so a verdict is identical however you reach it.
 
-```mermaid
-flowchart LR
-    H([MCP Host]):::io
-
-    subgraph A["A · Guard Server"]
-      GS[glad.* tools<br/>:8810/mcp]:::g
-    end
-    subgraph B["B · Interceptor"]
-      IC[inline proxy<br/>scrub + block]:::g
-    end
-    subgraph C["C · Tool-aware chat"]
-      CH[/v1/chat/completions<br/>validates tools/tool_calls]:::g
-    end
-
-    H -->|calls glad.* to vet| GS
-    H -->|all JSON-RPC flows through| IC --> DS([Downstream MCP server]):::io
-    H -->|OpenAI function-calling| CH
-
-    classDef io fill:#3f51b5,color:#fff,stroke:#283593;
-    classDef g fill:#00838f,color:#fff,stroke:#005662;
-```
+![Diagram](../assets/diagrams/mcp-index.svg){: .diagram }
 
 <div class="grid cards" markdown>
 

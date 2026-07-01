@@ -2,19 +2,7 @@
 
 Geodesia G-1 can operate in two enforcement modes that control what happens when a detection axis flags content. The mode can be set globally (in the gateway configuration) and overridden on a per-request basis.
 
-```mermaid
-flowchart TD
-    S{{Axis flags content}} --> M{Enforcement<br/>mode?}
-    M -->|blocking| B[/Withhold content<br/>return block notice/]:::block
-    M -->|passthrough| A[Return real answer<br/>annotated with verdict]:::pass
-
-    B --> L[(Audit log:<br/>decision = blocked)]:::db
-    A --> L2[(Audit log:<br/>decision = flagged)]:::db
-
-    classDef block fill:#c62828,color:#fff,stroke:#8e0000;
-    classDef pass fill:#2e7d32,color:#fff,stroke:#1b5e20;
-    classDef db fill:#37474f,color:#fff,stroke:#263238;
-```
+![Diagram](../assets/diagrams/gateway-enforcement-modes.svg){: .diagram }
 <p class="diagram-caption">Both modes record the verdict — they differ only in whether the flagged content reaches the user.</p>
 
 ---
