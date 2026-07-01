@@ -2,166 +2,186 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://geodesia-ai.github.io/geodesia-docs/</loc>
-         <lastmod>2026-06-27</lastmod>
+         <lastmod>2026-07-01</lastmod>
     </url>
     <url>
          <loc>https://geodesia-ai.github.io/geodesia-docs/architecture/</loc>
-         <lastmod>2026-06-27</lastmod>
+         <lastmod>2026-07-01</lastmod>
     </url>
     <url>
          <loc>https://geodesia-ai.github.io/geodesia-docs/quickstart/</loc>
-         <lastmod>2026-06-27</lastmod>
+         <lastmod>2026-07-01</lastmod>
     </url>
     <url>
          <loc>https://geodesia-ai.github.io/geodesia-docs/agent-flow/</loc>
-         <lastmod>2026-06-27</lastmod>
+         <lastmod>2026-07-01</lastmod>
     </url>
     <url>
          <loc>https://geodesia-ai.github.io/geodesia-docs/compliance/</loc>
-         <lastmod>2026-06-27</lastmod>
+         <lastmod>2026-07-01</lastmod>
     </url>
     <url>
          <loc>https://geodesia-ai.github.io/geodesia-docs/compliance/audit-chain/</loc>
-         <lastmod>2026-06-27</lastmod>
+         <lastmod>2026-07-01</lastmod>
     </url>
     <url>
          <loc>https://geodesia-ai.github.io/geodesia-docs/compliance/dashboard/</loc>
-         <lastmod>2026-06-27</lastmod>
+         <lastmod>2026-07-01</lastmod>
     </url>
     <url>
          <loc>https://geodesia-ai.github.io/geodesia-docs/compliance/fria/</loc>
-         <lastmod>2026-06-27</lastmod>
+         <lastmod>2026-07-01</lastmod>
     </url>
     <url>
          <loc>https://geodesia-ai.github.io/geodesia-docs/compliance/kill-switch/</loc>
-         <lastmod>2026-06-27</lastmod>
+         <lastmod>2026-07-01</lastmod>
     </url>
     <url>
          <loc>https://geodesia-ai.github.io/geodesia-docs/compliance/oversight/</loc>
-         <lastmod>2026-06-27</lastmod>
+         <lastmod>2026-07-01</lastmod>
     </url>
     <url>
          <loc>https://geodesia-ai.github.io/geodesia-docs/compliance/reports/</loc>
-         <lastmod>2026-06-27</lastmod>
+         <lastmod>2026-07-01</lastmod>
     </url>
     <url>
          <loc>https://geodesia-ai.github.io/geodesia-docs/compliance/watermark/</loc>
-         <lastmod>2026-06-27</lastmod>
+         <lastmod>2026-07-01</lastmod>
     </url>
     <url>
          <loc>https://geodesia-ai.github.io/geodesia-docs/configuration/</loc>
-         <lastmod>2026-06-27</lastmod>
+         <lastmod>2026-07-01</lastmod>
     </url>
     <url>
          <loc>https://geodesia-ai.github.io/geodesia-docs/configuration/env-vars/</loc>
-         <lastmod>2026-06-27</lastmod>
+         <lastmod>2026-07-01</lastmod>
     </url>
     <url>
          <loc>https://geodesia-ai.github.io/geodesia-docs/gateway/</loc>
-         <lastmod>2026-06-27</lastmod>
+         <lastmod>2026-07-01</lastmod>
     </url>
     <url>
          <loc>https://geodesia-ai.github.io/geodesia-docs/gateway/backends/</loc>
-         <lastmod>2026-06-27</lastmod>
+         <lastmod>2026-07-01</lastmod>
     </url>
     <url>
          <loc>https://geodesia-ai.github.io/geodesia-docs/gateway/causal-xai/</loc>
-         <lastmod>2026-06-27</lastmod>
+         <lastmod>2026-07-01</lastmod>
     </url>
     <url>
          <loc>https://geodesia-ai.github.io/geodesia-docs/gateway/chat-api/</loc>
-         <lastmod>2026-06-27</lastmod>
+         <lastmod>2026-07-01</lastmod>
     </url>
     <url>
          <loc>https://geodesia-ai.github.io/geodesia-docs/gateway/compatibility/</loc>
-         <lastmod>2026-06-27</lastmod>
+         <lastmod>2026-07-01</lastmod>
     </url>
     <url>
          <loc>https://geodesia-ai.github.io/geodesia-docs/gateway/configuration/</loc>
-         <lastmod>2026-06-27</lastmod>
+         <lastmod>2026-07-01</lastmod>
     </url>
     <url>
          <loc>https://geodesia-ai.github.io/geodesia-docs/gateway/deep-scan/</loc>
-         <lastmod>2026-06-27</lastmod>
+         <lastmod>2026-07-01</lastmod>
     </url>
     <url>
          <loc>https://geodesia-ai.github.io/geodesia-docs/gateway/detection-axes/</loc>
-         <lastmod>2026-06-27</lastmod>
+         <lastmod>2026-07-01</lastmod>
     </url>
     <url>
          <loc>https://geodesia-ai.github.io/geodesia-docs/gateway/enforcement-modes/</loc>
-         <lastmod>2026-06-27</lastmod>
+         <lastmod>2026-07-01</lastmod>
     </url>
     <url>
          <loc>https://geodesia-ai.github.io/geodesia-docs/gateway/feedback/</loc>
-         <lastmod>2026-06-27</lastmod>
+         <lastmod>2026-07-01</lastmod>
     </url>
     <url>
          <loc>https://geodesia-ai.github.io/geodesia-docs/gateway/web-search/</loc>
-         <lastmod>2026-06-27</lastmod>
+         <lastmod>2026-07-01</lastmod>
     </url>
     <url>
          <loc>https://geodesia-ai.github.io/geodesia-docs/includes/mkdocs/</loc>
-         <lastmod>2026-06-27</lastmod>
+         <lastmod>2026-07-01</lastmod>
+    </url>
+    <url>
+         <loc>https://geodesia-ai.github.io/geodesia-docs/mcp/</loc>
+         <lastmod>2026-07-01</lastmod>
+    </url>
+    <url>
+         <loc>https://geodesia-ai.github.io/geodesia-docs/mcp/chat-aware/</loc>
+         <lastmod>2026-07-01</lastmod>
+    </url>
+    <url>
+         <loc>https://geodesia-ai.github.io/geodesia-docs/mcp/guard-server/</loc>
+         <lastmod>2026-07-01</lastmod>
+    </url>
+    <url>
+         <loc>https://geodesia-ai.github.io/geodesia-docs/mcp/interceptor/</loc>
+         <lastmod>2026-07-01</lastmod>
+    </url>
+    <url>
+         <loc>https://geodesia-ai.github.io/geodesia-docs/mcp/policy/</loc>
+         <lastmod>2026-07-01</lastmod>
     </url>
     <url>
          <loc>https://geodesia-ai.github.io/geodesia-docs/product-api/</loc>
-         <lastmod>2026-06-27</lastmod>
+         <lastmod>2026-07-01</lastmod>
     </url>
     <url>
          <loc>https://geodesia-ai.github.io/geodesia-docs/product-api/evaluate/</loc>
-         <lastmod>2026-06-27</lastmod>
+         <lastmod>2026-07-01</lastmod>
     </url>
     <url>
          <loc>https://geodesia-ai.github.io/geodesia-docs/product-api/explainability/</loc>
-         <lastmod>2026-06-27</lastmod>
+         <lastmod>2026-07-01</lastmod>
     </url>
     <url>
          <loc>https://geodesia-ai.github.io/geodesia-docs/rag/</loc>
-         <lastmod>2026-06-27</lastmod>
+         <lastmod>2026-07-01</lastmod>
     </url>
     <url>
          <loc>https://geodesia-ai.github.io/geodesia-docs/reference/response-format/</loc>
-         <lastmod>2026-06-27</lastmod>
+         <lastmod>2026-07-01</lastmod>
     </url>
     <url>
          <loc>https://geodesia-ai.github.io/geodesia-docs/reference/thresholds/</loc>
-         <lastmod>2026-06-27</lastmod>
+         <lastmod>2026-07-01</lastmod>
     </url>
     <url>
          <loc>https://geodesia-ai.github.io/geodesia-docs/regulatory/</loc>
-         <lastmod>2026-06-27</lastmod>
+         <lastmod>2026-07-01</lastmod>
     </url>
     <url>
          <loc>https://geodesia-ai.github.io/geodesia-docs/regulatory/eu-ai-act/</loc>
-         <lastmod>2026-06-27</lastmod>
+         <lastmod>2026-07-01</lastmod>
     </url>
     <url>
          <loc>https://geodesia-ai.github.io/geodesia-docs/regulatory/global-laws/</loc>
-         <lastmod>2026-06-27</lastmod>
+         <lastmod>2026-07-01</lastmod>
     </url>
     <url>
          <loc>https://geodesia-ai.github.io/geodesia-docs/studio/</loc>
-         <lastmod>2026-06-27</lastmod>
+         <lastmod>2026-07-01</lastmod>
     </url>
     <url>
          <loc>https://geodesia-ai.github.io/geodesia-docs/studio/applications/</loc>
-         <lastmod>2026-06-27</lastmod>
+         <lastmod>2026-07-01</lastmod>
     </url>
     <url>
          <loc>https://geodesia-ai.github.io/geodesia-docs/studio/cloud-upstreams/</loc>
-         <lastmod>2026-06-27</lastmod>
+         <lastmod>2026-07-01</lastmod>
     </url>
     <url>
          <loc>https://geodesia-ai.github.io/geodesia-docs/studio/control-plane-api/</loc>
-         <lastmod>2026-06-27</lastmod>
+         <lastmod>2026-07-01</lastmod>
     </url>
     <url>
          <loc>https://geodesia-ai.github.io/geodesia-docs/studio/cost/</loc>
-         <lastmod>2026-06-27</lastmod>
+         <lastmod>2026-07-01</lastmod>
     </url>
     <url>
          <loc>https://geodesia-ai.github.io/geodesia-docs/studio/licensing/</loc>
-         <lastmod>2026-06-27</lastmod>
+         <lastmod>2026-07-01</lastmod>
     </url>
 </urlset>
