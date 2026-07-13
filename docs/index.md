@@ -61,7 +61,7 @@ You do not need to retrain your model. You do not need to change your applicatio
 <div class="feature-card">
 <span class="feature-icon">🪡</span>
 <h3>Deep Scan (GLAD-Tapestry)</h3>
-<p>Opt-in 8B guardian second opinion for high-stakes Applications — blended confidently into the safety and hallucination axes. Off by default; zero overhead until enabled.</p>
+<p>Opt-in geometric MoE second opinion for high-stakes Applications — blended confidently into the safety and hallucination axes. Off by default; zero overhead until enabled.</p>
 </div>
 
 <div class="feature-card">

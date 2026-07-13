@@ -52,7 +52,7 @@ on the first numeric request; a strong solver may pull a 7B model on first use).
 
 ### Deep Scan (GLAD-Tapestry 8B)
 
-Enables the heavyweight 8B second opinion on safety and hallucination/grounding. **Applies live** (loads on
+Enables the geometric MoE second opinion on safety and hallucination/grounding. **Applies live** (loads on
 first use). It runs on the **GPU** by default; on a GPU that can't also hold the LLM + companion (e.g. a
 16 GB card) install with `--deep-scan-cpu` so it runs on CPU/RAM instead — see
 [Deep Scan](../gateway/deep-scan.md) and the [Installer](../installer.md).

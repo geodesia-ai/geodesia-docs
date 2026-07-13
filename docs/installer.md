@@ -68,7 +68,7 @@ The flag can appear anywhere; these are equivalent:
 ```
 
 !!! note "Deep scan on CPU"
-    Deep scan defaults **on**. On `--cpu` it loads an 8B model in bf16 (~16 GB RAM) on first use and is
+    Deep scan defaults **on**. On `--cpu` it loads the deep-scan model in bf16 (~16 GB RAM) on first use and is
     noticeably slower than GPU. Set `DEEP_SCAN=off` before installing to disable it.
 
 ---
@@ -119,7 +119,7 @@ All optional, with sensible defaults. Set them inline before the command.
 | `UPSTREAM_TYPE` | `ollama` | `ollama` · `openai` · `vllm` · `sglang` · `trtllm` · `internal` · `azure-openai` · `bedrock` · `vertex` |
 | `UPSTREAM_URL` | `http://localhost:11434` | your LLM base URL |
 | `UPSTREAM_MODEL` | `llama3.1:8b` | the model your LLM serves |
-| `DEEP_SCAN` | `on` | `on`/`off` — 8B second-opinion judge |
+| `DEEP_SCAN` | `on` | `on`/`off` — geometric MoE second-opinion judge |
 | `GATEWAY_URL` | `http://localhost:8800` | where g1-studio reaches the engine (for `g1-studio`-only installs) |
 | `WORKDIR` | `$PWD/geodesia-g1` | where the install files live |
 | `LICENSE` | (unset) | signed token / path / raw JSON |

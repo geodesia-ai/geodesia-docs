@@ -1,6 +1,6 @@
 # Deep Scan — GLAD-Tapestry
 
-**GLAD-Tapestry** is Geodesia's optional *deep-scan* tier: a heavyweight 8B guardian that reads the full geometry of a prompt/answer exchange and returns a confident **second opinion** on the safety and hallucination axes. It runs *behind* the always-on [GLAD-Hummingbird](detection-axes.md) detector and is **off by default** — when disabled it is never loaded and adds zero overhead.
+**GLAD-Tapestry** is Geodesia's optional *deep-scan* tier: a geometric MoE model that reads the full geometry of a prompt/answer exchange and returns a confident **second opinion** on the safety and hallucination axes. It runs *behind* the always-on [GLAD-Hummingbird](detection-axes.md) detector and is **off by default** — when disabled it is never loaded and adds zero overhead.
 
 !!! abstract "When to use it"
     Use Deep Scan for **high-stakes** Applications — medical, legal, financial, or any deployment where a missed jailbreak or hallucination is expensive — and where the extra latency and a larger GPU are acceptable. For everything else, GLAD-Hummingbird alone is the fast default.
@@ -9,7 +9,7 @@
 
 ## How it works
 
-GLAD-Tapestry is Geodesia's own **proprietary 8B guardian symbiont** loaded **in-process** in 4-bit (bnb nf4, ~5 GB of VRAM). The gateway runs it *after* the GLAD-Hummingbird verdict and blends its scores into the matching axes:
+GLAD-Tapestry is Geodesia's own **proprietary geometric MoE model** loaded **in-process** (~5 GB of VRAM). The gateway runs it *after* the GLAD-Hummingbird verdict and blends its scores into the matching axes:
 
 | Tapestry score | Blended into axis | Phase |
 |---|---|---|
@@ -32,7 +32,7 @@ This is the same confidence-weighting used by the numeric solver. The net effect
 
 | Flavour | Loaded when | Behaviour |
 |---|---|---|
-| **Trained Tapestry** *(preferred)* | `GW_DEEP_SCAN_DIR` points at a trained export directory | Reads the model's **geometry heads** → continuous per-axis scores. This is the GLAD symbiont fine-tuned on closed-book / grounded corpora. |
+| **Trained Tapestry** *(preferred)* | `GW_DEEP_SCAN_DIR` points at a trained export directory | Reads the model's **geometry heads** → continuous per-axis scores. This is the geometric MoE model fine-tuned on closed-book / grounded corpora. |
 | **Zero-shot Tapestry** *(fallback)* | only `GW_DEEP_SCAN_MODEL` is set | Invokes the base Tapestry checkpoint as a yes/no risk classifier and reads the probability mass on the affirmative token → a calibrated score in `[0, 1]`. |
 
 ---
@@ -106,7 +106,7 @@ These are the **raw** second-opinion probabilities. Each axis in `axis_energy` s
 | `GW_DEEP_SCAN_MODEL` | `geodesia-guardian-8b` | Tapestry model id for the zero-shot fallback (used when `GW_DEEP_SCAN_DIR` is unset). |
 | `GW_DEEP_SCAN_QUANT` | `4bit` | `4bit` (bnb nf4, ~5 GB) or empty for bf16 (~16 GB). 4-bit needs CUDA. |
 | `GW_DEEP_SCAN_DEVICE` | `auto` | `auto` picks CUDA → MPS → CPU. Pin to e.g. `cuda:0`. |
-| `GW_DEEP_SCAN_LORA` | *(unset)* | Optional QLoRA symbiont adapter directory layered on the zero-shot guardian. |
+| `GW_DEEP_SCAN_LORA` | *(unset)* | Optional adapter directory layered on the geometric MoE model. |
 
 !!! warning "Hardware"
-    The 8B guardian needs roughly **5 GB of VRAM in 4-bit** (CUDA), or ~16 GB in bf16. On Apple Silicon it runs on MPS; on CPU it loads but is slow. Plan for it to share the GPU with GLAD-Hummingbird and (if co-located) the upstream model.
+    The deep-scan model needs roughly **5 GB of VRAM** (CUDA), or ~16 GB in bf16. On Apple Silicon it runs on MPS; on CPU it loads but is slow. Plan for it to share the GPU with GLAD-Hummingbird and (if co-located) the upstream model.

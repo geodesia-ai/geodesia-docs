@@ -144,7 +144,7 @@ This pulls `${REG}/g1-proxy:cuda` and `${REG}/g1-studio:wolfi`, then starts:
 
 ### 4. Enable Deep Scan on the proxy (optional)
 
-To turn on the [GLAD-Tapestry](gateway/deep-scan.md) deep-scan tier, add its env vars to the `g1-proxy` service (it needs ~5 GB of extra VRAM in 4-bit):
+To turn on the [GLAD-Tapestry](gateway/deep-scan.md) deep-scan tier, add its env vars to the `g1-proxy` service (it needs ~5 GB of extra VRAM):
 
 ```bash
 GW_DEEP_SCAN=on \

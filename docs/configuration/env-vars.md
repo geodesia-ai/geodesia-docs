@@ -146,7 +146,7 @@ See [Cost & Budget](../studio/cost.md) for the FinOps engine, budget bands, and 
 
 ### Deep Scan (GLAD-Tapestry)
 
-Opt-in 8B guardian second opinion, blended into the safety and hallucination axes. **Off by default → never loaded, zero overhead.** See [Deep Scan](../gateway/deep-scan.md).
+Opt-in geometric MoE second opinion, blended into the safety and hallucination axes. **Off by default → never loaded, zero overhead.** See [Deep Scan](../gateway/deep-scan.md).
 
 | Variable | Default | Description |
 |---|---|---|
@@ -155,7 +155,7 @@ Opt-in 8B guardian second opinion, blended into the safety and hallucination axe
 | `GW_DEEP_SCAN_MODEL` | `geodesia-guardian-8b` | Tapestry model id for the zero-shot fallback (when `GW_DEEP_SCAN_DIR` is unset). |
 | `GW_DEEP_SCAN_QUANT` | `4bit` | `4bit` (bnb nf4, ~5 GB VRAM, needs CUDA) or empty for bf16 (~16 GB). |
 | `GW_DEEP_SCAN_DEVICE` | `auto` | `auto` → CUDA → MPS → CPU. Pin to e.g. `cuda:0`. |
-| `GW_DEEP_SCAN_LORA` | — | Optional QLoRA symbiont adapter directory for the zero-shot guardian. |
+| `GW_DEEP_SCAN_LORA` | — | Optional adapter directory for the geometric MoE model. |
 
 ### Live Web Search
 

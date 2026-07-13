@@ -130,7 +130,7 @@ GATEWAY_PORT=8800      # engine port
 UPSTREAM_TYPE=ollama   # ollama | openai | vllm | sglang | trtllm | internal | azure-openai | bedrock | vertex
 UPSTREAM_URL=http://localhost:11434
 UPSTREAM_MODEL=llama3.1:8b
-DEEP_SCAN=on           # on | off  (8B second-opinion judge)
+DEEP_SCAN=on           # on | off  (geometric MoE second-opinion judge)
 GATEWAY_URL=http://localhost:8800   # where g1-studio reaches the engine
 WORKDIR=$PWD/geodesia-g1            # where compose + config live
 ```
@@ -234,7 +234,7 @@ curl -s http://localhost:8800/v1/glad/gateway/entitlements | python3 -m json.too
 
 ## 7. Deep scan (GLAD-Tapestry)
 
-Deep scan is an 8B second-opinion judge, ON by default (`DEEP_SCAN=on`). On `--cpu` it loads ~16GB in bf16 on
+Deep scan is a geometric MoE second-opinion judge, ON by default (`DEEP_SCAN=on`). On `--cpu` it loads ~16GB in bf16 on
 first use and is slower.
 
 ```bash
@@ -488,7 +488,7 @@ docker compose down -v          # also wipe the DB/state volume (destroys apps, 
 | `UPSTREAM_TYPE` | `ollama` | `ollama\|openai\|vllm\|sglang\|trtllm\|internal\|azure-openai\|bedrock\|vertex` |
 | `UPSTREAM_URL` | `http://localhost:11434` | your LLM base URL |
 | `UPSTREAM_MODEL` | `llama3.1:8b` | model name the LLM serves |
-| `DEEP_SCAN` | `on` | 8B second-opinion judge |
+| `DEEP_SCAN` | `on` | geometric MoE second-opinion judge |
 | `GATEWAY_URL` | `http://localhost:8800` | where g1-studio reaches the engine |
 | `WORKDIR` | `$PWD/geodesia-g1` | install directory |
 | `LICENSE` | (unset) | `GEO1.<b64>` \| path \| raw JSON |
