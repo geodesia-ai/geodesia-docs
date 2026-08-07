@@ -303,7 +303,7 @@ Each axis produces a per-axis object in the `geodesia.axis_energy` response fiel
 | `fact_seeking` | `bool` | (closed-book only) Whether the question was classified as fact-seeking. Only fact-seeking questions can flag. |
 | `suppressed_by` | `string` \| `null` | Reason why the axis was suppressed despite the score. Example: `"rag_claim_verification"` when all RAG claims are verified. |
 | `p_detector_raw` | `float` \| `null` | The original score before suppression, for audit purposes. |
-| `exemplar_match` | `object` \| `null` | Present when the [feedback exemplar bank](feedback.md#episodic-exemplar-bank-fast-loop) moved this score, with the matched verdict and similarity. |
+| `exemplar_match` | `object` \| `null` | Present when the [feedback exemplar bank](self-evolving.md#3-the-fast-loop-episodic-memory) moved this score, with the matched verdict and similarity. |
 
 The `geodesia.brake` field is `true` if any **answer-region** axis (`halluc_context`, `halluc_closedbook`, `answer_safety`) has `flag: true`. Input-region axes affect the input phase separately.
 

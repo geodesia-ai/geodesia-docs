@@ -144,7 +144,7 @@ This pulls `${REG}/g1-proxy:cuda` and `${REG}/g1-studio:wolfi`, then starts:
 
 ### 4. Enable Deep Scan on the proxy (optional)
 
-To turn on the [GLAD-Tapestry](gateway/deep-scan.md) deep-scan tier, add its env vars to the `g1-proxy` service (it needs ~5 GB of extra VRAM):
+To turn on the [GLAD-Tapestry](g1-proxy/deep-scan.md) deep-scan tier, add its env vars to the `g1-proxy` service (it needs ~5 GB of extra VRAM):
 
 ```bash
 GW_DEEP_SCAN=on \
@@ -258,9 +258,9 @@ The product backend is then available at `http://localhost:8199/v1/glad/`.
 
 | Goal | Guide |
 |---|---|
-| Connect a different LLM backend | [Upstream Backends](gateway/backends.md) |
+| Connect a different LLM backend | [Upstream Backends](g1-proxy/backends.md) |
 | Configure detection thresholds | [Detection Thresholds](reference/thresholds.md) |
-| Enable blocking mode | [Enforcement Modes](gateway/enforcement-modes.md) |
+| Enable blocking mode | [Enforcement Modes](g1-proxy/enforcement-modes.md) |
 | Upload documents for RAG | [Knowledge Base](rag/index.md) |
 | Set up EU AI Act compliance | [FRIA](compliance/fria.md) |
 | Understand the full config.yaml | [Configuration Reference](configuration/index.md) |

@@ -56,13 +56,13 @@ Negative rates are rejected at config validation; missing rates default to `0`, 
 
 ### Two models, two rates
 
-When [complexity routing](../gateway/cost-control.md#complexity-routing-model-a-model-b) is enabled, a call answered by **Model B** is priced with `cost.complex_input_per_mtok` / `cost.complex_output_per_mtok` instead. Both default to `null`, in which case they inherit the Model A rates — so an Application that enables routing without setting them still bills correctly, just at a single blended rate.
+When [complexity routing](../g1-proxy/cost-control.md#complexity-routing-model-a-model-b) is enabled, a call answered by **Model B** is priced with `cost.complex_input_per_mtok` / `cost.complex_output_per_mtok` instead. Both default to `null`, in which case they inherit the Model A rates — so an Application that enables routing without setting them still bills correctly, just at a single blended rate.
 
 The ledger always prices the call at the rate of the model that **actually answered**, which is what makes the routing saving readable rather than theoretical: the cheap tier and the expensive tier appear as different unit costs in the same series.
 
 ### The refused call
 
-A request refused at the gate — an unsafe prompt, or an off-topic one when `out_of_scope` is a blocking axis — never reaches the upstream, so it contributes **zero** input and output tokens while still producing an audit row. Refused volume is visible as `prompt_blocked` in `GET /v1/glad/apps/{app_id}/metrics`; read it next to spend to see what the gate is saving you. See [Token & Cost Control](../gateway/cost-control.md).
+A request refused at the gate — an unsafe prompt, or an off-topic one when `out_of_scope` is a blocking axis — never reaches the upstream, so it contributes **zero** input and output tokens while still producing an audit row. Refused volume is visible as `prompt_blocked` in `GET /v1/glad/apps/{app_id}/metrics`; read it next to spend to see what the gate is saving you. See [Token & Cost Control](../g1-proxy/cost-control.md).
 
 ---
 
@@ -435,4 +435,4 @@ The **Cost & FinOps** view (`CostView`) renders the active Application's spend a
 
 - [Applications](applications.md) — where the `cost` config (rates, budget, alerts, recipients) is set per Application, and where the budget projection chart lives.
 - [Control-Plane API](control-plane-api.md) — the full `/v1/glad` surface and RBAC.
-- [Detection Axes](../gateway/detection-axes.md) — what the `blocked` flag on a ledger row reflects.
+- [Detection Axes](../g1-proxy/detection-axes.md) — what the `blocked` flag on a ledger row reflects.

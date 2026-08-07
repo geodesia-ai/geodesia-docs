@@ -37,7 +37,7 @@ Each Application stores a validated `AppConfig` JSON document (`config_json`), v
 | `schema_version` | `int` | `1` | Config document schema version. |
 | `calibration_profile` | `string` | `"default"` | Calibration profile id for this Application's thresholds (set to the model key when seeded). |
 | `binding` | object | see below | Upstream LLM binding (**Model A**). |
-| `complex_routing` | object | disabled | Optional [complexity routing](../gateway/cost-control.md#complexity-routing-model-a-model-b) to a second model (**Model B**). |
+| `complex_routing` | object | disabled | Optional [complexity routing](../g1-proxy/cost-control.md#complexity-routing-model-a-model-b) to a second model (**Model B**). |
 | `policy` | object | see below | Detection policy: thresholds + enforcement + options. |
 | `cost` | object | see below | Cost rates and budget (FinOps). |
 | `governance` | object | see below | Compliance and human-oversight settings. |
@@ -59,7 +59,7 @@ Each Application stores a validated `AppConfig` JSON document (`config_json`), v
 !!! danger "Credentials are never stored in plaintext"
     `api_key_ref` holds a **reference**, not a secret: `secret://app/<name>`. The secrets provider resolves it at request time (environment variable → file → AWS Secrets Manager). Bedrock and Vertex use the host's IAM role / Application Default Credentials and need no key at all. The plaintext upstream key is never persisted in the Application config.
 
-The `logprobs` setting governs the closed-book fabrication axis: `require` forces a logprob-capable path, `off` disables it, and `auto` (default) uses logprobs when the upstream offers them. See [Detection Axes](../gateway/detection-axes.md) for why `halluc_closedbook` depends on per-token log-probabilities.
+The `logprobs` setting governs the closed-book fabrication axis: `require` forces a logprob-capable path, `off` disables it, and `auto` (default) uses logprobs when the upstream offers them. See [Detection Axes](../g1-proxy/detection-axes.md) for why `halluc_closedbook` depends on per-token log-probabilities.
 
 ### `complex_routing` — a second model for hard prompts
 
@@ -71,7 +71,7 @@ Optional. Disabled by default, in which case the Application behaves exactly as 
 | `threshold` | `float` | `0.5` | `p(prompt_complexity)` **strictly greater** than this routes to Model B. `0.5` is the classifier's training boundary. |
 | `complex_binding` | object \| `null` | `null` | Partial override of `binding` for Model B. Every field is optional and inherits Model A when unset — usually only `model` is set. |
 
-See [Token & Cost Control](../gateway/cost-control.md#complexity-routing-model-a-model-b) for what this buys you and how to size the threshold.
+See [Token & Cost Control](../g1-proxy/cost-control.md#complexity-routing-model-a-model-b) for what this buys you and how to size the threshold.
 
 ### `policy` — detection thresholds and enforcement
 
@@ -85,7 +85,7 @@ The policy is scored across the **nine** GLAD-Hummingbird axes. Each axis has it
 | `inject_system` | `bool` | `true` | If `true`, the Constitutional Intelligence system prompt is prepended to every request. |
 | `ci_prompt_ref` | `string` | `"docs/G1_Constitutional_Prompt_Compact.md"` | Reference to the CI system prompt to inject. |
 | `scope` | `string` | `""` | **The Application's declared purpose, in one sentence.** The only input of the `out_of_scope` axis — without it that axis is silent by construction. A client's own system message overrides it per conversation. |
-| `feedback_learning` | `bool` | `false` | Opt this Application into the approved-[feedback](../gateway/feedback.md) exemplar bank without flipping the global default. `false` = byte-identical detection. |
+| `feedback_learning` | `bool` | `false` | Opt this Application into the approved-[feedback](../g1-proxy/self-evolving.md) exemplar bank without flipping the global default. `false` = byte-identical detection. |
 | `rag_collection` | `string` \| `null` | `null` | RAG knowledge-base collection bound to this Application. |
 | `optional_detectors` | `dict[str, bool]` | `{causal_xai: false, self_consistency: false}` | Opt-in extra detectors. |
 | `streaming_brake` | `dict` | `{enabled: true, cadence_tokens: 32}` | Mid-stream re-scoring: whether the brake is on and how often (in tokens) it fires. |
@@ -110,7 +110,7 @@ The policy is scored across the **nine** GLAD-Hummingbird axes. Each axis has it
 !!! note "Threshold direction"
     A **higher** threshold is more permissive (fewer flags); a **lower** threshold is stricter. The prompt-region axes default to `block` enforcement, while the answer-region hallucination/safety axes default to `annotate` so you can observe before you block. Validation rejects thresholds outside `[0, 1]`, unknown axis names, and enforcement modes other than `block` / `annotate` / `off`.
 
-The two `optional_detectors` are off by default: `causal_xai` adds causal token attribution (see [Causal XAI](../gateway/causal-xai.md)), and `self_consistency` draws multiple samples to reduce closed-book fabrication false positives.
+The two `optional_detectors` are off by default: `causal_xai` adds causal token attribution (see [Causal XAI](../g1-proxy/causal-xai.md)), and `self_consistency` draws multiple samples to reduce closed-book fabrication false positives.
 
 ### `cost` — rates and budget (FinOps)
 

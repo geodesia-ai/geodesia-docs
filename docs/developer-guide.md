@@ -158,8 +158,8 @@ not one blended score.
 
 The last three ship **annotate-only**: they appear in `axis_energy` and in the audit record but do not
 withhold anything until an operator promotes them. See
-[Detection Axes](gateway/detection-axes.md#guardrails-vs-operational-axes) and
-[Token & Cost Control](gateway/cost-control.md).
+[Detection Axes](g1-proxy/detection-axes.md#guardrails-vs-operational-axes) and
+[Token & Cost Control](g1-proxy/cost-control.md).
 
 ### Per-axis fields
 

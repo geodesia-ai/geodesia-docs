@@ -63,8 +63,8 @@ Both services share a single **Geodesia detection engine**, which comes in two c
 
 | Tier | Name | What it is | When it runs |
 |---|---|---|---|
-| **Always-on** | **GLAD-Hummingbird** | A geometric MoE model. Reads the prompt, context, and answer and produces the nine independent [detection axes](gateway/detection-axes.md) in a single forward pass. Fast and lightweight — milliseconds per request on a small GPU (or CPU). | Every request |
-| **Opt-in** | **GLAD-Tapestry** | A geometric MoE model. Reads the *full geometry* of the exchange and returns a confident second opinion that is blended into the safety and hallucination axes. Off by default — never loaded, zero overhead. | When **Deep Scan** is enabled (see [Deep Scan](gateway/deep-scan.md)) |
+| **Always-on** | **GLAD-Hummingbird** | A geometric MoE model. Reads the prompt, context, and answer and produces the nine independent [detection axes](g1-proxy/detection-axes.md) in a single forward pass. Fast and lightweight — milliseconds per request on a small GPU (or CPU). | Every request |
+| **Opt-in** | **GLAD-Tapestry** | A geometric MoE model. Reads the *full geometry* of the exchange and returns a confident second opinion that is blended into the safety and hallucination axes. Off by default — never loaded, zero overhead. | When **Deep Scan** is enabled (see [Deep Scan](g1-proxy/deep-scan.md)) |
 
 GLAD-Hummingbird is **model-agnostic**: the same checkpoint works against any upstream, from a locally hosted model to the OpenAI API.
 

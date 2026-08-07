@@ -2,7 +2,7 @@
 
 The **Model Context Protocol (MCP)** lets an AI host (Claude Desktop, an IDE, an agent runtime) connect to external **tools**, **resources** and **prompts** over JSON-RPC. That power is also a new attack surface: the model no longer just *answers* — it *calls tools*, *reads untrusted data*, and *acts*. The MCP specification is explicit that it **cannot enforce security at the protocol level** and leaves consent, tool safety and data-egress control to the implementer.
 
-Geodesia G-1 fills exactly that gap. Starting G1-Proxy starts an **MCP security layer** alongside the LLM chat gateway: the same always-on [GLAD-Hummingbird](../gateway/detection-axes.md) detector (and the optional [GLAD-Tapestry](../gateway/deep-scan.md) deep scan) now vets **every MCP surface** — tool descriptions, tool-call arguments, tool/resource *results* and final answers — before they can act, and explains *why* it flagged something with [Causal XAI](../gateway/causal-xai.md).
+Geodesia G-1 fills exactly that gap. Starting G1-Proxy starts an **MCP security layer** alongside the LLM chat gateway: the same always-on [GLAD-Hummingbird](../g1-proxy/detection-axes.md) detector (and the optional [GLAD-Tapestry](../g1-proxy/deep-scan.md) deep scan) now vets **every MCP surface** — tool descriptions, tool-call arguments, tool/resource *results* and final answers — before they can act, and explains *why* it flagged something with [Causal XAI](../g1-proxy/causal-xai.md).
 
 !!! abstract "One sentence"
     Geodesia turns "trust the tool" into a **measurable, per-axis, per-tool, per-application verdict** — with an optional signed certificate — that any MCP host can consult or that the gateway can enforce inline.
@@ -23,7 +23,7 @@ Geodesia G-1 fills exactly that gap. Starting G1-Proxy starts an **MCP security 
 
 ## How a surface maps to a detection axis
 
-Each MCP message carries untrusted content in a specific *role*. Geodesia places it in the slot the matching [axis](../gateway/detection-axes.md) reads:
+Each MCP message carries untrusted content in a specific *role*. Geodesia places it in the slot the matching [axis](../g1-proxy/detection-axes.md) reads:
 
 | MCP surface | Untrusted content | Region | Primary axes |
 |---|---|---|---|

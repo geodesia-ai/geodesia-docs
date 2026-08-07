@@ -1,6 +1,6 @@
 # Control Plane API
 
-The **control plane** is how you create and manage Organizations, Applications, policy, cost configuration, and API keys in G-1 Studio. It is the management counterpart to the [chat data plane](../gateway/chat-api.md): the control plane decides *what* an Application is, the data plane *runs* requests through it.
+The **control plane** is how you create and manage Organizations, Applications, policy, cost configuration, and API keys in G-1 Studio. It is the management counterpart to the [chat data plane](../g1-proxy/chat-api.md): the control plane decides *what* an Application is, the data plane *runs* requests through it.
 
 Every control-plane route is mounted under **`/v1/glad`** — right next to the compliance API — on the same single-origin server as the gateway and the web UI. The routes operate on the shared Studio database (Organizations, Applications, API keys, the usage ledger).
 
@@ -95,7 +95,7 @@ Every route, grouped by resource. The **Role** column is the minimum role for th
 | `PUT` | `/v1/glad/apps/{app_id}/policy` | `app_editor` | Merge fields into the policy block. |
 | `GET` | `/v1/glad/apps/{app_id}/cost` | — | The Application's cost configuration (rates, budget). |
 | `PUT` | `/v1/glad/apps/{app_id}/cost` | `app_editor` | Merge fields into the cost configuration. |
-| `GET` | `/v1/glad/apps/{app_id}/routing` | — | The Application's [complexity-routing](../gateway/cost-control.md#complexity-routing-model-a-model-b) block (Model B binding + threshold). |
+| `GET` | `/v1/glad/apps/{app_id}/routing` | — | The Application's [complexity-routing](../g1-proxy/cost-control.md#complexity-routing-model-a-model-b) block (Model B binding + threshold). |
 | `PUT` | `/v1/glad/apps/{app_id}/routing` | `app_editor` | Merge fields into the routing block. A masked or omitted `api_key` keeps the stored Model-B credential. |
 
 ### Metrics & cost
@@ -331,7 +331,7 @@ curl -s http://localhost:8080/v1/chat/completions \
   -d '{"model":"llama3.1:8b","stream":false,"messages":[{"role":"user","content":"Is this NDA mutual?"}]}'
 ```
 
-The key belongs to exactly one Application, so it resolves the Application implicitly — a raw API client that authenticates with just `Authorization: Bearer g1k_live_…` is still routed to, scoped to, and billed against its own Application. If you send **both** an explicit id/header **and** a `g1k_` key, the explicit id/header wins. For the full chat request/response contract, see the [Chat API](../gateway/chat-api.md).
+The key belongs to exactly one Application, so it resolves the Application implicitly — a raw API client that authenticates with just `Authorization: Bearer g1k_live_…` is still routed to, scoped to, and billed against its own Application. If you send **both** an explicit id/header **and** a `g1k_` key, the explicit id/header wins. For the full chat request/response contract, see the [Chat API](../g1-proxy/chat-api.md).
 
 ---
 
@@ -340,4 +340,4 @@ The key belongs to exactly one Application, so it resolves the Application impli
 - [Managing Applications](applications.md) — the Application config shape (binding, policy, cost, governance) and lifecycle.
 - [Licensing](licensing.md) — the entitlement cap, license tokens, and how they raise the Application limit.
 - [Cost & FinOps](cost.md) — the usage ledger, daily roll-up, budgets, and forecasting model.
-- [Chat API](../gateway/chat-api.md) — the data-plane endpoint that consumes the routing header and the per-Application policy.
+- [Chat API](../g1-proxy/chat-api.md) — the data-plane endpoint that consumes the routing header and the per-Application policy.

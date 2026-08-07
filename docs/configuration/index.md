@@ -1,6 +1,6 @@
 # Configuration Reference
 
-Geodesia G-1 uses a single `config.yaml` file for the Product Backend. The Gateway is configured via environment variables and the [GatewayConfig API](../gateway/configuration.md). This page documents every `config.yaml` section.
+Geodesia G-1 uses a single `config.yaml` file for the Product Backend. The Gateway is configured via environment variables and the [GatewayConfig API](../g1-proxy/configuration.md). This page documents every `config.yaml` section.
 
 ---
 

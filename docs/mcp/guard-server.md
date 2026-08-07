@@ -62,7 +62,7 @@ Persist the returned `hashes` as your approved set; pass them back as `approved_
 
 ### `glad.scan_resource`
 
-Scans an untrusted **result** (a tool's output or a file/resource) for indirect prompt injection — the `rag_jailbreak` axis is trained for exactly "hidden `assistant: do X` instructions inside context". With deep scan on, a [GLAD-Tapestry](../gateway/deep-scan.md) pass adds a harmful-payload score (`safety_p`).
+Scans an untrusted **result** (a tool's output or a file/resource) for indirect prompt injection — the `rag_jailbreak` axis is trained for exactly "hidden `assistant: do X` instructions inside context". With deep scan on, a [GLAD-Tapestry](../g1-proxy/deep-scan.md) pass adds a harmful-payload score (`safety_p`).
 
 ```jsonc
 { "name": "glad.scan_resource",
@@ -97,7 +97,7 @@ Confirms the final answer is grounded in the tool results (no fabrication beyond
 
 ### `glad.explain` — Causal XAI
 
-Explains **why** content was flagged, at the token level, using the same black-box attribution as the [Causal XAI](../gateway/causal-xai.md) endpoint. Pass `generated` for a flagged answer, or `prompt`/`context` for a flagged tool description / injected resource.
+Explains **why** content was flagged, at the token level, using the same black-box attribution as the [Causal XAI](../g1-proxy/causal-xai.md) endpoint. Pass `generated` for a flagged answer, or `prompt`/`context` for a flagged tool description / injected resource.
 
 ```jsonc
 { "name": "glad.explain",

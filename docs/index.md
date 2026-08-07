@@ -22,10 +22,10 @@ You do not need to retrain your model. You do not need to change your applicatio
 - **Hallucination detection** — independent, separately calibrated signals that tell you whether the model's answer is grounded in the provided context or is a fabrication.
 - **Safety enforcement** — real-time prompt screening and answer inspection to block unsafe, harmful, or jailbreak requests before they reach the model or the user.
 - **Regulatory compliance** — a full audit trail, EU AI Act impact assessments, GDPR data retention, kill-switch, human oversight escalation, and more — across 13 global frameworks.
-- **Causal explainability** — token-level attribution that shows exactly *which* words in the input caused the model's output, with no access to model internals required — painted as a [heatmap on the text](gateway/causal-xai.md#how-it-works-visualized).
+- **Causal explainability** — token-level attribution that shows exactly *which* words in the input caused the model's output, with no access to model internals required — painted as a [heatmap on the text](g1-proxy/causal-xai.md#how-it-works-visualized).
 - **Realtime voice guard** — a streaming-Whisper layer in front of the detector screens *spoken* jailbreaks and unsafe prompts as they are said, and brakes mid-sentence.
 - **MCP security** — starting the proxy starts an [MCP security layer](mcp/index.md) that vets every tool description, tool-call argument and tool result before an agent can act.
-- **Token & cost control** — off-topic requests are refused before the upstream call (zero tokens billed) and easy prompts are [routed to a cheaper model](gateway/cost-control.md) than hard ones, from the same detector pass.
+- **Token & cost control** — off-topic requests are refused before the upstream call (zero tokens billed) and easy prompts are [routed to a cheaper model](g1-proxy/cost-control.md) than hard ones, from the same detector pass.
 - **A security policy that evolves with you** — [Policy Lens](studio/policy-lens.md) simulates a threshold change on your own real traffic before you apply it, and every human correction feeds back into the detector.
 
 <div class="feature-grid">
@@ -45,7 +45,7 @@ You do not need to retrain your model. You do not need to change your applicatio
 <div class="feature-card">
 <span class="feature-icon">💸</span>
 <h3>Token &amp; Cost Control</h3>
-<p>Two axes that pay for themselves: <a href="gateway/cost-control/"><code>out_of_scope</code></a> refuses off-topic traffic <em>before</em> the upstream call (zero tokens billed), and <code>prompt_complexity</code> routes easy prompts to the cheap model and hard ones to the capable one — no extra latency, no extra model call.</p>
+<p>Two axes that pay for themselves: <a href="g1-proxy/cost-control/"><code>out_of_scope</code></a> refuses off-topic traffic <em>before</em> the upstream call (zero tokens billed), and <code>prompt_complexity</code> routes easy prompts to the cheap model and hard ones to the capable one — no extra latency, no extra model call.</p>
 </div>
 
 <div class="feature-card">
@@ -57,7 +57,7 @@ You do not need to retrain your model. You do not need to change your applicatio
 <div class="feature-card">
 <span class="feature-icon">🎙️</span>
 <h3>Realtime Voice Guard</h3>
-<p>A streaming <strong>Whisper</strong> layer (sliding window · LocalAgreement-2) transcribes speech incrementally and re-scores it on the input axes — a <a href="gateway/audio-input/">brake on the microphone</a> that stops spoken jailbreaks mid-sentence. <code>tiny</code> baked in, real-time on CPU.</p>
+<p>A streaming <strong>Whisper</strong> layer (sliding window · LocalAgreement-2) transcribes speech incrementally and re-scores it on the input axes — a <a href="g1-proxy/audio-input/">brake on the microphone</a> that stops spoken jailbreaks mid-sentence. <code>tiny</code> baked in, real-time on CPU.</p>
 </div>
 
 <div class="feature-card">
@@ -69,7 +69,7 @@ You do not need to retrain your model. You do not need to change your applicatio
 <div class="feature-card">
 <span class="feature-icon">🔍</span>
 <h3>Causal Explainability</h3>
-<p><strong>Deterministic</strong> <a href="gateway/causal-xai/#how-it-works-visualized">token-level attribution</a> painted as a heatmap on the answer — DCA and MuPAX&nbsp;LLM over the detector, no upstream-model internals, no gradients, no sampling. Shows the one token that caused the flag, and proves it by removing it.</p>
+<p><strong>Deterministic</strong> <a href="g1-proxy/causal-xai/#how-it-works-visualized">token-level attribution</a> painted as a heatmap on the answer — DCA and MuPAX&nbsp;LLM over the detector, no upstream-model internals, no gradients, no sampling. Shows the one token that caused the flag, and proves it by removing it.</p>
 </div>
 
 <div class="feature-card">
@@ -119,7 +119,7 @@ You do not need to retrain your model. You do not need to change your applicatio
 
 Every chat message goes through this pipeline:
 
-1. **Input validation** — the prompt and conversation history are scored across prompt safety and jailbreak detection axes. If a threshold is exceeded in blocking mode, the request is refused before the model sees it. **Spoken** input is transcribed by a [streaming Whisper layer](gateway/audio-input.md) and scored on the same axes, mid-utterance.
+1. **Input validation** — the prompt and conversation history are scored across prompt safety and jailbreak detection axes. If a threshold is exceeded in blocking mode, the request is refused before the model sees it. **Spoken** input is transcribed by a [streaming Whisper layer](g1-proxy/audio-input.md) and scored on the same axes, mid-utterance.
 2. **Context injection** — if you supplied a grounding context (or uploaded documents to the knowledge base), it is injected into the upstream request.
 3. **Generation** — the upstream LLM produces a response. For streaming requests, Geodesia monitors every 32 tokens (configurable cadence) and can halt generation mid-stream if dangerous content emerges.
 4. **Output validation** — the completed answer is scored for hallucination and unsafe content. RAG answers additionally go through claim-level citation verification.
@@ -135,16 +135,16 @@ Every chat message goes through this pipeline:
 | **Install Geodesia G-1 (one command)** | [Installer (install.sh)](installer.md) |
 | Configure & operate the stack | [Installation & Configuration](installation.md) |
 | Create an API key & make my first call | [Developer Quickstart](developer-quickstart.md) |
-| Connect my first LLM backend | [Upstream Backends](gateway/backends.md) |
-| Understand the detection axes | [Detection Axes](gateway/detection-axes.md) |
-| **Cut my token bill** | [Token & Cost Control](gateway/cost-control.md) |
+| Connect my first LLM backend | [Upstream Backends](g1-proxy/backends.md) |
+| Understand the detection axes | [Detection Axes](g1-proxy/detection-axes.md) |
+| **Cut my token bill** | [Token & Cost Control](g1-proxy/cost-control.md) |
 | **Tune a threshold on my own traffic** | [Policy Lens](studio/policy-lens.md) |
-| **Guard realtime voice input** | [Audio Input (Realtime Voice)](gateway/audio-input.md) |
-| **See how explainability works** | [Causal XAI — visualized](gateway/causal-xai.md#how-it-works-visualized) |
+| **Guard realtime voice input** | [Audio Input (Realtime Voice)](g1-proxy/audio-input.md) |
+| **See how explainability works** | [Causal XAI — visualized](g1-proxy/causal-xai.md#how-it-works-visualized) |
 | Secure MCP tools & agents | [MCP Security Gateway](mcp/index.md) |
 | Set up multiple Applications | [G-1 Studio](studio/index.md) |
 | Track cost & budgets | [Cost & FinOps](studio/cost.md) |
-| Call the chat endpoint | [Chat API](gateway/chat-api.md) |
+| Call the chat endpoint | [Chat API](g1-proxy/chat-api.md) |
 | Upload documents for RAG | [Knowledge Base](rag/index.md) |
 | Set up compliance for the EU AI Act | [FRIA](compliance/fria.md) |
 | Configure detection thresholds | [Detection Thresholds](reference/thresholds.md) |

@@ -17,7 +17,7 @@ score <  threshold  →  pass
 
 Scores are always in the range [0, 1]: **0** = the detector is confident the content is safe/grounded/in-scope; **1** = confident it is not.
 
-A flag is not automatically a block. What a flag *does* depends on the axis's **enforcement mode** — `block`, `annotate`, or `off` — configured per Application. See [Detection Axes](../gateway/detection-axes.md#guardrails-vs-operational-axes).
+A flag is not automatically a block. What a flag *does* depends on the axis's **enforcement mode** — `block`, `annotate`, or `off` — configured per Application. See [Detection Axes](../g1-proxy/detection-axes.md#guardrails-vs-operational-axes).
 
 ---
 
@@ -168,13 +168,13 @@ The **borderline zone** is where detection is least certain and where human revi
 "human_oversight": { "auto_trigger": true, "safety_threshold": 0.70, "halluc_threshold": 0.75 }
 ```
 
-Reviewed borderline calls become corrections, corrections feed the [feedback loop](../gateway/feedback.md), and the loop is what lets you move the threshold next month on evidence instead of instinct.
+Reviewed borderline calls become corrections, corrections feed the [self-evolving loop](../g1-proxy/self-evolving.md), and the loop is what lets you move the threshold next month on evidence instead of instinct.
 
 ---
 
 ## See also
 
-- [Detection Axes](../gateway/detection-axes.md) — what each axis scores and how enforcement is grouped
+- [Detection Axes](../g1-proxy/detection-axes.md) — what each axis scores and how enforcement is grouped
 - [Policy Lens](../studio/policy-lens.md) — the counterfactual simulator these thresholds deserve
-- [Token & Cost Control](../gateway/cost-control.md) — the two axes where the threshold is a spending decision
-- [Human Feedback Loop](../gateway/feedback.md) — correcting individual cases instead of moving the line
+- [Token & Cost Control](../g1-proxy/cost-control.md) — the two axes where the threshold is a spending decision
+- [Self-Evolving Security](../g1-proxy/self-evolving.md) — correcting individual cases instead of moving the line

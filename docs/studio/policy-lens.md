@@ -51,7 +51,7 @@ This is not an estimate and not a sample. The threshold is applied *after* scori
 
 Two consequences worth stating plainly:
 
-- **The ground truth is yours.** The "confirmed good moves" counter is computed from your reviewers' own approved corrections in the [feedback loop](../gateway/feedback.md) — never from a synthetic label or a vendor benchmark.
+- **The ground truth is yours.** The "confirmed good moves" counter is computed from your reviewers' own approved corrections in the [self-evolving loop](../g1-proxy/self-evolving.md) — never from a synthetic label or a vendor benchmark.
 - **Nothing is sent anywhere.** The simulation runs over rows already in your database; the text never leaves the row store, and only the previews already kept for the audit trail are displayed.
 
 ### Applying it
@@ -62,7 +62,7 @@ Two consequences worth stating plainly:
 
 ## The per-message counterfactual: *but-for*
 
-Tap any message and the deep-dive opens: the **[causal attribution](../gateway/causal-xai.md)** of that decision, rendered as a heatmap over the message's own words.
+Tap any message and the deep-dive opens: the **[causal attribution](../g1-proxy/causal-xai.md)** of that decision, rendered as a heatmap over the message's own words.
 
 Three things happen there that a score alone cannot tell you:
 
@@ -83,7 +83,7 @@ When the right answer is *"this one case is wrong"* rather than *"the line is wr
 - **Wrongly blocked** — a benign message that was refused (`false_positive`)
 - **Should block** — a real problem that got through (`false_negative`), routed to the axis currently in view so the correction trains the right axis
 
-The correction goes into the same `/v1/glad/feedback` queue the chat uses — it is reviewed, approved, and then feeds the episodic exemplar bank and the export corpus exactly like any other flag. There is no separate store and no separate workflow. See [Human Feedback Loop](../gateway/feedback.md).
+The correction goes into the same `/v1/glad/feedback` queue the chat uses — it is reviewed, approved, and then feeds the episodic exemplar bank and the export corpus exactly like any other flag. There is no separate store and no separate workflow. See [Self-Evolving Security](../g1-proxy/self-evolving.md).
 
 ---
 
@@ -188,7 +188,7 @@ Send only the axes you are changing — the update is a merge, and the response 
 
 ## See also
 
-- [Detection Axes](../gateway/detection-axes.md) — what each threshold governs, and the calibrated starting points
-- [Human Feedback Loop](../gateway/feedback.md) — the surgical lever end to end, including the retrain API
-- [Causal Explainability](../gateway/causal-xai.md) — how the responsible words are computed, and why the computation is deterministic
-- [Token & Cost Control](../gateway/cost-control.md) — tuning `out_of_scope` and `prompt_complexity` on the same surface
+- [Detection Axes](../g1-proxy/detection-axes.md) — what each threshold governs, and the calibrated starting points
+- [Self-Evolving Security](../g1-proxy/self-evolving.md) — the surgical lever end to end, including the retrain API
+- [Causal Explainability](../g1-proxy/causal-xai.md) — how the responsible words are computed, and why the computation is deterministic
+- [Token & Cost Control](../g1-proxy/cost-control.md) — tuning `out_of_scope` and `prompt_complexity` on the same surface

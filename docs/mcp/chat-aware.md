@@ -1,6 +1,6 @@
 # Tool-aware Chat (Modality C)
 
-Agents that use **OpenAI-style function calling** put their tools in-band: a `tools` array on the request and `tool_calls` in the assistant message. Modality C makes the existing [`/v1/chat/completions`](../gateway/chat-api.md) endpoint *aware* of this — it validates the tool surface **before** the upstream model is called, with no new transport and no client change.
+Agents that use **OpenAI-style function calling** put their tools in-band: a `tools` array on the request and `tool_calls` in the assistant message. Modality C makes the existing [`/v1/chat/completions`](../g1-proxy/chat-api.md) endpoint *aware* of this — it validates the tool surface **before** the upstream model is called, with no new transport and no client change.
 
 !!! success "Byte-identical when there's nothing to scan"
     The preflight runs **only** when a request actually contains tools or tool-role messages. Plain chat is completely unaffected.

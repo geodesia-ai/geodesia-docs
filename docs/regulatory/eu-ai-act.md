@@ -30,7 +30,7 @@ Article 5 prohibits certain AI applications (social scoring, real-time biometric
 
 | Requirement | Geodesia G-1 Feature |
 |---|---|
-| Identify and analyze known and foreseeable risks | [Detection axes](../gateway/detection-axes.md) — 5-axis risk monitoring |
+| Identify and analyze known and foreseeable risks | [Detection axes](../g1-proxy/detection-axes.md) — 5-axis risk monitoring |
 | Evaluate risks from deployment context | [FRIA](../compliance/fria.md) — deployment context section |
 | Implement risk management measures | [Thresholds](../reference/thresholds.md) — configurable detection thresholds |
 | Testing with real-world data | [Human oversight decisions](../compliance/oversight.md) — ground-truth feedback loop |

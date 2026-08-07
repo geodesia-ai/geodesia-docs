@@ -8,7 +8,7 @@ This page documents each of those scale-out surfaces. For a full step-by-step wa
 
 ## Cloud upstream adapters
 
-An Application's binding selects which LLM it talks to. In addition to the local OpenAI-compatible backends (`vllm`, `sglang`, `trtllm`, `openai`, `ollama`, `internal` — see [Upstream Backends](../gateway/backends.md)), `binding.upstream_type` can be one of three **managed cloud providers**:
+An Application's binding selects which LLM it talks to. In addition to the local OpenAI-compatible backends (`vllm`, `sglang`, `trtllm`, `openai`, `ollama`, `internal` — see [Upstream Backends](../g1-proxy/backends.md)), `binding.upstream_type` can be one of three **managed cloud providers**:
 
 | `upstream_type` | Provider | SDK | Auth | Logprobs |
 |---|---|---|---|---|
@@ -47,7 +47,7 @@ OpenAI messages are translated to Gemini `contents` (the `assistant` role become
 Azure OpenAI is **not a separate adapter** — `get_adapter("azure-openai")` returns `None` and the gateway serves it through its existing OpenAI-compatible HTTP path, passing the Azure API key as an `api-key` header. Because it is an OpenAI-compatible endpoint, it **does** expose per-token logprobs, so all detection axes remain available.
 
 !!! warning "Bedrock and Vertex do not expose per-token logprobs"
-    The `halluc_closedbook` axis is computed from per-token log-probabilities. Bedrock and Vertex do not return them (their adapters always yield empty `token_records`), so for those upstreams the closed-book axis is **automatically advisory / off** — no configuration change is required. The gateway degrades to its 4-axis mode the same way it does for legacy Ollama **< 0.12** (current Ollama ≥ 0.12 *does* expose logprobs and runs the full 5 axes). The other axes (prompt safety, jailbreak, RAG/context-injection, grounded hallucination, answer safety) work fully. See [Detection Axes](../gateway/detection-axes.md) for what each axis needs.
+    The `halluc_closedbook` axis is computed from per-token log-probabilities. Bedrock and Vertex do not return them (their adapters always yield empty `token_records`), so for those upstreams the closed-book axis is **automatically advisory / off** — no configuration change is required. The gateway degrades to its 4-axis mode the same way it does for legacy Ollama **< 0.12** (current Ollama ≥ 0.12 *does* expose logprobs and runs the full 5 axes). The other axes (prompt safety, jailbreak, RAG/context-injection, grounded hallucination, answer safety) work fully. See [Detection Axes](../g1-proxy/detection-axes.md) for what each axis needs.
 
 ---
 

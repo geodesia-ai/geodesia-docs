@@ -18,7 +18,7 @@ Each `entry_hash` is computed over: `prev_hash + timestamp + event_type + payloa
 
 The hash chain proves that a record **was not altered after the fact**. It cannot, on its own, prove that the record was *right* — a perfectly intact chain of unexplainable decisions is still unexplainable.
 
-Geodesia pairs it with a second, independent property: the decision's explanation is **deterministic and recomputable**. [Causal explainability](../gateway/causal-xai.md) is a measurement over a deterministic detector — no gradients, no sampling, no LLM in the loop — so the same request, against the same detector build, yields the same responsible tokens for anyone who runs it, including an auditor who does not trust you.
+Geodesia pairs it with a second, independent property: the decision's explanation is **deterministic and recomputable**. [Causal explainability](../g1-proxy/causal-xai.md) is a measurement over a deterministic detector — no gradients, no sampling, no LLM in the loop — so the same request, against the same detector build, yields the same responsible tokens for anyone who runs it, including an auditor who does not trust you.
 
 | Question an auditor asks | Answered by |
 |---|---|

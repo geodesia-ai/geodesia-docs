@@ -121,7 +121,7 @@ For the companion gateway deployment (where Geodesia runs against an external LL
 
 <div class="endpoint"><span class="method method-post">POST</span><span class="path">/v1/glad/causal-explainability/analyze</span></div>
 
-See [Causal XAI](../gateway/causal-xai.md) for full documentation.
+See [Causal XAI](../g1-proxy/causal-xai.md) for full documentation.
 
 ---
 

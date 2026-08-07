@@ -177,7 +177,7 @@ docker compose up -d --force-recreate
 ## 5. Configure the upstream LLM
 
 The engine talks to your LLM via `GEODESIA_UPSTREAM_*`. Set them at install (env above) or edit `.env` and
-recreate. **The container ENV is the source of truth** — a `POST .../gateway/config` change is in-memory only
+recreate. **The container ENV is the source of truth** — a `POST .../g1-proxy/config` change is in-memory only
 and is overwritten by the env on the next restart.
 
 ```bash

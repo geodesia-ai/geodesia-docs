@@ -75,7 +75,7 @@ Set these variables when starting the gateway (`python -m uvicorn geodesia_gatew
 | `GW_BLOCK_INPUT` | `0` | Set to `1` to enable input blocking (prompt safety + jailbreak enforcement). `0` = annotate only. |
 | `GW_BLOCK_OUTPUT` | `0` | Set to `1` to enable output blocking (answer safety + hallucination enforcement). |
 | `GW_DEFAULT_MODE` | `"block"` | Default enforcement mode: `"block"` or `"passthrough"` |
-| `GW_PROMPT_BLOCK_AXES` | `prompt_safety,jailbreak` | Which prompt-region axes may **refuse** a request. Widen it to promote an operational axis, e.g. `prompt_safety,jailbreak,out_of_scope` to refuse off-topic traffic before the upstream call. Never add `prompt_complexity`. See [Detection Axes](../gateway/detection-axes.md#guardrails-vs-operational-axes). |
+| `GW_PROMPT_BLOCK_AXES` | `prompt_safety,jailbreak` | Which prompt-region axes may **refuse** a request. Widen it to promote an operational axis, e.g. `prompt_safety,jailbreak,out_of_scope` to refuse off-topic traffic before the upstream call. Never add `prompt_complexity`. See [Detection Axes](../g1-proxy/detection-axes.md#guardrails-vs-operational-axes). |
 | `GB_EXTRA_AXES` | *(per checkpoint)* | Axes the served head adds on top of the base six, as `name:region,…` (`region ∈ ans\|prompt\|context`). The 9-axis head ships `profanity:prompt,out_of_scope:prompt,prompt_complexity:prompt`. Read by the detector, the gateway, the policy schema and the feedback store from this single source. |
 | `GW_SYSTEM_AS_CONTEXT` | `0` | `1` treats system messages as grounding context for `halluc_context`. Off by default: a system prompt is an instruction, not evidence — it feeds `out_of_scope` instead. Enable only if your deployment ships its knowledge base inside the system message. |
 
@@ -96,7 +96,7 @@ These override the thresholds stored in the database for the gateway instance.
 
 ### Causal Explainability (Gateway)
 
-Black-box causal attribution over the companion detector. See [Causal Explainability](../gateway/causal-xai.md).
+Black-box causal attribution over the companion detector. See [Causal Explainability](../g1-proxy/causal-xai.md).
 
 | Variable | Default | Description |
 |---|---|---|
@@ -165,7 +165,7 @@ See [Cost & Budget](../studio/cost.md) for the FinOps engine, budget bands, and 
 
 ### Deep Scan (GLAD-Tapestry)
 
-Opt-in geometric MoE second opinion, blended into the safety and hallucination axes. **Off by default → never loaded, zero overhead.** See [Deep Scan](../gateway/deep-scan.md).
+Opt-in geometric MoE second opinion, blended into the safety and hallucination axes. **Off by default → never loaded, zero overhead.** See [Deep Scan](../g1-proxy/deep-scan.md).
 
 | Variable | Default | Description |
 |---|---|---|
@@ -178,7 +178,7 @@ Opt-in geometric MoE second opinion, blended into the safety and hallucination a
 
 ### Live Web Search
 
-On by default; the chat searches the live web, screens every page through the GLAD-BERT firewall, and grounds the answer in the safe pages. A **Tavily** API key gives reliable, rate-limit-free results; without one, the key-less DuckDuckGo engine is used as a fallback. See [Live Web Search](../gateway/web-search.md).
+On by default; the chat searches the live web, screens every page through the GLAD-BERT firewall, and grounds the answer in the safe pages. A **Tavily** API key gives reliable, rate-limit-free results; without one, the key-less DuckDuckGo engine is used as a fallback. See [Live Web Search](../g1-proxy/web-search.md).
 
 | Variable | Default | Description |
 |---|---|---|
@@ -195,7 +195,7 @@ On by default; the chat searches the live web, screens every page through the GL
 
 ### Human Feedback Loop
 
-Opt-in episodic exemplar bank built from approved chat feedback. Off by default → detection is byte-identical. See [Human Feedback Loop](../gateway/feedback.md).
+Opt-in episodic exemplar bank built from approved chat feedback. Off by default → detection is byte-identical. See [Self-Evolving Security](../g1-proxy/self-evolving.md).
 
 | Variable | Default | Description |
 |---|---|---|

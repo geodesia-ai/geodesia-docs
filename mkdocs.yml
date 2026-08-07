@@ -135,21 +135,22 @@ nav:
     - Control Plane API: studio/control-plane-api.md
     - Licensing & Entitlements: studio/licensing.md
     - Cloud Upstreams & Scale-Out: studio/cloud-upstreams.md
-  - Gateway:
-    - Introduction: gateway/index.md
-    - Configuration: gateway/configuration.md
-    - Upstream Backends: gateway/backends.md
-    - Framework Compatibility: gateway/compatibility.md
-    - Chat API: gateway/chat-api.md
-    - Audio Input (Realtime Voice): gateway/audio-input.md
-    - Enforcement Modes: gateway/enforcement-modes.md
-    - Detection Axes: gateway/detection-axes.md
-    - Token & Cost Control: gateway/cost-control.md
-    - Deep Scan (GLAD-Tapestry): gateway/deep-scan.md
-    - Live Web Search: gateway/web-search.md
-    - Human Feedback Loop: gateway/feedback.md
+  - G1-Proxy:
+    - Introduction: g1-proxy/index.md
+    - Configuration: g1-proxy/configuration.md
+    - Upstream Backends: g1-proxy/backends.md
+    - Framework Compatibility: g1-proxy/compatibility.md
+    - Chat API: g1-proxy/chat-api.md
+    - Audio Input (Realtime Voice): g1-proxy/audio-input.md
+    - Enforcement Modes: g1-proxy/enforcement-modes.md
+    - Detection Axes: g1-proxy/detection-axes.md
+    - Token & Cost Control: g1-proxy/cost-control.md
+    - Deep Scan (GLAD-Tapestry): g1-proxy/deep-scan.md
+    - Live Web Search: g1-proxy/web-search.md
+    - Self-Evolving Security: g1-proxy/self-evolving.md
+    - Human Feedback Loop: g1-proxy/feedback.md
     - Knowledge Base (RAG): rag/index.md
-    - Causal Explainability: gateway/causal-xai.md
+    - Causal Explainability: g1-proxy/causal-xai.md
   - MCP Security:
     - Overview: mcp/index.md
     - Guard Server: mcp/guard-server.md

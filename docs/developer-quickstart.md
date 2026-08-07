@@ -113,8 +113,8 @@ The 9 axes: `prompt_safety`, `jailbreak`, `rag_jailbreak`, `profanity`, `out_of_
 
 The last three of the user-side axes are not guardrails: `profanity` moderates tone, `out_of_scope`
 refuses questions outside what the Application is for, and `prompt_complexity` picks which upstream
-model answers. See [Detection Axes](gateway/detection-axes.md) and
-[Token & Cost Control](gateway/cost-control.md).
+model answers. See [Detection Axes](g1-proxy/detection-axes.md) and
+[Token & Cost Control](g1-proxy/cost-control.md).
 
 Quick check in one line:
 ```bash

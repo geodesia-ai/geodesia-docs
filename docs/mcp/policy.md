@@ -13,7 +13,7 @@ Because policy is per Application, scoring uses that Application's **bound model
 | Setting | Meaning |
 |---|---|
 | **enabled** | MCP guard active for this Application |
-| **deep_scan** | escalate this app's MCP scans to [GLAD-Tapestry](../gateway/deep-scan.md) |
+| **deep_scan** | escalate this app's MCP scans to [GLAD-Tapestry](../g1-proxy/deep-scan.md) |
 | **scan tool descriptions / results · verify args** | toggle each scan family |
 | **toolset signing** | anti rug-pull (approved-hash diff) |
 | **action_tool_description / _result / _args** | the default action per surface (`block` / `annotate` / `off` / `policy`) |
@@ -77,4 +77,4 @@ When **toolset signing** is on, Geodesia stores an HMAC of each approved tool de
 | **Studio → Applications → *app* → MCP** | per-app surface actions, **per-axis** table, **per-tool** rules, allowlist, egress |
 | env/CLI | interceptors (`mcp_interceptors`), deep-scan model paths — security-sensitive, not remotely settable |
 
-See [Detection Axes](../gateway/detection-axes.md) for what each axis detects and [Enforcement Modes](../gateway/enforcement-modes.md) for how block vs annotate behaves end-to-end.
+See [Detection Axes](../g1-proxy/detection-axes.md) for what each axis detects and [Enforcement Modes](../g1-proxy/enforcement-modes.md) for how block vs annotate behaves end-to-end.
