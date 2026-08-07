@@ -49,7 +49,7 @@ Tests a candidate upstream connection: reachability, model list, logprob support
 
 <div class="endpoint"><span class="method method-post">POST</span><span class="path">/v1/glad/causal-explainability/analyze</span></div>
 
-Computes black-box token-level causal attribution (occlusion or MuPAX) for a given prompt/response pair.
+Computes black-box token-level causal attribution (occlusion or MuPAX LLM) for a given prompt/response pair.
 
 <div class="endpoint"><span class="method method-get">GET</span><span class="path">/v1/glad/documentation</span></div>
 

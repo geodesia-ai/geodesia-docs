@@ -157,7 +157,7 @@ A token that is stable on both is a certified cause. A token that is stable on n
 
 ## Determinism and tamper evidence
 
-| Property | DCA (default) | MuPAX (deep) |
+| Property | DCA (default) | MuPAX LLM (deep) |
 |---|---|---|
 | Randomness | **None.** No RNG anywhere in the search. | Monte-Carlo coalitions drawn from a **fixed seed** (`seed = 0`) |
 | Reproducible | Bit-for-bit, same input + same checkpoint | Bit-for-bit at the same seed, sample count and input |
@@ -183,7 +183,7 @@ The search **always** surfaces the tokens that drove the decision. The `attribut
 | `partial` | The strongest joint group stayed just under the bar. Its tokens are the real contributors and are shown. |
 | `distributed` | Defensive last resort: literally no token moves the score. The cause is the pattern, not any word. |
 | `not_flagged` | The axis never crossed the decision floor — there is no verdict to explain. |
-| `uncertified` | MuPAX only: contributions were estimated but no necessity/sufficiency verification was run. |
+| `uncertified` | MuPAX LLM only: contributions were estimated but no necessity/sufficiency verification was run. |
 
 For `certified`, `certificate_basis` distinguishes three real situations:
 
@@ -205,13 +205,15 @@ All methods are reachable from the same endpoint via the `method` field.
 | `dca` **(default)** | **Deterministic Convergent Attribution.** Exact leave-one-out for necessity + keep-only for sufficiency, then a verified minimal sufficient reason with a greedy coalition fallback. Converges to *all and only* the responsible units. | Exact | ~2·N detector passes (N = content units) |
 | `dca_dual` | The **dual-surface product XAI**: one payload with two questions answered separately — *which PROMPT tokens caused the block* (scored exactly like the live pre-generation decision, answer blanked) and *which ANSWER tokens caused the flag* — each attributed strictly over its own region, never a mixed heatmap. Restricts work to the side(s) that actually fired. | Exact | ~1 flagged side |
 | `dca_multi_axis` | A **separately certified token set for every flagged axis**, jointly over prompt + answer (+ context). A jailbreak block and a hallucination flag on the same message get their own sets instead of being conflated. | Exact | per flagged axis |
-| `mupax_causal` | **MuPAX** — Monte-Carlo coalitions plus a jointly-estimated linear surrogate (see below). Accounts for interactions between units. Reports contributions, does not certify. | Seeded | `n_samples` passes |
+| `mupax_causal` | **MuPAX LLM** — Monte-Carlo coalitions plus a jointly-estimated linear surrogate (see below). Accounts for interactions between units. Reports contributions, does not certify. | Seeded | `n_samples` passes |
 | `occlusion` / `gradient_causal` | Single-pass occlusion: remove one unit, measure the change. The cheapest signal, no verification. | Exact | N passes |
 | `dca_token_matrix` | True **prompt → generated-token map** via generator occlusion (occlude each prompt token, measure ΔNLL of every generated token). Requires an upstream that echoes `prompt_logprobs` (vLLM / SGLang); falls back to the companion dual-region map. | Exact | expensive |
 
-### MuPAX
+### MuPAX LLM
 
-**MuPAX** (Monte Carlo Perturbation Attribution via Exclusion) is Geodesia's coalition-based estimator. It draws random coalitions of content units — each unit kept with probability ½ — scores each coalition with the detector, and fits a **linear surrogate jointly over all units**:
+**MuPAX LLM** is the coalition-based estimator that ships in G-1 — the variant of Geodesia's published **MuPAX** method adapted to token-level attribution over a text detector. The two are named apart on purpose: the paper describes the method, `MuPAX LLM` is what runs behind the DEEP button and is what these fields document.
+
+It draws random coalitions of content units — each unit kept with probability ½ — scores each coalition with the detector, and fits a **linear surrogate jointly over all units**:
 
 ```
 p(coalition) ≈ Σ_k β_k · [unit k present]  +  b
@@ -219,10 +221,10 @@ p(coalition) ≈ Σ_k β_k · [unit k present]  +  b
 
 The coefficient **β_k is the attribution χ** of unit k: its marginal contribution to the score, estimated in the presence of every other unit rather than in isolation. Estimating all coefficients *jointly* in one least-squares fit — instead of unit-by-unit, two-armed — is what keeps the variance low at small sample counts, which is what makes it usable interactively.
 
-MuPAX sees what leave-one-out cannot: **interactions**. When two words only matter together, occluding either one alone under-reports both; the coalition fit attributes them correctly. This is why it is the "deep" option in the UI even though it is slower and does not certify.
+MuPAX LLM sees what leave-one-out cannot: **interactions**. When two words only matter together, occluding either one alone under-reports both; the coalition fit attributes them correctly. This is why it is the "deep" option in the UI even though it is slower and does not certify.
 
 - **Configurable:** `mupax_n_samples` (default 200) and `mupax_threshold_percentile` (default 0.2, the fraction of top units kept as causally significant) trade speed for precision.
-- **Honest labelling:** MuPAX has no necessity+sufficiency verification step, so it never reports `certified` or `distributed` — only `uncertified`. If you need a certificate, use `dca`.
+- **Honest labelling:** MuPAX LLM has no necessity+sufficiency verification step, so it never reports `certified` or `distributed` — only `uncertified`. If you need a certificate, use `dca`.
 
 ---
 
@@ -244,7 +246,7 @@ MuPAX sees what leave-one-out cannot: **interactions**. When two words only matt
 | `thresholds` | `object` | — | `dca_dual` only — per-axis live decision thresholds, echoed per side for the "p vs threshold" display. |
 | `include_not_flagged` | `bool` | — | `dca_dual` only — keep the honest `not_flagged` stub for clean sides instead of omitting them. |
 | `deep_scan` | `bool` | — | Back the attribution with **GLAD-Tapestry** instead of GLAD-Hummingbird, when a trained Tapestry is loaded. |
-| `mupax_n_samples` / `mupax_samples` / `mc_samples` | `integer` | — | Monte-Carlo samples for MuPAX. Default `200`. |
+| `mupax_n_samples` / `mupax_samples` / `mc_samples` | `integer` | — | Monte-Carlo samples for MuPAX LLM. Default `200`. |
 | `mupax_threshold_percentile` | `float` | — | Fraction of top-χ units kept as causally significant (0–1). Default `0.2`. |
 
 ### Response — single-axis (`dca`)
@@ -367,7 +369,7 @@ The date *"1885"* comes back as the certified necessary token: removing it alone
 The **Causal Intelligence** page gives an interactive view of any scored message:
 
 1. Select an assistant answer (or a blocked prompt) from the history.
-2. Pick the engine: **⚡ QUICK (DCA)** — exact, deterministic, certified, seconds — or **🔬 DEEP (MuPAX)** — coalition-based, accounts for interactions, slower.
+2. Pick the engine: **⚡ QUICK (DCA)** — exact, deterministic, certified, seconds — or **🔬 DEEP (MuPAX LLM)** — coalition-based, accounts for interactions, slower.
 3. Optionally pin **one axis**, so the heatmap answers "which tokens drove *this* axis" rather than blending several.
 4. Read the full prompt **and** answer with every token coloured by its causal contribution, plus the certificate card (mode, basis, necessity/sufficiency verified, forward passes spent).
 

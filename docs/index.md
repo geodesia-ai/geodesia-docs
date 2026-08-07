@@ -69,7 +69,7 @@ You do not need to retrain your model. You do not need to change your applicatio
 <div class="feature-card">
 <span class="feature-icon">🔍</span>
 <h3>Causal Explainability</h3>
-<p><strong>Deterministic</strong> <a href="gateway/causal-xai/#how-it-works-visualized">token-level attribution</a> painted as a heatmap on the answer — DCA and MuPAX over the detector, no upstream-model internals, no gradients, no sampling. Shows the one token that caused the flag, and proves it by removing it.</p>
+<p><strong>Deterministic</strong> <a href="gateway/causal-xai/#how-it-works-visualized">token-level attribution</a> painted as a heatmap on the answer — DCA and MuPAX&nbsp;LLM over the detector, no upstream-model internals, no gradients, no sampling. Shows the one token that caused the flag, and proves it by removing it.</p>
 </div>
 
 <div class="feature-card">

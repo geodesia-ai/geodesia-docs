@@ -308,8 +308,8 @@ xai:
 | Field | Default | Description |
 |---|---|---|
 | `enabled` | `true` | Whether XAI computation is available |
-| `mupax_n_samples` | `500` | Number of Monte Carlo samples for MuPAX attribution |
-| `mupax_max_input_tokens` | `512` | Maximum input length for MuPAX. Inputs longer than this are truncated from the left. |
+| `mupax_n_samples` | `500` | Number of Monte Carlo samples for MuPAX LLM attribution |
+| `mupax_max_input_tokens` | `512` | Maximum input length for MuPAX LLM. Inputs longer than this are truncated from the left. |
 | `pss_n_samples` | `5` | Default number of resamples for PSS |
 | `pss_temperature` | `0.7` | Default PSS sampling temperature |
 | `pss_match_mode` | `"ngram"` | Default PSS alignment algorithm |

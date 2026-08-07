@@ -25,10 +25,10 @@ The `credit_tiers` array specifies which attribution methods to run. Methods can
 |---|---|---|---|
 | Tier 1 | `"gradient"` | Fast (~50ms) | Deterministic prompt-token occlusion: each prompt token is masked one at a time and the change in detection score is the importance. Deterministic and reproducible. |
 | Tier 1.5 | `"pss"`, `"tier1_5"`, `"stability"` | Slow (~N× generation) | Positional Semantic Stability: generates N alternative answers and measures how much each prompt token affects whether specific output claims appear. Training-free. Controlled by `pss_n_samples`, `pss_temperature`, `pss_match_mode`. |
-| Tier 2 | `"mupax"` | Medium (~0.4–2s) | **MuPAX** — Monte Carlo Perturbation Attribution via Exclusion: random coalitions of units, scored with the detector and fitted with a single joint linear surrogate whose coefficients are the per-unit attribution χ. Accounts for interactions between tokens. Seeded, so it reproduces exactly. |
+| Tier 2 | `"mupax"` | Medium (~0.4–2s) | **MuPAX LLM** — the coalition estimator that ships in G-1: random coalitions of units, scored with the detector and fitted with a single joint linear surrogate whose coefficients are the per-unit attribution χ. Accounts for interactions between tokens. Seeded, so it reproduces exactly. |
 | Tier 3 | `"learned"` | Fast (~10ms) | Learned attribution head (if the checkpoint includes one). Fastest, but accuracy depends on training data coverage. |
 
-**Example — run MuPAX and gradient together:**
+**Example — run MuPAX LLM and gradient together:**
 ```json
 {
   "model_path": "/app/pretrained_glad",
