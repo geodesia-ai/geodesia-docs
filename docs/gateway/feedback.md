@@ -3,14 +3,16 @@
 Geodesia G-1 turns everyday chat usage into a **continuous improvement flywheel**. When a user spots a bad answer — a hallucination that slipped through, or a benign message that was wrongly flagged — they raise a one-click **feedback flag** directly in the chat. A reviewer (the *curator*) triages the flag in a queue, and the approved incidents feed two loops:
 
 - a **fast loop** — an opt-in, non-parametric [episodic exemplar bank](#episodic-exemplar-bank-fast-loop) that the live detector consults at scoring time, giving exact recall of the corrected pattern **without retraining**;
-- a **slow loop** — a labelled **JSONL corpus** you export and aggregate for the next detector fine-tune.
+- a **slow loop** — a labelled **JSONL corpus** you export and aggregate for the next detector fine-tune, [triggerable from the API](#triggering-a-re-train).
+
+Corrections can also be raised from [Policy Lens](../studio/policy-lens.md) while tuning a threshold on real traffic — same queue, same pipeline.
 
 !!! abstract "Why it matters"
     The detector geometry is validated out-of-distribution and must not be disturbed by ad-hoc tweaks. The feedback loop lets a deployment *memorize* rare, deployment-specific incidents — a particular jailbreak phrasing, a domain term the model over-flags — without smearing that validated manifold. **Memorize, don't retrain** for the cases that matter today; fold them into the weights later, deliberately.
 
 ![Diagram](../assets/diagrams/gateway-feedback.svg){: .diagram }
 
-The whole system is **additive and model-agnostic**: flags live in one extra SQLite table on the database the gateway already uses (no new datastore), and the canonical incident record is shared by both detectors — **GLAD-Hummingbird** (6 axes) and **GLAD-Tapestry** (the first 5). A flag whose axis a given model does not have is simply skipped when that model builds its bank.
+The whole system is **additive and model-agnostic**: flags live in one extra SQLite table on the database the gateway already uses (no new datastore), and the canonical incident record is shared by both detectors — **GLAD-Hummingbird** (all nine axes) and **GLAD-Tapestry** (the five it has). A flag whose axis a given model does not have is simply skipped when that model builds its bank.
 
 ---
 
@@ -23,15 +25,26 @@ Every message in the chat carries a small **flag** control. A flag is **region-s
 
 The user then picks a **plain-language problem** (no ML jargon). The system maps that choice to a *suggested* detection axis, which the curator can later override:
 
-| Region | Plain-language problem | Suggested axis |
-|---|---|---|
-| `answer` | *"It's made up / not true"* | `halluc_closedbook` |
-| `answer` | *"Contradicts the sources / the document"* | `halluc_context` |
-| `answer` | *"Contains dangerous or harmful content"* | `answer_safety` |
-| `prompt` | *"Dangerous request that wasn't blocked"* | `prompt_safety` |
-| `prompt` | *"Attempt to bypass the rules"* | `jailbreak` |
-| `prompt` | *"Document with hidden instructions"* | `rag_jailbreak` |
-| either | *"Other"* (free text) | *curator assigns* |
+| Region | Plain-language problem | `problem` key | Suggested axis |
+|---|---|---|---|
+| `answer` | *"It is made up / not true"* | `fabricated` | `halluc_closedbook` |
+| `answer` | *"Contradicts the sources / the document"* | `contradicts_sources` | `halluc_context` |
+| `answer` | *"Contains dangerous or harmful content"* | `dangerous_answer` | `answer_safety` |
+| `prompt` | *"Dangerous request not blocked"* | `dangerous_request` | `prompt_safety` |
+| `prompt` | *"Attempt to bypass the rules"* | `jailbreak_attempt` | `jailbreak` |
+| `prompt` | *"Document with hidden instructions"* | `hidden_instructions` | `rag_jailbreak` |
+| `prompt` | *"Contains profanity / offensive language"* | `profane_content` | `profanity` |
+| `prompt` | *"Off-topic / out of scope"* | `off_topic` | `out_of_scope` |
+| `prompt` | *"Request is too complex / ambiguous"* | `too_complex` | `prompt_complexity` |
+| either | *"It was wrongly blocked (this is benign)"* | `wrongly_blocked` | *inferred from the score snapshot* |
+| either | *"👍 This is benign — correct"* | `correctly_benign` | *inferred — positive reinforcement* |
+| either | *"👍 A real threat, correctly blocked"* | `correctly_blocked` | *inferred — positive reinforcement* |
+| either | *"Other…"* (free text) | `other` | *curator assigns* |
+
+!!! tip "Praise is training data too"
+    `correctly_benign` and `correctly_blocked` are **positive reinforcement**: they confirm a decision that was already right. A confirmed benign becomes a benign anchor (keep allowing this), a confirmed threat becomes a danger anchor. A loop that only ever hears about mistakes drifts, because nothing holds the correct decisions in place.
+
+The vocabulary above is **served, not hard-coded**: `GET /v1/glad/feedback/schema` returns the axis list, the region grouping and the full `problem → axis` map, so a front-end stays in sync as axes are added and no UI code changes when the served checkpoint gains an axis.
 
 The flag snapshots the surrounding context — the `prompt`, any RAG `context`, the `answer`, and the detector `scores` at flag time — so the curator has the full picture and the corpus is self-contained. The new row starts as `status: "pending"` and is scoped to the active Application (resolved from `application_id` in the body or the `X-Geodesia-App` header, falling back to `default`).
 
@@ -149,6 +162,9 @@ All routes are mounted under **`/v1/glad/feedback`** on the gateway, alongside t
 | `DELETE` | `/v1/glad/feedback/{id}` | Drop a row. |
 | `GET` | `/v1/glad/feedback/export` | Download the approved corpus as JSONL. |
 | `GET` | `/v1/glad/feedback/bank/status` | Exemplar-bank version + approved count. |
+| `POST` | `/v1/glad/feedback/retrain` | Trigger a re-train from the approved corpus — `mode: "memory"` (instant bank refresh) or `"weights"` (background trainer). |
+| `GET` | `/v1/glad/feedback/retrain/status?job_id=…` | Job state + a tail of its log. |
+| `GET` | `/v1/glad/feedback/retrain/jobs` | All re-train jobs. |
 
 ### Create a flag
 
@@ -181,6 +197,71 @@ curl -s http://localhost:8800/v1/glad/feedback/fb_9c1f2a7b4e0d6a18/review \
 ```
 
 To record a contrastive benign twin at review time, add `weight`, `twin_prompt` / `twin_answer`, and `attack_family` (consumed by the [v2 bank](#contrastive-safety-memory-optional)).
+
+---
+
+## Triggering a re-train
+
+The two loops can be driven from the API — the fast one instantly, the slow one as a background job.
+
+```bash
+# fast loop: rebuild the episodic memory from the approved corpus, right now
+curl -s http://localhost:8800/v1/glad/feedback/retrain \
+  -H "Content-Type: application/json" \
+  -d '{"mode": "memory", "application_id": "acme"}'
+```
+
+```bash
+# slow loop: export the corpus and launch the configured trainer in the background
+curl -s http://localhost:8800/v1/glad/feedback/retrain \
+  -H "Content-Type: application/json" \
+  -d '{"mode": "weights"}'
+```
+
+```json
+{ "job_id": "rt_5f1c9a2e7b04", "mode": "weights", "n_rows": 214,
+  "status": "queued", "created_at": "2026-08-05T10:02:11+00:00" }
+```
+
+Poll it, log tail included:
+
+```bash
+curl -s "http://localhost:8800/v1/glad/feedback/retrain/status?job_id=rt_5f1c9a2e7b04"
+```
+
+| `mode` | What happens | Cost |
+|---|---|---|
+| `memory` (default) | Bumps the bank version so the gateway rebuilds the [exemplar bank](#episodic-exemplar-bank-fast-loop) from the approved corpus on the next request. | Instant, no GPU, no subprocess |
+| `weights` | Exports the approved corpus to JSONL and launches the configured trainer as a background subprocess. | A real training run |
+
+One `weights` job runs at a time (a second returns `409`). With **no trainer configured** the corpus is still exported and the job returns `status: "prepared"` with the path — you never lose the export just because the training command was not wired yet.
+
+| Variable | Default | Description |
+|---|---|---|
+| `GW_RETRAIN_CMD` | *(unset)* | The trainer command, with `{corpus}` and `{out}` placeholders. Unset ⇒ export-only (`prepared`). |
+| `GW_RETRAIN_CWD` | *(unset)* | Working directory for the trainer subprocess. |
+| `GW_RETRAIN_DIR` | `<db dir>/retrain` | Where corpora, logs and outputs are written. |
+| `GW_RETRAIN_AUTOPROMOTE` | `1` | On a successful `weights` job, point the live detector at the new checkpoint and restart. Set `0` to keep promotion manual. |
+| `GW_FEEDBACK_AUTOAPPROVE` | `off` | `on` ⇒ a flag whose plain-language problem resolves to an axis goes straight into the engine with no curator. `other` and unresolvable flags still wait in the queue. |
+
+!!! danger "Auto-promotion is a real deployment change"
+    With `GW_RETRAIN_AUTOPROMOTE` on (the default), a completed `weights` job **replaces the live detector and restarts the service**. That is the right behaviour for a self-improving deployment you control end to end; it is the wrong behaviour if a human is supposed to sign off on every model change. Turn it off for regulated deployments and promote deliberately — the choice itself is worth recording in your [FRIA](../compliance/fria.md).
+
+---
+
+## Security that evolves with the deployment
+
+Everything above exists because **safety is relative**. What must be blocked is a function of the company, the sector and the internal policy — not of the model — and it moves as the product moves. A detector calibrated for the general case is a starting point, never the answer.
+
+Three levers, three timescales, all inside your deployment:
+
+| Lever | Mechanism | Effect |
+|---|---|---|
+| **Global** | Threshold change from [Policy Lens](../studio/policy-lens.md) | Immediate, simulated exactly on your own traffic *before* it is applied |
+| **Surgical** | Approved correction → exemplar bank | The corrected pattern is recalled at scoring time, without retraining |
+| **Structural** | Approved corpus → `retrain` → weights | The corrections are folded into the detector, deliberately |
+
+The layering is the point: the detector's geometry is validated out-of-distribution and must not be disturbed by ad-hoc tweaks, so deployment-specific incidents are **memorised** rather than trained in — and folded into the weights only when someone decides to. That is what lets one deployment adapt to its own definition of unacceptable without each adaptation degrading everything else.
 
 ---
 

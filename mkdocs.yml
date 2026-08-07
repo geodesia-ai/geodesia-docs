@@ -130,6 +130,7 @@ nav:
     - Overview: studio/index.md
     - Settings: studio/settings.md
     - Managing Applications: studio/applications.md
+    - Policy Lens (Counterfactual Tuning): studio/policy-lens.md
     - Cost & FinOps: studio/cost.md
     - Control Plane API: studio/control-plane-api.md
     - Licensing & Entitlements: studio/licensing.md
@@ -143,11 +144,12 @@ nav:
     - Audio Input (Realtime Voice): gateway/audio-input.md
     - Enforcement Modes: gateway/enforcement-modes.md
     - Detection Axes: gateway/detection-axes.md
+    - Token & Cost Control: gateway/cost-control.md
     - Deep Scan (GLAD-Tapestry): gateway/deep-scan.md
     - Live Web Search: gateway/web-search.md
     - Human Feedback Loop: gateway/feedback.md
     - Knowledge Base (RAG): rag/index.md
-    - Causal XAI: gateway/causal-xai.md
+    - Causal Explainability: gateway/causal-xai.md
   - MCP Security:
     - Overview: mcp/index.md
     - Guard Server: mcp/guard-server.md

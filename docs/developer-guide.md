@@ -139,7 +139,7 @@ block with the per-axis detector output.
 }
 ```
 
-### The 6 axes (`geodesia.axis_energy`)
+### The 9 axes (`geodesia.axis_energy`)
 
 Each axis is an **independent** risk signal with its **own** calibrated threshold — read each on its own, it is
 not one blended score.
@@ -152,6 +152,14 @@ not one blended score.
 | `halluc_context` | the answer drifts from the provided/RAG context (ungrounded) | output |
 | `halluc_closedbook` | with no context, the answer is likely an unsupported fabrication | output |
 | `answer_safety` | the model's answer contains harmful content | output |
+| `profanity` | the prompt is vulgar / abusive (independently of whether it is dangerous) | input |
+| `out_of_scope` | the prompt is off-topic for the Application's declared scope (silent without one) | input |
+| `prompt_complexity` | the prompt is "complex" — a routing signal, never a guardrail | input |
+
+The last three ship **annotate-only**: they appear in `axis_energy` and in the audit record but do not
+withhold anything until an operator promotes them. See
+[Detection Axes](gateway/detection-axes.md#guardrails-vs-operational-axes) and
+[Token & Cost Control](gateway/cost-control.md).
 
 ### Per-axis fields
 

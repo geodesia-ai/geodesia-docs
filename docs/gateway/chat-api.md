@@ -67,13 +67,20 @@ The standard OpenAI response is returned unchanged, with three additional top-le
       "halluc_closedbook": { "p_detector": 0.08, "flag": false, "threshold": 0.50, "fact_seeking": true, "available": true },
       "prompt_safety": { "p_detector": 0.02, "flag": false, "threshold": 0.90, "available": true },
       "answer_safety": { "p_detector": 0.03, "flag": false, "threshold": 0.57, "available": true },
-      "jailbreak": { "p_detector": 0.01, "flag": false, "threshold": 0.57, "available": true }
+      "jailbreak": { "p_detector": 0.01, "flag": false, "threshold": 0.9997, "available": true },
+      "rag_jailbreak": { "p_detector": 0.04, "flag": false, "threshold": 0.2501, "available": true },
+      "profanity": { "p_detector": 0.00, "flag": false, "threshold": 0.90, "available": true },
+      "out_of_scope": { "p_detector": 0.01, "flag": false, "threshold": 0.90, "available": true },
+      "prompt_complexity": { "p_detector": 0.22, "flag": false, "threshold": 0.50, "available": true }
     },
     "brake": false,
     "dominant_axis": "halluc_context"
   }
 }
 ```
+
+!!! note "`out_of_scope` needs a declared scope"
+    Send the Application's purpose as a `system` message (or set `policy.scope` once, per Application) or that axis stays silent by construction — see [Detection Axes](detection-axes.md#out_of_scope-off-topic-out-of-scope).
 
 #### Top-level Extension Fields
 
@@ -92,6 +99,7 @@ See [API Response Format](../reference/response-format.md) for the full structur
 | `axis_energy` | Per-axis detection results (score, flag, threshold, availability) |
 | `brake` | `true` if any answer-region axis is flagged |
 | `dominant_axis` | The axis with the highest detection score |
+| `routing` | Present when [complexity routing](cost-control.md) is enabled: `axis`, `score`, `threshold`, `used_complex_model`, and the `model` that actually answered |
 | `energy_dHmax_joule` | (internal diagnostic; not used in standard integrations) |
 | `rag` | Present when RAG is active; contains `sources`, `n_sources`, and `verification` results |
 | `input` | Present when streaming — the input-region analysis sent in the first SSE chunk |
@@ -178,7 +186,7 @@ This means a user may see the beginning of a response before it is cut off. If y
 For streaming responses, the detection payload arrives in two places:
 
 1. **First chunk** — the `input` analysis (prompt-region axes: `prompt_safety`, `jailbreak`) is attached to the very first empty-delta chunk so you can display safety status immediately.
-2. **Final chunk** (or the early-stop chunk) — the full output analysis for all 5 axes is attached to the last chunk.
+2. **Final chunk** (or the early-stop chunk) — the full output analysis for every axis is attached to the last chunk.
 
 ---
 

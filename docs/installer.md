@@ -136,7 +136,7 @@ UPSTREAM_TYPE=ollama UPSTREAM_URL=http://localhost:11434 UPSTREAM_MODEL=llama3.1
 
 !!! warning "The upstream must return `logprobs`"
     The closed-book hallucination axis needs `top_logprobs`. ollama and vLLM both provide them. If missing,
-    the engine runs with 4 axes instead of 5 (`/health` shows `logprobs: false`).
+    the engine runs with 8 axes instead of 9 (`/health` shows `logprobs: false`).
 
 ---
 
@@ -210,7 +210,7 @@ docker compose down -v              # stop AND wipe the DB/state volume (destroy
 |---|---|
 | `docker login ... failed` | The embedded key is read-only and time-limited; pass your own with `SA_JSON_B64=`/`REGISTRY_TOKEN=`, or ensure the images are already present. |
 | `--gpu` container won't start | No GPU/toolkit on the host → install with `--cpu`. |
-| `/health` shows `logprobs: false` (4 axes) | Upstream doesn't return `top_logprobs`; use ollama or vLLM with logprobs on. |
+| `/health` shows `logprobs: false` (8 axes) | Upstream doesn't return `top_logprobs`; use ollama or vLLM with logprobs on. |
 | Chat 404 / upstream error | `UPSTREAM_URL`/`UPSTREAM_MODEL` wrong or the LLM is down. `curl` it directly, fix `.env`, `docker compose up -d --force-recreate`. |
 | `application limit reached (free tier: 1)` | Raise `MAX_APPS`, use a license, or `FREE_UNLIMITED=1`. |
 | Config reverts after restart | The container ENV is the source of truth — put durable values in `.env`, not the runtime `POST config`. |

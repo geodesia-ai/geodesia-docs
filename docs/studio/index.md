@@ -72,26 +72,27 @@ Applications are grouped under **Organizations**. An organization carries the li
 G-1 Studio cleanly separates **management** from **serving**:
 
 - **Control plane** — `/v1/glad/apps/*`. Create and configure Applications and Organizations, mint API keys, edit policy, read cost / metrics / forecast. See [Control-Plane API](control-plane-api.md).
-- **Data plane** — the chat path. Each request resolves its Application, GLAD-Hummingbird scores the 6 axes, the request is routed to that app's LLM, and the call is logged with its cost.
+- **Data plane** — the chat path. Each request resolves its Application, GLAD-Hummingbird scores the 9 axes in one pass, the request is routed to that app's LLM (or to its cheaper / stronger second model, see [Token & Cost Control](../gateway/cost-control.md)), and the call is logged with its cost.
 
 ![Diagram](../assets/diagrams/studio-index.svg){: .diagram }
 <p class="diagram-caption">The control plane writes Application config; the data plane reads it on every chat request to score, route, and bill against the right Application.</p>
 
 ---
 
-## The 6 detection axes
+## The 9 detection axes
 
-GLAD-Hummingbird scores every request across **six** independent axes, grouped by **where** in the request lifecycle they run. Each axis has its own threshold and enforcement mode in the app's policy.
+GLAD-Hummingbird scores every request across **nine** independent axes — in a single forward pass — grouped by **where** in the request lifecycle they run. Each axis has its own threshold and enforcement mode in the app's policy.
 
 | Region | Axes | Runs |
 |---|---|---|
 | **Prompt / context** | `prompt_safety`, `jailbreak`, `rag_jailbreak` | Before the LLM is called |
+| **Prompt (operational)** | `profanity`, `out_of_scope`, `prompt_complexity` | Before the LLM is called |
 | **Answer** | `halluc_context`, `halluc_closedbook`, `answer_safety` | After the answer is generated |
 
-The `rag_jailbreak` axis is the context-injection firewall: it catches adversarial instructions smuggled in through retrieved documents or tool outputs.
+`rag_jailbreak` is the context-injection firewall: it catches adversarial instructions smuggled in through retrieved documents or tool outputs. The three operational axes are not guardrails — `profanity` moderates tone, `out_of_scope` refuses questions outside the Application's declared purpose (and so never pays for the upstream call), and `prompt_complexity` decides which model answers.
 
 !!! tip "Per-axis defaults"
-    Studio ships serving-calibrated defaults (gemma4-e2b, FPR≈0.07): `prompt_safety` 0.70, `jailbreak` 0.50, `rag_jailbreak` 0.05, `halluc_context` 0.32, `halluc_closedbook` 0.58, `answer_safety` 0.90. Prompt-region axes default to `block`; answer-region axes default to `annotate`. Missing axes are always backfilled so the 6-axis contract holds downstream.
+    Studio ships the serving calibration of the 9-axis head: `prompt_safety` 0.9215, `jailbreak` 0.9997, `rag_jailbreak` 0.2501, `halluc_context` 0.6475, `halluc_closedbook` 0.58, `answer_safety` 0.7295, `profanity` 0.90, `out_of_scope` 0.90, `prompt_complexity` 0.50. The prompt guardrails default to `block`, the answer axes to `annotate`, the operational axes to `annotate`, and `prompt_complexity` to `off`. Missing axes are always backfilled so the axis contract holds downstream. Tune yours on real traffic with [Policy Lens](policy-lens.md).
 
 For the full behaviour of each axis, see [Detection Axes](../gateway/detection-axes.md).
 

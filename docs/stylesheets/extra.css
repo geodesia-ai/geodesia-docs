@@ -138,6 +138,23 @@
 .md-typeset .axis-card.prompt  { border-color: #f48fb1; background: rgba(244,143,177,0.06); }
 .md-typeset .axis-card.answer  { border-color: #ffcc80; background: rgba(255,204,128,0.06); }
 .md-typeset .axis-card.jailbreak { border-color: #ef9a9a; background: rgba(239,154,154,0.06); }
+/* axes added by the 9-axis head */
+.md-typeset .axis-card.profanity { border-color: #ce93d8; background: rgba(206,147,216,0.06); }
+.md-typeset .axis-card.scope     { border-color: #80cbc4; background: rgba(128,203,196,0.06); }
+.md-typeset .axis-card.complexity { border-color: #9fa8da; background: rgba(159,168,218,0.06); }
+
+/* An axis card that is not a safety guardrail but an operational / cost signal */
+.md-typeset .axis-card .axis-tag {
+  display: inline-block;
+  margin-bottom: 0.6rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: rgba(127,127,127,0.14);
+}
 
 .md-typeset .axis-card .axis-name {
   font-weight: 700;

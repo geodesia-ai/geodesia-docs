@@ -14,6 +14,22 @@ Each `entry_hash` is computed over: `prev_hash + timestamp + event_type + payloa
 
 ---
 
+## Two kinds of tamper evidence
+
+The hash chain proves that a record **was not altered after the fact**. It cannot, on its own, prove that the record was *right* — a perfectly intact chain of unexplainable decisions is still unexplainable.
+
+Geodesia pairs it with a second, independent property: the decision's explanation is **deterministic and recomputable**. [Causal explainability](../gateway/causal-xai.md) is a measurement over a deterministic detector — no gradients, no sampling, no LLM in the loop — so the same request, against the same detector build, yields the same responsible tokens for anyone who runs it, including an auditor who does not trust you.
+
+| Question an auditor asks | Answered by |
+|---|---|
+| *"Has this record been changed since it was written?"* | The hash chain — `GET /v1/glad/chain/verify` |
+| *"Why was this specific request blocked?"* | The certified responsible tokens stored with the decision |
+| *"Can I check that answer myself?"* | Re-running the attribution and getting the same tokens |
+
+This is a property an LLM provider structurally cannot offer. An explanation *generated* by a language model is another sample — temperature-dependent, unverifiable, different tomorrow. An explanation *computed* by intervening on a deterministic function is arithmetic, and arithmetic can be repeated.
+
+---
+
 ## What Gets Logged
 
 Every entry in the chain has an `event_type`. The following events are automatically recorded:

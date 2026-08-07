@@ -61,7 +61,7 @@ Every route, grouped by resource. The **Role** column is the minimum role for th
 
 | Method | Path | Role | Purpose |
 |---|---|---|---|
-| `GET` | `/v1/glad/apps/meta` | — | The 6 detection axes, the supported-law catalog, and a complete default config — used to render the New Application form. |
+| `GET` | `/v1/glad/apps/meta` | — | The detection axes the served checkpoint has (`axes`, `extra_axes`, `supports_axis`), the supported-law catalog, and a complete default config — used to render the New Application form and to hide controls for axes the model does not have. |
 | `POST` | `/v1/glad/apps/upstream/models` | — | Discover the models available on an upstream. Live for `ollama` / vLLM / OpenAI-compatible servers; a curated catalog for Bedrock / Vertex. |
 
 ### Organizations
@@ -95,6 +95,8 @@ Every route, grouped by resource. The **Role** column is the minimum role for th
 | `PUT` | `/v1/glad/apps/{app_id}/policy` | `app_editor` | Merge fields into the policy block. |
 | `GET` | `/v1/glad/apps/{app_id}/cost` | — | The Application's cost configuration (rates, budget). |
 | `PUT` | `/v1/glad/apps/{app_id}/cost` | `app_editor` | Merge fields into the cost configuration. |
+| `GET` | `/v1/glad/apps/{app_id}/routing` | — | The Application's [complexity-routing](../gateway/cost-control.md#complexity-routing-model-a-model-b) block (Model B binding + threshold). |
+| `PUT` | `/v1/glad/apps/{app_id}/routing` | `app_editor` | Merge fields into the routing block. A masked or omitted `api_key` keeps the stored Model-B credential. |
 
 ### Metrics & cost
 
@@ -104,6 +106,9 @@ Every route, grouped by resource. The **Role** column is the minimum role for th
 | `GET` | `/v1/glad/apps/{app_id}/cost/summary` | — | Month-to-date spend, token totals, blocked count, average cost per call. |
 | `GET` | `/v1/glad/apps/{app_id}/cost/daily` | — | Per-day cost series (for charts). |
 | `GET` | `/v1/glad/apps/{app_id}/cost/forecast` | — | Projected month-end spend (`run_rate` / `moving_avg` / `linreg` / `linreg_dow`). |
+| `GET` | `/v1/glad/apps/{app_id}/messages` | — | Recent real requests with their per-axis detector probabilities and live decision — the substrate [Policy Lens](policy-lens.md) re-decides under a candidate threshold. Optional `session_id`, `limit` (≤ 2000). |
+| `GET` | `/v1/glad/apps/{app_id}/export` | `app_editor` | Full per-Application data export as a `.zip` of per-table CSV / JSONL. |
+| `GET` | `/v1/glad/apps/{app_id}/export.sqlite` | `app_editor` | The same export as a standalone SQLite file. |
 
 ### API keys
 
@@ -177,7 +182,7 @@ curl -s http://localhost:8080/v1/glad/apps \
 }
 ```
 
-If you omit `config`, the Application is created with the complete default config (all 6 axes, serving-calibrated thresholds). Returns `201 Created`. An invalid config returns `400` with the validation message.
+If you omit `config`, the Application is created with the complete default config (every axis the served checkpoint has, at its serving-calibrated threshold). Returns `201 Created`. An invalid config returns `400` with the validation message.
 
 !!! danger "The free-tier Application cap"
     Application creation is subject to a global, license-driven entitlement cap. On the **free tier** the limit is **1 Application** (the seeded `default` Application already counts toward it). When you exceed it, `POST /apps` returns `403`:
@@ -209,8 +214,12 @@ curl -s -X PUT http://localhost:8080/v1/glad/apps/contract_reviewer_4f2a9c/polic
 ```json
 {
   "policy": {
-    "thresholds": {"prompt_safety": 0.75, "jailbreak": 0.55, "rag_jailbreak": 0.05, "halluc_context": 0.32, "halluc_closedbook": 0.58, "answer_safety": 0.90},
-    "enforcement": {"prompt_safety": "block", "jailbreak": "block", "rag_jailbreak": "block", "halluc_context": "annotate", "halluc_closedbook": "annotate", "answer_safety": "block"},
+    "thresholds": {"prompt_safety": 0.75, "jailbreak": 0.55, "rag_jailbreak": 0.2501,
+                   "halluc_context": 0.6475, "halluc_closedbook": 0.58, "answer_safety": 0.7295,
+                   "profanity": 0.90, "out_of_scope": 0.90, "prompt_complexity": 0.50},
+    "enforcement": {"prompt_safety": "block", "jailbreak": "block", "rag_jailbreak": "block",
+                    "halluc_context": "annotate", "halluc_closedbook": "annotate", "answer_safety": "block",
+                    "profanity": "annotate", "out_of_scope": "annotate", "prompt_complexity": "off"},
     "block_input": true
   },
   "config_version": 2

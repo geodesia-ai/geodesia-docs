@@ -1,11 +1,11 @@
 # Managing Applications
 
-In Geodesia G-1 **Studio**, an **Application** is the unit you manage: one upstream LLM with GLAD-Hummingbird in the middle, owning its own **policy** (6-axis thresholds + enforcement), **threshold profile**, **RAG knowledge base**, **cost center**, and **governance** record. You select the active Application from the topbar App switcher, and every other surface — Dashboard, Oversight, FRIA, Reports, Knowledge Base, Cost — scopes to it.
+In Geodesia G-1 **Studio**, an **Application** is the unit you manage: one upstream LLM with GLAD-Hummingbird in the middle, owning its own **policy** (9-axis thresholds + enforcement, plus its declared scope), **threshold profile**, **RAG knowledge base**, **cost center**, and **governance** record. You select the active Application from the topbar App switcher, and every other surface — Dashboard, Oversight, FRIA, Reports, Knowledge Base, Cost — scopes to it.
 
 Studio is a backward-compatible evolution of the single-upstream gateway: an existing deployment surfaces as a single Application named `default`, with zero behaviour change.
 
 !!! info "Two planes, one engine"
-    Applications live on the **control plane** (`/v1/glad/apps/*` — Applications, orgs, keys, policy, cost, metrics). The **data plane** is chat: resolve the Application, score the 6 axes, route to the Application's LLM, then log and cost the call. See the [Control Plane API](control-plane-api.md) for the underlying routes.
+    Applications live on the **control plane** (`/v1/glad/apps/*` — Applications, orgs, keys, policy, cost, metrics). The **data plane** is chat: resolve the Application, score the 9 axes, route to the Application's LLM (optionally to a second, cheaper or stronger model), then log and cost the call. See the [Control Plane API](control-plane-api.md) for the underlying routes.
 
 ---
 
@@ -30,13 +30,14 @@ State transitions go through `set_status`, which only accepts `active`, `paused`
 
 ## Configuration model
 
-Each Application stores a validated `AppConfig` JSON document (`config_json`), versioned by `config_version` (incremented on every config update). The document has four sections — `binding`, `policy`, `cost`, `governance` — plus two top-level fields. Missing axes are always back-filled with the defaults, so the 6-axis contract always holds downstream.
+Each Application stores a validated `AppConfig` JSON document (`config_json`), versioned by `config_version` (incremented on every config update). The document has five sections — `binding`, `complex_routing`, `policy`, `cost`, `governance` — plus two top-level fields. Missing axes are always back-filled with the defaults, so the axis contract always holds downstream.
 
 | Top-level field | Type | Default | Meaning |
 |---|---|---|---|
 | `schema_version` | `int` | `1` | Config document schema version. |
 | `calibration_profile` | `string` | `"default"` | Calibration profile id for this Application's thresholds (set to the model key when seeded). |
-| `binding` | object | see below | Upstream LLM binding. |
+| `binding` | object | see below | Upstream LLM binding (**Model A**). |
+| `complex_routing` | object | disabled | Optional [complexity routing](../gateway/cost-control.md#complexity-routing-model-a-model-b) to a second model (**Model B**). |
 | `policy` | object | see below | Detection policy: thresholds + enforcement + options. |
 | `cost` | object | see below | Cost rates and budget (FinOps). |
 | `governance` | object | see below | Compliance and human-oversight settings. |
@@ -60,9 +61,21 @@ Each Application stores a validated `AppConfig` JSON document (`config_json`), v
 
 The `logprobs` setting governs the closed-book fabrication axis: `require` forces a logprob-capable path, `off` disables it, and `auto` (default) uses logprobs when the upstream offers them. See [Detection Axes](../gateway/detection-axes.md) for why `halluc_closedbook` depends on per-token log-probabilities.
 
+### `complex_routing` — a second model for hard prompts
+
+Optional. Disabled by default, in which case the Application behaves exactly as a single-model deployment and no routing logic runs at all.
+
+| Field | Type | Default | Meaning |
+|---|---|---|---|
+| `enabled` | `bool` | `false` | Master switch. |
+| `threshold` | `float` | `0.5` | `p(prompt_complexity)` **strictly greater** than this routes to Model B. `0.5` is the classifier's training boundary. |
+| `complex_binding` | object \| `null` | `null` | Partial override of `binding` for Model B. Every field is optional and inherits Model A when unset — usually only `model` is set. |
+
+See [Token & Cost Control](../gateway/cost-control.md#complexity-routing-model-a-model-b) for what this buys you and how to size the threshold.
+
 ### `policy` — detection thresholds and enforcement
 
-The policy is scored across the **six** GLAD-Hummingbird axes. Each axis has its own threshold (probability space, `0.0`–`1.0`) and its own enforcement mode.
+The policy is scored across the **nine** GLAD-Hummingbird axes. Each axis has its own threshold (probability space, `0.0`–`1.0`) and its own enforcement mode.
 
 | Field | Type | Default | Meaning |
 |---|---|---|---|
@@ -71,31 +84,28 @@ The policy is scored across the **six** GLAD-Hummingbird axes. Each axis has its
 | `block_input` | `bool` | `true` | If `true`, a flagged prompt is refused before the upstream is called. |
 | `inject_system` | `bool` | `true` | If `true`, the Constitutional Intelligence system prompt is prepended to every request. |
 | `ci_prompt_ref` | `string` | `"docs/G1_Constitutional_Prompt_Compact.md"` | Reference to the CI system prompt to inject. |
+| `scope` | `string` | `""` | **The Application's declared purpose, in one sentence.** The only input of the `out_of_scope` axis — without it that axis is silent by construction. A client's own system message overrides it per conversation. |
+| `feedback_learning` | `bool` | `false` | Opt this Application into the approved-[feedback](../gateway/feedback.md) exemplar bank without flipping the global default. `false` = byte-identical detection. |
 | `rag_collection` | `string` \| `null` | `null` | RAG knowledge-base collection bound to this Application. |
 | `optional_detectors` | `dict[str, bool]` | `{causal_xai: false, self_consistency: false}` | Opt-in extra detectors. |
 | `streaming_brake` | `dict` | `{enabled: true, cadence_tokens: 32}` | Mid-stream re-scoring: whether the brake is on and how often (in tokens) it fires. |
 
-**Default thresholds** (`DEFAULT_THRESHOLDS` — serving-calibrated for gemma4-e2b at FPR ≈ 0.07, plus the `rag_jailbreak` firewall):
+**Defaults** (`DEFAULT_THRESHOLDS` / `DEFAULT_ENFORCEMENT` — the serving calibration of the 9-axis head; `prompt_safety` and `jailbreak` share a joint 2 % false-positive budget measured on a **multilingual** benign pool):
 
-| Axis | Region | Default threshold |
-|---|---|---|
-| `prompt_safety` | prompt | `0.70` |
-| `jailbreak` | prompt | `0.50` |
-| `rag_jailbreak` | prompt / context | `0.05` |
-| `halluc_context` | answer | `0.32` |
-| `halluc_closedbook` | answer | `0.58` |
-| `answer_safety` | answer | `0.90` |
+| Axis | Region | Default threshold | Default enforcement |
+|---|---|---|---|
+| `prompt_safety` | prompt | `0.9215` | `block` |
+| `jailbreak` | prompt | `0.9997` | `block` |
+| `rag_jailbreak` | prompt / context | `0.2501` | `block` |
+| `halluc_context` | answer | `0.6475` | `annotate` |
+| `halluc_closedbook` | answer | `0.58` (advisory) | `annotate` |
+| `answer_safety` | answer | `0.7295` | `annotate` |
+| `profanity` | prompt | `0.90` | `annotate` |
+| `out_of_scope` | prompt | `0.90` | `annotate` |
+| `prompt_complexity` | prompt | `0.50` (routing boundary) | `off` |
 
-**Default enforcement** (`DEFAULT_ENFORCEMENT`):
-
-| Axis | Default enforcement |
-|---|---|
-| `prompt_safety` | `block` |
-| `jailbreak` | `block` |
-| `rag_jailbreak` | `block` |
-| `halluc_context` | `annotate` |
-| `halluc_closedbook` | `annotate` |
-| `answer_safety` | `annotate` |
+!!! warning "Thresholds do not transfer across detector builds"
+    These values belong to a specific checkpoint. A new detector build means a new calibration — an Application created before the change keeps the thresholds stored in its own config. Tune yours against real traffic with [Policy Lens](policy-lens.md) rather than by copying numbers.
 
 !!! note "Threshold direction"
     A **higher** threshold is more permissive (fewer flags); a **lower** threshold is stricter. The prompt-region axes default to `block` enforcement, while the answer-region hallucination/safety axes default to `annotate` so you can observe before you block. Validation rejects thresholds outside `[0, 1]`, unknown axis names, and enforcement modes other than `block` / `annotate` / `off`.
@@ -110,6 +120,8 @@ The two `optional_detectors` are off by default: `causal_xai` adds causal token 
 | `input_per_mtok` | `float` | `0.0` | Cost per **million input tokens**. |
 | `output_per_mtok` | `float` | `0.0` | Cost per **million output tokens**. |
 | `glad_compute_per_mtok` | `float` | `0.0` | Cost per million tokens for GLAD scoring compute. |
+| `complex_input_per_mtok` | `float` \| `null` | `null` | Model B input rate. `null` ⇒ inherits the Model A rate, so an Application that has not set it still bills correctly. |
+| `complex_output_per_mtok` | `float` \| `null` | `null` | Model B output rate. `null` ⇒ inherits the Model A rate. |
 | `budget_month` | `float` | `0.0` | Monthly budget for this Application. |
 | `alert_pct` | `list[float]` | `[0.8, 1.0]` | Budget-fraction alert points; **must be ascending**. |
 | `on_budget_exceeded` | `string` | `"alert"` | Action when the budget is exceeded: `alert` or `block`. |

@@ -1,227 +1,180 @@
 # Threshold Tuning Guide
 
-Geodesia G-1 uses **probability thresholds** to decide when a detection score is high enough to trigger a block or flag. Setting thresholds correctly is one of the most important operational decisions you will make — too low and you block legitimate content; too high and harmful content gets through.
+Geodesia G-1 uses **probability thresholds** to decide when a detection score is high enough to trigger a block, a flag, or a routing decision. Where you set them is one of the most consequential operational decisions you will make — too low and you block legitimate traffic, too high and problems get through.
 
-This guide explains what each threshold controls, how to reason about the trade-off, and recommended starting points by deployment type.
+This guide explains what each threshold controls and how to set it **empirically, on your own traffic**, rather than by copying a number.
 
 ---
 
-## The Detection Decision
+## The detection decision
 
 For each axis, the decision is:
 
 ```
-score >= threshold  →  triggered (flag or block)
+score >= threshold  →  flagged
 score <  threshold  →  pass
 ```
 
-Scores are always in the range [0, 1]:
+Scores are always in the range [0, 1]: **0** = the detector is confident the content is safe/grounded/in-scope; **1** = confident it is not.
 
-- **0** = the model is confident this content is safe/grounded
-- **1** = the model is confident this content is unsafe/hallucinated
-
-Thresholds define where you draw the line between pass and flag.
+A flag is not automatically a block. What a flag *does* depends on the axis's **enforcement mode** — `block`, `annotate`, or `off` — configured per Application. See [Detection Axes](../gateway/detection-axes.md#guardrails-vs-operational-axes).
 
 ---
 
-## Threshold Locations
+## Where thresholds live
 
-Thresholds live in three places, resolved from highest to lowest precedence:
+Resolved from highest to lowest precedence:
 
 1. **Per-request `threshold_overrides`** in the API request body
-2. **Database threshold preferences** set via `POST /v1/glad/threshold-prefs`
-3. **Default values** compiled into the model
+2. **The Application's policy** — `policy.thresholds`, set from Studio, from [Policy Lens](../studio/policy-lens.md), or via `PUT /v1/glad/apps/{id}/policy`
+3. **The serving calibration** shipped with the detector checkpoint
 
-To set persistent thresholds for your deployment:
+The per-Application policy is the one you normally use, because it is versioned, audited, and hot-reloaded:
 
 ```bash
-curl -X POST http://localhost:8199/v1/glad/threshold-prefs \
+curl -s -X PUT http://localhost:8080/v1/glad/apps/support_bot/policy \
   -H "Content-Type: application/json" \
-  -d '{
-    "deployer_id": "acme-corp",
-    "prompt_safety": 0.35,
-    "answer_safety": 0.50,
-    "halluc": 0.617,
-    "combined_halluc": 0.617
-  }'
+  -d '{"policy": {"thresholds": {"prompt_safety": 0.88, "out_of_scope": 0.85}}}'
 ```
 
----
-
-## Per-Axis Reference
-
-### `prompt_safety` — Input Safety
-
-Controls when a **user prompt** is considered unsafe and blocked before generation.
-
-| Threshold | Behavior |
-|---|---|
-| `0.10–0.20` | Aggressive — catches most unsafe requests but will flag ambiguous phrasing ("how do I shoot a video?") |
-| `0.30–0.40` | **Recommended starting point** — good balance for general-purpose chatbots |
-| `0.50–0.70` | Conservative — only blocks clear violations |
-| `0.80+` | Near-permissive — use only if you have a separate safety layer upstream |
-
-**Calibrated default:** `0.35`
-
-**Tip:** If you see frequent false positives on technical prompts (SQL queries, security research, medical questions), raise this threshold incrementally. Use the [human oversight](../compliance/oversight.md) queue to accumulate real-world false-positive examples before tuning.
+Send only the axes you are changing — the update is a merge and the response echoes the resulting policy with a new `config_version`.
 
 ---
 
-### `answer_safety` — Output Safety (combined)
+## The calibrated defaults
 
-Controls when a **generated answer** is considered unsafe and withheld. The `combined_score` from the multi-signal combiner is compared against this threshold.
+These are the serving-calibrated values for the 9-axis head. They are a **starting point produced by a specific calibration on a specific checkpoint**, not universal constants.
 
-| Threshold | Behavior |
-|---|---|
-| `0.10–0.15` | Very aggressive — catches subtle harmful content but has high false positives on corporate/grounded queries |
-| `0.20–0.40` | **Recommended** for customer-facing deployments |
-| `0.50–0.70` | Moderate — suitable when you also have human review active |
-| `0.80+` | Near-permissive — use only in research/internal contexts |
+| Axis | Default | Enforcement | How it was set |
+|---|---|---|---|
+| `prompt_safety` | `0.9215` | `block` | Joint 2 % false-positive budget with `jailbreak`, on a **multilingual** benign pool |
+| `jailbreak` | `0.9997` | `block` | Same joint budget; the axis is extremely confident on real attacks, so the operating point sits far out on the tail |
+| `rag_jailbreak` | `0.2501` | `block` | Aggressive by design — benign retrieved context almost never contains imperatives aimed at the model |
+| `halluc_context` | `0.6475` | `annotate` | Dev split |
+| `halluc_closedbook` | `0.58` | `annotate` | Advisory — the SLEDGE conformal calibration actually decides this axis at serving time |
+| `answer_safety` | `0.7295` | `annotate` | Dev split |
+| `profanity` | `0.90` | `annotate` | Conservative: only fires when the detector is very sure |
+| `out_of_scope` | `0.90` | `annotate` | Conservative: refusing a customer is expensive |
+| `prompt_complexity` | `0.50` | `off` | The **training boundary** of a binary classifier — not a false-positive budget |
 
-**Calibrated default:** `0.11` (Youden optimal)
+!!! danger "Two things these numbers depend on"
+    **The checkpoint.** Thresholds do not transfer across detector builds. A new build means re-running the calibration; an Application created earlier keeps the thresholds stored in its own policy.
 
-!!! warning "Known issue with default threshold"
-    The default threshold of 0.11 is calibrated for maximum balanced accuracy but sits in the middle of the benign score distribution. Deployers using the system with corporate knowledge bases or RAG pipelines will see false positives. **Recommended production value: 0.50** until you have measured your specific benign score distribution.
-
----
-
-### `halluc` (combined) — Hallucination Detection
-
-Controls when an answer is considered a hallucination. This applies to both:
-- **Context faithfulness** (`halluc_context`): is the answer supported by the provided context?
-- **Closed-book fabrication** (`halluc_closedbook`): is the answer a confident fabrication?
-
-The `combined_halluc_score` from the 10-signal calibrated combiner is compared against this threshold.
-
-| Threshold | Behavior |
-|---|---|
-| `0.40–0.50` | Aggressive — catches subtle hallucinations but flags uncertain but correct answers |
-| `0.55–0.65` | **Recommended** for RAG pipelines and fact-checking use cases |
-| `0.617` | **Default** — optimal on HaluEval benchmark (AUROC 0.97) |
-| `0.70–0.80` | Conservative — only blocks confident fabrications |
-| `0.85+` | Near-permissive |
-
-**Calibrated default:** `0.617`
+    **The language mix.** The safety pair is calibrated on a multilingual benign pool for a reason: a threshold calibrated on an English-only pool produced a **13 % false-positive rate on Italian traffic**. Multilingual attack detection is largely a *calibration* problem, not a capability problem — the ranking (AUROC 0.85–0.99) can be excellent while recall sits at 16–64 % simply because the scores are shifted. If your traffic is dominated by a language your calibration pool does not represent, re-calibrate; do not nudge the number.
 
 ---
 
-### `jailbreak` — Jailbreak Detection
+## How to set a threshold properly
 
-Controls when a prompt is classified as a jailbreak attempt (attempting to bypass safety constraints or manipulate the model's behavior).
+The only defensible method is to measure on **your** traffic. In order of preference:
 
-| Threshold | Behavior |
-|---|---|
-| `0.30–0.40` | Aggressive — blocks some creative/roleplay prompts that look like jailbreaks |
-| `0.50` | **Default** — good balance for most deployments |
-| `0.60–0.70` | Conservative — only blocks explicit jailbreak patterns |
+### 1. Policy Lens (recommended)
 
-**Calibrated default:** `0.50`
+[Policy Lens](../studio/policy-lens.md) re-decides every stored request under a candidate threshold, exactly — the threshold is applied after scoring, so this is a recomputation over scores already in your call log, not a simulation.
+
+1. Run the axis in `annotate` for a few days so real traffic accumulates.
+2. Open Policy Lens, pick the axis, drag the slider.
+3. Read **would unblock** / **would newly block** — and read the actual messages that move.
+4. Check **reviewer-confirmed good moves**: how many of the moves your own reviewers already flagged as correct.
+5. Apply. It hot-reloads on the next request and bumps `config_version`.
+
+### 2. Offline, from the score distribution
+
+If you prefer to compute it yourself, pull the traffic and work on the numbers:
+
+```bash
+curl -s "http://localhost:8080/v1/glad/apps/support_bot/messages?limit=2000" \
+  | jq '[.items[] | select(.axes.prompt_safety != null) | .axes.prompt_safety] | sort'
+```
+
+Set the threshold at the percentile of **benign** scores matching the false-positive rate you can afford (95th percentile ⇒ ~5 % FPR), then validate against known-bad examples from your own domain. A benchmark FPR is not your FPR.
+
+### 3. Passthrough observation
+
+Set enforcement to `annotate` (or run the request with `mode: "passthrough"`), let 1 000+ calls accumulate, export from the dashboard, and repeat step 2. Nothing is blocked while you measure.
 
 ---
 
-## Recommended Configurations by Deployment Type
+## Choosing by what the error costs you
 
-### Customer Support Chatbot (RAG)
+Thresholds are a business decision dressed as a number. The useful question is never "what is the right value" but "which mistake can I afford".
+
+| Axis | A false positive costs you | A false negative costs you | Lean |
+|---|---|---|---|
+| `prompt_safety` / `jailbreak` | An over-refused customer; support load; churn | An unsafe answer, and an incident to explain | Strict for public/consumer surfaces, relaxed for vetted internal users |
+| `rag_jailbreak` | A retrieved document rejected | An agent obeying an injected instruction | Strict — the base rate of imperatives in benign context is very low |
+| `halluc_context` | A correct answer annotated as unsupported | A confidently wrong answer shipped to a customer | Strict in legal / medical / finance |
+| `halluc_closedbook` | An "uncertain but correct" answer flagged | A fabricated citation, name or statistic | Strict for fact-seeking products, relaxed for creative ones |
+| `answer_safety` | A benign answer withheld | Harmful content delivered | Strict on public surfaces |
+| `profanity` | A frustrated but legitimate customer moderated | Offensive language passing into your logs and your brand | Relaxed for support (people swear), strict for public forums |
+| `out_of_scope` | **A customer you should have served is refused** | You pay for an answer outside your remit | Conservative (`0.90`+), and only promote it to `block` once Policy Lens shows the refused list contains nothing you wanted |
+| `prompt_complexity` | You pay premium rates for an easy question | A hard question gets a weak answer | Start at `0.50` and watch the Model-A/Model-B split in [Cost & FinOps](../studio/cost.md) |
+
+---
+
+## Starting points by deployment type
+
+Use these as *first* values, then tune with Policy Lens. Only the axes you would actually move are listed; everything else keeps its calibrated default.
+
+### Customer support (RAG, public)
 
 ```json
-{
-  "prompt_safety": 0.40,
-  "answer_safety": 0.50,
-  "halluc": 0.60,
-  "combined_halluc": 0.60
-}
+{ "thresholds": { "halluc_context": 0.55, "answer_safety": 0.65,
+                  "profanity": 0.95, "out_of_scope": 0.85 },
+  "enforcement": { "out_of_scope": "block", "answer_safety": "block" } }
 ```
 
-Rationale: moderate input filtering with a slightly higher answer safety threshold to reduce false positives on corporate/grounded content.
+Grounding matters more than tone (customers swear; that is not a safety event), and off-topic traffic is worth refusing outright — it is the cheapest token you will ever save.
 
----
-
-### Public-Facing Chat (General Purpose)
+### Internal knowledge base (vetted users)
 
 ```json
-{
-  "prompt_safety": 0.30,
-  "answer_safety": 0.25,
-  "halluc": 0.617,
-  "combined_halluc": 0.617
-}
+{ "thresholds": { "prompt_safety": 0.96, "jailbreak": 0.9999,
+                  "halluc_context": 0.50 },
+  "enforcement": { "profanity": "off" } }
 ```
 
-Rationale: stricter safety across both prompt and answer, default hallucination threshold.
+Relaxed safety (employees are identified), stricter hallucination — the risk here is a confident wrong answer being trusted, not an attacker.
 
----
-
-### Internal Knowledge Base / Enterprise
+### Legal / medical / finance (high-stakes)
 
 ```json
-{
-  "prompt_safety": 0.60,
-  "answer_safety": 0.70,
-  "halluc": 0.55,
-  "combined_halluc": 0.55
-}
+{ "thresholds": { "prompt_safety": 0.85, "halluc_context": 0.40,
+                  "halluc_closedbook": 0.45, "answer_safety": 0.60 },
+  "enforcement": { "halluc_context": "block" } }
 ```
 
-Rationale: relaxed safety thresholds (employees are vetted users), stricter hallucination to protect factual accuracy.
+Aggressive everywhere: in high-stakes domains, flagging and escalating to [human oversight](../compliance/oversight.md) beats letting a borderline answer through.
+
+### Supervisory / audit mode (no blocking)
+
+Set every axis to `annotate` (or send `mode: "passthrough"`). Every response is scored and logged, nothing is withheld. This is the right first week of any deployment.
 
 ---
 
-### Legal / Medical / Finance (High-Stakes)
+## The three-zone model
+
+Think of each threshold as dividing scores into three zones:
+
+```
+0.0 ──────────────────[threshold − 10%]──[threshold]──────── 1.0
+        Safe zone            Borderline        Flagged zone
+     (pass silently)       (queue for review)  (block or annotate)
+```
+
+The **borderline zone** is where detection is least certain and where human review is worth the money. Configure [human oversight](../compliance/oversight.md) to queue borderline calls without changing the block threshold:
 
 ```json
-{
-  "prompt_safety": 0.25,
-  "answer_safety": 0.20,
-  "halluc": 0.45,
-  "combined_halluc": 0.45
-}
+"human_oversight": { "auto_trigger": true, "safety_threshold": 0.70, "halluc_threshold": 0.75 }
 ```
 
-Rationale: aggressive on all axes — in high-stakes domains it is better to flag and escalate to human review than to allow a borderline response through.
+Reviewed borderline calls become corrections, corrections feed the [feedback loop](../gateway/feedback.md), and the loop is what lets you move the threshold next month on evidence instead of instinct.
 
 ---
 
-### Supervisory / Audit Mode (No Blocking)
+## See also
 
-Set enforcement to `"passthrough"` and keep default thresholds. The system annotates every response with scores without blocking anything.
-
-```json
-{
-  "mode": "passthrough"
-}
-```
-
----
-
-## The Three-Zone Model
-
-Think of each axis threshold as dividing scores into three zones:
-
-```
-0.0 ────────────────────[threshold - 10%]──[threshold]──────── 1.0
-         Safe zone              Borderline        Triggered zone
-      (pass silently)          (flag for review)  (block or annotate)
-```
-
-The **borderline zone** (within 10% of the threshold in either direction) is where the detection is least certain. Configure [human oversight](../compliance/oversight.md) to queue borderline calls for review:
-
-```yaml
-human_oversight:
-  oversight_threshold: 0.55   # 0.617 threshold - ~10%
-```
-
-This captures all borderline calls for human review without changing the block threshold.
-
----
-
-## Measuring Your Threshold
-
-The best way to calibrate thresholds for your specific deployment:
-
-1. Run the system in **passthrough mode** for at least 1,000 calls
-2. Export the call log from the dashboard
-3. Review the score distribution for each axis
-4. Set your threshold at the 95th percentile of benign scores (leaving 5% FPR as acceptable)
-5. Validate with known-harmful examples from your domain
-
-This approach gives you a threshold tuned to your traffic, not a generic benchmark.
+- [Detection Axes](../gateway/detection-axes.md) — what each axis scores and how enforcement is grouped
+- [Policy Lens](../studio/policy-lens.md) — the counterfactual simulator these thresholds deserve
+- [Token & Cost Control](../gateway/cost-control.md) — the two axes where the threshold is a spending decision
+- [Human Feedback Loop](../gateway/feedback.md) — correcting individual cases instead of moving the line

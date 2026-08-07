@@ -2,7 +2,7 @@
 <h1>Geodesia G-1</h1>
 <p class="subtitle">The AI Validation Gateway — hallucination detection, safety enforcement, and regulatory compliance in a single drop-in layer.</p>
 <div class="hero-badges">
-  <span class="hero-badge">🛡️ 6-Axis Detection</span>
+  <span class="hero-badge">🛡️ 9-Axis Detection</span>
   <span class="hero-badge">🎙️ Realtime Voice Guard</span>
   <span class="hero-badge">🔌 MCP Security Layer</span>
   <span class="hero-badge">🔍 Causal Explainability</span>
@@ -19,12 +19,14 @@ The platform is now **Application-oriented** — with **G-1 Studio**, one shared
 
 You do not need to retrain your model. You do not need to change your application code. You plug Geodesia G-1 in, and your LLM immediately gains:
 
-- **Hallucination detection** — five independent signals that tell you whether the model's answer is grounded in the provided context or is a fabrication.
+- **Hallucination detection** — independent, separately calibrated signals that tell you whether the model's answer is grounded in the provided context or is a fabrication.
 - **Safety enforcement** — real-time prompt screening and answer inspection to block unsafe, harmful, or jailbreak requests before they reach the model or the user.
 - **Regulatory compliance** — a full audit trail, EU AI Act impact assessments, GDPR data retention, kill-switch, human oversight escalation, and more — across 13 global frameworks.
 - **Causal explainability** — token-level attribution that shows exactly *which* words in the input caused the model's output, with no access to model internals required — painted as a [heatmap on the text](gateway/causal-xai.md#how-it-works-visualized).
 - **Realtime voice guard** — a streaming-Whisper layer in front of the detector screens *spoken* jailbreaks and unsafe prompts as they are said, and brakes mid-sentence.
 - **MCP security** — starting the proxy starts an [MCP security layer](mcp/index.md) that vets every tool description, tool-call argument and tool result before an agent can act.
+- **Token & cost control** — off-topic requests are refused before the upstream call (zero tokens billed) and easy prompts are [routed to a cheaper model](gateway/cost-control.md) than hard ones, from the same detector pass.
+- **A security policy that evolves with you** — [Policy Lens](studio/policy-lens.md) simulates a threshold change on your own real traffic before you apply it, and every human correction feeds back into the detector.
 
 <div class="feature-grid">
 
@@ -36,8 +38,20 @@ You do not need to retrain your model. You do not need to change your applicatio
 
 <div class="feature-card">
 <span class="feature-icon">🔬</span>
-<h3>6-Axis Detection</h3>
-<p><strong>GLAD-Hummingbird</strong> scores context faithfulness, closed-book fabrication, prompt safety, answer safety, jailbreak, and <code>rag_jailbreak</code> (RAG / context-injection firewall) — each scored independently with calibrated thresholds.</p>
+<h3>9-Axis Detection</h3>
+<p><strong>GLAD-Hummingbird</strong> scores context faithfulness, closed-book fabrication, prompt safety, answer safety, jailbreak, <code>rag_jailbreak</code> (context-injection firewall), profanity, out-of-scope and prompt complexity — nine independent axes, calibrated thresholds, <strong>one forward pass</strong>.</p>
+</div>
+
+<div class="feature-card">
+<span class="feature-icon">💸</span>
+<h3>Token &amp; Cost Control</h3>
+<p>Two axes that pay for themselves: <a href="gateway/cost-control/"><code>out_of_scope</code></a> refuses off-topic traffic <em>before</em> the upstream call (zero tokens billed), and <code>prompt_complexity</code> routes easy prompts to the cheap model and hard ones to the capable one — no extra latency, no extra model call.</p>
+</div>
+
+<div class="feature-card">
+<span class="feature-icon">🎚️</span>
+<h3>Policy Lens</h3>
+<p>Security is relative to <em>your</em> policy. <a href="studio/policy-lens/">Simulate a threshold change</a> against your own real traffic — exactly which requests would flip, and which flips your reviewers already confirmed — then apply it with one click and a hot reload.</p>
 </div>
 
 <div class="feature-card">
@@ -55,7 +69,7 @@ You do not need to retrain your model. You do not need to change your applicatio
 <div class="feature-card">
 <span class="feature-icon">🔍</span>
 <h3>Causal Explainability</h3>
-<p>Black-box <a href="gateway/causal-xai/#how-it-works-visualized">token-level attribution</a> painted as a heatmap on the answer — MuPAX / SHAP over the detector, no upstream-model internals. Shows the one token that caused the flag.</p>
+<p><strong>Deterministic</strong> <a href="gateway/causal-xai/#how-it-works-visualized">token-level attribution</a> painted as a heatmap on the answer — DCA and MuPAX over the detector, no upstream-model internals, no gradients, no sampling. Shows the one token that caused the flag, and proves it by removing it.</p>
 </div>
 
 <div class="feature-card">
@@ -123,6 +137,8 @@ Every chat message goes through this pipeline:
 | Create an API key & make my first call | [Developer Quickstart](developer-quickstart.md) |
 | Connect my first LLM backend | [Upstream Backends](gateway/backends.md) |
 | Understand the detection axes | [Detection Axes](gateway/detection-axes.md) |
+| **Cut my token bill** | [Token & Cost Control](gateway/cost-control.md) |
+| **Tune a threshold on my own traffic** | [Policy Lens](studio/policy-lens.md) |
 | **Guard realtime voice input** | [Audio Input (Realtime Voice)](gateway/audio-input.md) |
 | **See how explainability works** | [Causal XAI — visualized](gateway/causal-xai.md#how-it-works-visualized) |
 | Secure MCP tools & agents | [MCP Security Gateway](mcp/index.md) |

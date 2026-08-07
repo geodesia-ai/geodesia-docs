@@ -75,6 +75,9 @@ Set these variables when starting the gateway (`python -m uvicorn geodesia_gatew
 | `GW_BLOCK_INPUT` | `0` | Set to `1` to enable input blocking (prompt safety + jailbreak enforcement). `0` = annotate only. |
 | `GW_BLOCK_OUTPUT` | `0` | Set to `1` to enable output blocking (answer safety + hallucination enforcement). |
 | `GW_DEFAULT_MODE` | `"block"` | Default enforcement mode: `"block"` or `"passthrough"` |
+| `GW_PROMPT_BLOCK_AXES` | `prompt_safety,jailbreak` | Which prompt-region axes may **refuse** a request. Widen it to promote an operational axis, e.g. `prompt_safety,jailbreak,out_of_scope` to refuse off-topic traffic before the upstream call. Never add `prompt_complexity`. See [Detection Axes](../gateway/detection-axes.md#guardrails-vs-operational-axes). |
+| `GB_EXTRA_AXES` | *(per checkpoint)* | Axes the served head adds on top of the base six, as `name:region,…` (`region ∈ ans\|prompt\|context`). The 9-axis head ships `profanity:prompt,out_of_scope:prompt,prompt_complexity:prompt`. Read by the detector, the gateway, the policy schema and the feedback store from this single source. |
+| `GW_SYSTEM_AS_CONTEXT` | `0` | `1` treats system messages as grounding context for `halluc_context`. Off by default: a system prompt is an instruction, not evidence — it feeds `out_of_scope` instead. Enable only if your deployment ships its knowledge base inside the system message. |
 
 ### Detection Thresholds (Gateway)
 
@@ -87,6 +90,22 @@ These override the thresholds stored in the database for the gateway instance.
 | `GW_THR_HALLUC` | from DB | Hallucination threshold [0–1] |
 | `GW_THR_COMBINED_HALLUC` | from DB | Combined hallucination threshold [0–1] |
 | `GW_THR_JAILBREAK` | from DB | Jailbreak detection threshold [0–1] |
+
+!!! tip "Prefer per-Application thresholds"
+    These gateway-wide overrides predate G-1 Studio. In a multi-Application deployment set thresholds in the Application's `policy` instead — they are versioned, audited, hot-reloaded, and tunable against real traffic with [Policy Lens](../studio/policy-lens.md).
+
+### Causal Explainability (Gateway)
+
+Black-box causal attribution over the companion detector. See [Causal Explainability](../gateway/causal-xai.md).
+
+| Variable | Default | Description |
+|---|---|---|
+| `GW_XAI_MAXLEN` | `512` | Maximum token length for XAI scoring passes. |
+| `GW_XAI_SRC_CHARS` | `2400` | Maximum characters of each region (prompt / context / answer) submitted for attribution. |
+| `GW_XAI_DCA_RHO` | `0.90` | Sufficiency coverage a subset must reproduce to be **certified**. Raising it to force certificates produces false explanations. |
+| `GW_XAI_DCA_FLOOR` | `0.01` | Relevance noise floor in probability units — below it a unit is `irrelevant`. |
+| `GW_XAI_DCA_MINBASE` | `0.5` | Minimum axis probability for a score to count as a *decision worth explaining*. This is the **attribution floor**, deliberately distinct from the decision threshold. |
+| `GW_ANALYZE_MIN_MAXLEN` | `512` | Minimum maxlen when the gateway auto-halves on OOM. |
 
 ### RAG
 
@@ -184,6 +203,11 @@ Opt-in episodic exemplar bank built from approved chat feedback. Off by default 
 | `GW_BANK_V2` | `off` | Use the **Contrastive Safety Memory** bank (dangerous/benign twins). Requires `GW_FEEDBACK_BANK=on`. |
 | `GW_FEEDBACK_BANK_TAU` | `0.88` | Cosine-similarity floor below which an exemplar is ignored (exact-pattern recall). |
 | `GW_FEEDBACK_BANK_GAIN` | `1.0` | How hard a perfect match pushes the probability (`1.0` = fully to 0/1 at `sim == 1`, `weight == 1`). |
+| `GW_FEEDBACK_AUTOAPPROVE` | `off` | `on` ⇒ a flag whose plain-language problem resolves to an axis enters the engine with no curator. `other` / unresolvable flags still queue. |
+| `GW_RETRAIN_CMD` | *(unset)* | Trainer command for a `mode: "weights"` re-train, with `{corpus}` / `{out}` placeholders. Unset ⇒ the corpus is exported and the job returns `prepared`. |
+| `GW_RETRAIN_CWD` | *(unset)* | Working directory for the trainer subprocess. |
+| `GW_RETRAIN_DIR` | `<db dir>/retrain` | Where re-train corpora, logs and outputs are written. |
+| `GW_RETRAIN_AUTOPROMOTE` | `1` | On a successful `weights` job, point the live detector at the new checkpoint and restart. Set `0` for regulated deployments where a human signs off on every model change. |
 
 ### Cloud upstreams & secrets
 

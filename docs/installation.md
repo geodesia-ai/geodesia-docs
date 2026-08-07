@@ -195,7 +195,7 @@ curl -s http://localhost:8800/health | python3 -m json.tool
 # look for  "upstream": "...",  "logprobs": true,  "axes": 5
 ```
 
-If `logprobs` is `false`/`null`, the closed-book hallucination axis is disabled (4 axes instead of 5) — use an
+If `logprobs` is `false`/`null`, the closed-book hallucination axis is disabled (8 axes instead of 9) — use an
 upstream that returns `top_logprobs`.
 
 ---
@@ -387,7 +387,7 @@ A normal OpenAI `chat.completion` **plus** `glad_*` fields and a `geodesia` bloc
 }
 ```
 
-**The 6 axes** (each independent, own threshold):
+**The 9 axes** (each independent, own threshold):
 
 | Axis | Region | Fires when |
 |---|---|---|
@@ -397,6 +397,9 @@ A normal OpenAI `chat.completion` **plus** `glad_*` fields and a `geodesia` bloc
 | `halluc_context` | answer | answer drifts from the provided context |
 | `halluc_closedbook` | answer | answer is an unsupported fabrication (no context) |
 | `answer_safety` | answer | the answer contains harmful content |
+| `profanity` | input | the prompt is vulgar / abusive |
+| `out_of_scope` | input | the prompt is off-topic for the declared scope (silent without one) |
+| `prompt_complexity` | input | routing signal — picks Model A or Model B, never blocks |
 
 **Per-axis fields:** `p_detector` (the probability you act on) vs `threshold`; `flag` = `p_detector >=
 threshold`; `p_energy`/`delta_E_joule` are diagnostic energy views. `halluc_closedbook` adds `token_surprisal[]`
@@ -466,7 +469,7 @@ docker compose down -v          # also wipe the DB/state volume (destroys apps, 
 | Symptom | Fix |
 |---|---|
 | `application limit reached (free tier: 1)` | `MAX_APPS=unlimited ./install.sh both`, or set `GLAD_FREE_MAX_APPLICATIONS=unlimited` on g1-studio and recreate. |
-| `health` shows `logprobs: false`, only 4 axes | Upstream doesn't return `top_logprobs`. Use ollama or vLLM with logprobs on. |
+| `health` shows `logprobs: false`, only 8 axes | Upstream doesn't return `top_logprobs`. Use ollama or vLLM with logprobs on. |
 | Chat 404 / upstream error | `UPSTREAM_URL`/`UPSTREAM_MODEL` wrong or LLM down. `curl` the upstream directly; fix `.env`; `docker compose up -d --force-recreate`. |
 | Model config changes revert after restart | Expected — the container ENV wins. Put durable values in `.env`/compose, not the runtime `POST config`. |
 | Deploy health-poll fails / auto-rollback | The health endpoint is `/health` (not `/healthz`). |

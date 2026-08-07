@@ -54,8 +54,8 @@ Log-probabilities express how confident the model was when it chose each word. G
 
 | Upstream returns log-probs | Active axes | What you lose without them |
 |---|---|---|
-| ✅ Yes | **5 axes** | nothing |
-| ❌ No | **4 axes** | closed-book fabrication only — context faithfulness, prompt safety, answer safety, and jailbreak all still run |
+| ✅ Yes | **9 axes** | nothing |
+| ❌ No | **8 axes** | closed-book fabrication only — every other axis still runs |
 
 No setting toggles this — the gateway probes it on the first request and `/health` reports the result. You can recover the 5th axis later with a [log-prob sidecar](#ollama).
 
@@ -80,7 +80,7 @@ No setting toggles this — the gateway probes it on the first request and `/hea
 | [LocalAI](#localai) | `openai` | OpenAI | ✅ | 5 | Self-hosted drop-in |
 | [Internal (self-managed)](#internal-self-managed-vllm) | `internal` | OpenAI | ✅ | 5 | Single-GPU, gateway owns lifecycle |
 
-<small>* Hosted providers expose log-probabilities on most—but not all—models and tiers; the gateway falls back to 4 axes automatically when they are absent.</small>
+<small>* Hosted providers expose log-probabilities on most—but not all—models and tiers; the gateway falls back to 8 axes automatically when they are absent.</small>
 
 ---
 
@@ -150,7 +150,7 @@ Every framework below is configured identically; only the values change.
 
 ### vLLM
 
-The recommended production backend on NVIDIA GPUs. Returns log-probabilities natively → 5 axes.
+The recommended production backend on NVIDIA GPUs. Returns log-probabilities natively → all 9 axes.
 
 === "Bare process"
 
