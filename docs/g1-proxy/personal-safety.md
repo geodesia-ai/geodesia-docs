@@ -166,7 +166,21 @@ enters the memory unless it clears **four** independent gates:
    convention inverted, and the two readings must agree. A small model will happily say yes twice to a
    leading question; agreeing with the question's own inverse is a much harder test to pass by
    accident.
-4. **It must fit within a daily budget.** A hard cap on how much the machine may add per day.
+4. **It must survive being thought about.** Only then, and only for what is left, the reviewer is
+   allowed to *reason* — to work through the strongest case each way before committing. If it does not
+   commit, nothing is written.
+5. **It must fit within a daily budget.** A hard cap on how much the machine may add per day.
+
+!!! note "Why the reasoning is at the end and not at the start"
+    Reading a request costs one pass. *Reasoning* about it costs hundreds, and on a CPU that is the
+    difference between reviewing forty exchanges in an idle window and reviewing two. There is also a
+    subtler reason: a model that has reasoned its way to an answer has already committed by the time
+    it speaks, so its confidence stops being graded — and the confidence is what gate 2 reads.
+
+    So the reviewer *screens* quickly and calibrated across everything, and *deliberates* slowly only
+    on the small fraction that reached a disagreement — which is also the only place where anything
+    irreversible happens. Cheap filters first, expensive ones on what survives. It is the same trade
+    the detector itself makes when it escalates a hard case to deep scan.
 
 Everything it writes is stamped as machine-made, so a reviewer can audit — or revoke — every automatic
 entry in one action without touching a single human decision. And if you would rather it never wrote
