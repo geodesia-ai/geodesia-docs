@@ -6,6 +6,9 @@ No general-purpose safety model can encode that, and no vendor can ship it to yo
 
 This page is the whole loop end to end — what each part does, where it runs, what it costs, and what it deliberately refuses to do.
 
+!!! tip "The loop can also run without a human"
+    Everything below is driven by someone raising a flag. There is now a second source for the same memory: an automatic reviewer that runs on spare CPU while your machine is idle, re-scores the traffic nobody flagged against **your own description of your organisation**, and contributes only the cases where it confidently disagrees with the detector. It is off by default. See **[Personal Safety](personal-safety.md)**.
+
 ---
 
 ## The three timescales

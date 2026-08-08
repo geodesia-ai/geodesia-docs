@@ -147,6 +147,7 @@ nav:
     - Token & Cost Control: g1-proxy/cost-control.md
     - Deep Scan (GLAD-Tapestry): g1-proxy/deep-scan.md
     - Live Web Search: g1-proxy/web-search.md
+    - Personal Safety: g1-proxy/personal-safety.md
     - Self-Evolving Security: g1-proxy/self-evolving.md
     - Human Feedback Loop: g1-proxy/feedback.md
     - Knowledge Base (RAG): rag/index.md
