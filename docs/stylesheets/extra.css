@@ -180,17 +180,27 @@
   font-weight: 600;
   line-height: 1.5;
 }
-.md-typeset .badge-green  { background: rgba(76,175,80,0.15);  color: #4caf50; }
-.md-typeset .badge-red    { background: rgba(244,67,54,0.15);  color: #f44336; }
-.md-typeset .badge-blue   { background: rgba(33,150,243,0.15); color: #2196f3; }
-.md-typeset .badge-orange { background: rgba(255,152,0,0.15);  color: #ff9800; }
-.md-typeset .badge-grey   { background: rgba(158,158,158,0.15);color: #9e9e9e; }
+/* Tinted pills: the background is a 15–20 % wash, so it follows the page —
+   near-white in light mode, near-black in slate. The text colour therefore
+   cannot be a single mid tone for both: the saturated tints below are the
+   light-mode values, and each block has a slate counterpart further down.
+   Anything lighter than these fails 4.5:1 on white. */
+.md-typeset .badge-green  { background: rgba(76,175,80,0.15);  color: #1b5e20; }
+.md-typeset .badge-red    { background: rgba(244,67,54,0.15);  color: #b71c1c; }
+.md-typeset .badge-blue   { background: rgba(33,150,243,0.15); color: #0d47a1; }
+.md-typeset .badge-orange { background: rgba(255,152,0,0.15);  color: #bf360c; }
+.md-typeset .badge-grey   { background: rgba(158,158,158,0.15);color: #424242; }
+[data-md-color-scheme="slate"] .md-typeset .badge-green  { color: #4caf50; }
+[data-md-color-scheme="slate"] .md-typeset .badge-red    { color: #f44336; }
+[data-md-color-scheme="slate"] .md-typeset .badge-blue   { color: #2196f3; }
+[data-md-color-scheme="slate"] .md-typeset .badge-orange { color: #ff9800; }
+[data-md-color-scheme="slate"] .md-typeset .badge-grey   { color: #bdbdbd; }
 
 /* Law tags */
 .md-typeset .law-tag {
   display: inline-block;
   background: rgba(63,81,181,0.15);
-  color: #7986cb;
+  color: #303f9f;
   border: 1px solid rgba(63,81,181,0.3);
   border-radius: 6px;
   padding: 0.2rem 0.6rem;
@@ -199,6 +209,7 @@
   font-weight: 600;
   margin: 0.15rem;
 }
+[data-md-color-scheme="slate"] .md-typeset .law-tag { color: #9fa8da; }
 
 /* Endpoint cards */
 .md-typeset .endpoint {
@@ -220,10 +231,14 @@
   min-width: 50px;
   text-align: center;
 }
-.md-typeset .method-get    { background: rgba(76,175,80,0.2);  color: #66bb6a; }
-.md-typeset .method-post   { background: rgba(33,150,243,0.2); color: #42a5f5; }
-.md-typeset .method-put    { background: rgba(255,152,0,0.2);  color: #ffa726; }
-.md-typeset .method-delete { background: rgba(244,67,54,0.2);  color: #ef5350; }
+.md-typeset .method-get    { background: rgba(76,175,80,0.2);  color: #1b5e20; }
+.md-typeset .method-post   { background: rgba(33,150,243,0.2); color: #0d47a1; }
+.md-typeset .method-put    { background: rgba(255,152,0,0.2);  color: #bf360c; }
+.md-typeset .method-delete { background: rgba(244,67,54,0.2);  color: #b71c1c; }
+[data-md-color-scheme="slate"] .md-typeset .method-get    { color: #81c784; }
+[data-md-color-scheme="slate"] .md-typeset .method-post   { color: #64b5f6; }
+[data-md-color-scheme="slate"] .md-typeset .method-put    { color: #ffb74d; }
+[data-md-color-scheme="slate"] .md-typeset .method-delete { color: #ef9a9a; }
 
 .md-typeset .endpoint .path {
   font-size: 0.95rem;
@@ -263,6 +278,11 @@
   border-bottom: 2px solid transparent;
 }
 .md-typeset .tok:hover { transform: translateY(-2px); }
+/* In slate the theme's text is a translucent light grey: fine over the pale
+   washes, but only ~3.2:1 over a token shaded near the top of the scale (the
+   one the reader is actually meant to look at). Opaque white clears 6:1 there
+   and stays >12:1 on the faint end. */
+[data-md-color-scheme="slate"] .md-typeset .tok { color: #fff; }
 /* risk-increasing (positive χ) → red scale · risk-reducing (negative χ) → teal */
 .md-typeset .tok.pos { border-bottom-color: rgba(244,67,54,0.9); }
 .md-typeset .tok.neg { border-bottom-color: rgba(0,188,212,0.9); }
@@ -365,28 +385,17 @@
   height: auto;
 }
 
-/* Filled nodes: the label must follow the node's own colour.
-   Material injects an id-scoped `.nodeLabel { color: ... }` rule into the SVG,
-   which otherwise repaints the label with the page text colour — dark grey on a
-   dark blue node in light mode, i.e. unreadable. Hence the explicit override. */
-.md-typeset .mermaid g.node.gdInput .nodeLabel,
-.md-typeset .mermaid g.node.gdInput .nodeLabel p,
-.md-typeset .mermaid g.node.gdInput span,
-.md-typeset .mermaid g.node.gdInput foreignObject div {
-  color: #ffd54f !important;
-}
-.md-typeset .mermaid g.node.gdCore .nodeLabel,
-.md-typeset .mermaid g.node.gdCore .nodeLabel p,
-.md-typeset .mermaid g.node.gdCore span,
-.md-typeset .mermaid g.node.gdCore foreignObject div {
-  color: #ffffff !important;
-}
-.md-typeset .mermaid g.node.gdOut .nodeLabel,
-.md-typeset .mermaid g.node.gdOut .nodeLabel p,
-.md-typeset .mermaid g.node.gdOut span,
-.md-typeset .mermaid g.node.gdOut foreignObject div {
-  color: #04323a !important;
-}
+/* NB — the colour of mermaid label text is NOT ours to set, neither from here
+   nor from the diagram source. Material renders every diagram into a *closed*
+   shadow root, so no rule in this file can reach it; and inside that shadow
+   root Material's own themeCSS carries
+       .nodeLabel, .nodeLabel p { color: var(--md-mermaid-label-fg-color) }
+   which matches the <p> holding the text directly. A `color:` in a mermaid
+   `style`/`classDef` only ever lands on the <span> wrapping that <p> — even as
+   an inline !important it loses, because a rule that matches an element beats
+   inheritance into it. Consequence, and the reason the diagrams look the way
+   they do: node fills must be light tints (`fill:#rrggbbAA`), never solid dark,
+   so that the theme's own label colour stays readable in light AND dark. */
 
 /* Section caption shown under a diagram */
 .md-typeset .diagram-caption {

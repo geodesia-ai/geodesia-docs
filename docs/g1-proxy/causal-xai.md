@@ -83,9 +83,12 @@ flowchart LR
     D --> E[Verify: minimal set that<br/>reproduces AND is needed]
     E --> F[Certified responsible tokens<br/>+ effect · sufficiency · responsibility]
     F --> G([Heatmap on the text])
-    classDef gdInput fill:#1a1f6e,stroke:#5c6bc0,color:#ffd54f
-    classDef gdCore  fill:#3f51b5,stroke:#7986cb,color:#ffffff
-    classDef gdOut   fill:#00bcd4,stroke:#0097a7,color:#04323a
+    %% Tinte chiare, mai fondi pieni: il colore del testo non e' nostro da
+    %% scegliere (vedi la nota in stylesheets/extra.css), quindi il fondo deve
+    %% restare vicino a quello della pagina in entrambi i temi.
+    classDef gdInput fill:#ffd54f2b,stroke:#f9a825,stroke-width:3px
+    classDef gdCore  fill:#3f51b538,stroke:#3f51b5,stroke-width:3px
+    classDef gdOut   fill:#00bcd438,stroke:#00acc1,stroke-width:3px
     class A gdInput
     class D gdCore
     class G gdOut

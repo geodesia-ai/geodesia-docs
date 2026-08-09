@@ -24,10 +24,15 @@ flowchart LR
     D -->|pass| U[→ upstream LLM]
     D -->|warn| A[annotate]
     D -->|block| X[⛔ refuse<br/>truncate utterance]
-    style W fill:#3f51b5,color:#fff
-    style G fill:#3f51b5,color:#fff
-    style X fill:#f44336,color:#fff
-    style U fill:#00bcd4,color:#052
+    %% Tinte chiare, mai fondi pieni: il colore del testo non e' nostro da
+    %% scegliere (vedi la nota in stylesheets/extra.css), quindi il fondo deve
+    %% restare vicino a quello della pagina in entrambi i temi.
+    classDef gdCore  fill:#3f51b538,stroke:#3f51b5,stroke-width:3px
+    classDef gdOut   fill:#00bcd438,stroke:#00acc1,stroke-width:3px
+    classDef gdBlock fill:#f4433630,stroke:#e53935,stroke-width:3px
+    class W,G gdCore
+    class U gdOut
+    class X gdBlock
 ```
 
 <p class="diagram-caption">The same "brake" the streaming monitor applies to a generated answer, moved to the input side: as the transcript commits new words, the input axes re-score — an early block fires before the speaker finishes.</p>
