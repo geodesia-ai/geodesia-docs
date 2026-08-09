@@ -365,6 +365,29 @@
   height: auto;
 }
 
+/* Filled nodes: the label must follow the node's own colour.
+   Material injects an id-scoped `.nodeLabel { color: ... }` rule into the SVG,
+   which otherwise repaints the label with the page text colour — dark grey on a
+   dark blue node in light mode, i.e. unreadable. Hence the explicit override. */
+.md-typeset .mermaid g.node.gdInput .nodeLabel,
+.md-typeset .mermaid g.node.gdInput .nodeLabel p,
+.md-typeset .mermaid g.node.gdInput span,
+.md-typeset .mermaid g.node.gdInput foreignObject div {
+  color: #ffd54f !important;
+}
+.md-typeset .mermaid g.node.gdCore .nodeLabel,
+.md-typeset .mermaid g.node.gdCore .nodeLabel p,
+.md-typeset .mermaid g.node.gdCore span,
+.md-typeset .mermaid g.node.gdCore foreignObject div {
+  color: #ffffff !important;
+}
+.md-typeset .mermaid g.node.gdOut .nodeLabel,
+.md-typeset .mermaid g.node.gdOut .nodeLabel p,
+.md-typeset .mermaid g.node.gdOut span,
+.md-typeset .mermaid g.node.gdOut foreignObject div {
+  color: #04323a !important;
+}
+
 /* Section caption shown under a diagram */
 .md-typeset .diagram-caption {
   text-align: center;

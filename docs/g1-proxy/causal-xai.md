@@ -83,9 +83,12 @@ flowchart LR
     D --> E[Verify: minimal set that<br/>reproduces AND is needed]
     E --> F[Certified responsible tokens<br/>+ effect · sufficiency · responsibility]
     F --> G([Heatmap on the text])
-    style A fill:#1a1f6e,color:#fff
-    style D fill:#3f51b5,color:#fff
-    style G fill:#00bcd4,color:#052
+    classDef gdInput fill:#1a1f6e,stroke:#5c6bc0,color:#ffd54f
+    classDef gdCore  fill:#3f51b5,stroke:#7986cb,color:#ffffff
+    classDef gdOut   fill:#00bcd4,stroke:#0097a7,color:#04323a
+    class A gdInput
+    class D gdCore
+    class G gdOut
 ```
 
 <p class="diagram-caption">Black-box causal attribution: intervene → re-score with the detector → verify the certificate → paint each token by its measured effect. No upstream-model gradients, no internals, no randomness.</p>
