@@ -145,7 +145,7 @@ nav:
     - Enforcement Modes: g1-proxy/enforcement-modes.md
     - Detection Axes: g1-proxy/detection-axes.md
     - Token & Cost Control: g1-proxy/cost-control.md
-    - Deep Scan (GLAD-Tapestry): g1-proxy/deep-scan.md
+    - Thinking Levels (GLAD-G + GLAD-H): g1-proxy/thinking-levels.md
     - Live Web Search: g1-proxy/web-search.md
     - Personal Safety: g1-proxy/personal-safety.md
     - Self-Evolving Security: g1-proxy/self-evolving.md

@@ -39,6 +39,7 @@ All standard OpenAI fields are accepted verbatim and forwarded to the upstream. 
 | `pass_extra` | `integer` | `1` | Number of independent answer samples to draw for closed-book uncertainty estimation. Values > 1 cause the gateway to re-sample the answer `N` times at temperature 0.8 and compute consistency signals. Only applied when the upstream supports log-probabilities and the turn has no explicit context. Use sparingly — each extra sample doubles the generation cost. |
 | `self_consistency` | `boolean` | `false` | Shorthand for `pass_extra > 1`. When `true`, the gateway draws `self_consistency_samples` extra samples. |
 | `self_consistency_samples` | `integer` | — | Number of extra samples when `self_consistency` is `true`. |
+| `thinking_level` | `integer` | `0` | `0` = GLAD-G only (default, byte-identical to a deployment without GLAD-H). `1` = GLAD-G + GLAD-H, Cascade gray-zone fusion (GLAD-H invoked only on borderline axes). `2` = GLAD-G + GLAD-H, Max-percentile-OR fusion (GLAD-H invoked always). Requires `GW_GLADH_CKPT` configured on the deployment — otherwise 1/2 silently fall back to 0. See [Thinking Levels](thinking-levels.md). |
 
 ### Response Body
 
@@ -100,6 +101,7 @@ See [API Response Format](../reference/response-format.md) for the full structur
 | `brake` | `true` if any answer-region axis is flagged |
 | `dominant_axis` | The axis with the highest detection score |
 | `routing` | Present when [complexity routing](cost-control.md) is enabled: `axis`, `score`, `threshold`, `used_complex_model`, and the `model` that actually answered |
+| `thinking_level` | Present when `thinking_level` 1/2 was requested AND GLAD-H was available: `thinking_level`, `thinking_tiers_used`, `thinking_escalated` (level 1 only). See [Thinking Levels](thinking-levels.md). |
 | `energy_dHmax_joule` | (internal diagnostic; not used in standard integrations) |
 | `rag` | Present when RAG is active; contains `sources`, `n_sources`, and `verification` results |
 | `input` | Present when streaming — the input-region analysis sent in the first SSE chunk |

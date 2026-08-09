@@ -10,15 +10,14 @@ key and reading the safety verdicts.
 4. [What the installer created](#4-what-the-installer-created)
 5. [Configure the upstream LLM](#5-configure-the-upstream-llm)
 6. [Licensing & tiers](#6-licensing-tiers)
-7. [Deep scan (GLAD-Tapestry)](#7-deep-scan-glad-tapestry)
-8. [Dilution guard (adaptive-attack defense)](#8-dilution-guard-adaptive-attack-defense)
-9. [Runtime gateway config](#9-runtime-gateway-config)
-10. [Create an Application + API key](#10-create-an-application-api-key)
-11. [Call the LLM with the key](#11-call-the-llm-with-the-key)
-12. [Interpret the response](#12-interpret-the-response)
-13. [Operations (logs, update, stop, health, metrics)](#13-operations)
-14. [Troubleshooting](#14-troubleshooting)
-15. [Full environment-variable reference](#15-full-environment-variable-reference)
+7. [Dilution guard (adaptive-attack defense)](#7-dilution-guard-adaptive-attack-defense)
+8. [Runtime gateway config](#8-runtime-gateway-config)
+9. [Create an Application + API key](#9-create-an-application-api-key)
+10. [Call the LLM with the key](#10-call-the-llm-with-the-key)
+11. [Interpret the response](#11-interpret-the-response)
+12. [Operations (logs, update, stop, health, metrics)](#12-operations)
+13. [Troubleshooting](#13-troubleshooting)
+14. [Full environment-variable reference](#14-full-environment-variable-reference)
 
 ---
 
@@ -38,7 +37,7 @@ Two containers, one command:
                               g1-studio :8080  ◀── you manage apps/keys here
 ```
 
-Images are **self-contained** (GLAD-BERT detector + GLAD-Tapestry deep-scan + RAG all baked in). You only
+Images are **self-contained** (GLAD-BERT detector + RAG all baked in). You only
 need to provide an **upstream LLM** that speaks the OpenAI API and returns `logprobs`.
 
 ---
@@ -130,7 +129,6 @@ GATEWAY_PORT=8800      # engine port
 UPSTREAM_TYPE=ollama   # ollama | openai | vllm | sglang | trtllm | internal | azure-openai | bedrock | vertex
 UPSTREAM_URL=http://localhost:11434
 UPSTREAM_MODEL=llama3.1:8b
-DEEP_SCAN=on           # on | off  (geometric MoE second-opinion judge)
 GATEWAY_URL=http://localhost:8800   # where g1-studio reaches the engine
 WORKDIR=$PWD/geodesia-g1            # where compose + config live
 ```
@@ -139,7 +137,7 @@ Example, everything at once:
 
 ```bash
 UPSTREAM_TYPE=openai UPSTREAM_URL=http://localhost:8002 UPSTREAM_MODEL=ministral3 \
-DEEP_SCAN=on HTTP_PORT=8080 GATEWAY_PORT=8800 \
+HTTP_PORT=8080 GATEWAY_PORT=8800 \
 ./install.sh both 'GEO1.eyJwYXlsb2FkIjp7...'
 ```
 
@@ -160,7 +158,7 @@ Everything lives in `WORKDIR` (default `./geodesia-g1`):
 ```bash
 cd geodesia-g1
 ls -la                     # .env, docker-compose.yml, (license.json if you passed one)
-cat .env                   # your resolved config (REG/TAG/DEVICE/UPSTREAM_*/DEEP_SCAN/...)
+cat .env                   # your resolved config (REG/TAG/DEVICE/UPSTREAM_*/...)
 cat docker-compose.yml     # the generated 2-service stack
 docker compose ps          # running containers
 docker volume ls | grep g1-data   # the shared DB/state volume
@@ -232,21 +230,7 @@ curl -s http://localhost:8800/v1/glad/gateway/entitlements | python3 -m json.too
 
 ---
 
-## 7. Deep scan (GLAD-Tapestry)
-
-Deep scan is a geometric MoE second-opinion judge, ON by default (`DEEP_SCAN=on`). On `--cpu` it loads ~16GB in bf16 on
-first use and is slower.
-
-```bash
-DEEP_SCAN=off ./install.sh both        # disable it
-# or edit .env: DEEP_SCAN=off  then  docker compose up -d --force-recreate
-```
-
-Per-request you can also pass `"deep_scan": true|false` in the chat body.
-
----
-
-## 8. Dilution guard (adaptive-attack defense)
+## 7. Dilution guard (adaptive-attack defense)
 
 Defends against camouflaged prompt-injection / jailbreaks (arXiv:2510.09023) that dilute a payload below the
 pooled detector's threshold. **OFF by default** (serving is byte-identical). Enable it by adding env to the
@@ -281,7 +265,7 @@ then switch to `enforce`. Re-fit `GW_DILUTION_TAU_ADJ` on your own benign traffi
 
 ---
 
-## 9. Runtime gateway config
+## 8. Runtime gateway config
 
 You can change some settings live (no restart) — but **env wins on the next restart**, so make durable changes
 in `.env`/compose.
@@ -297,7 +281,7 @@ curl -s -X POST http://localhost:8800/v1/glad/gateway/config \
 
 ---
 
-## 10. Create an Application + API key
+## 9. Create an Application + API key
 
 An **Application** is a tenant (its own upstream binding, policy, thresholds, budget). An **API key**
 (`g1k_live_…`) is its runtime identity. Mint both on the control plane (`:8080`):
@@ -329,7 +313,7 @@ If `GEODESIA_ADMIN_TOKEN` is set on g1-studio, add `-H "X-Geodesia-Admin-Key: <t
 
 ---
 
-## 11. Call the LLM with the key
+## 10. Call the LLM with the key
 
 Send OpenAI-style chat to the **engine** (`:8800`) with the key as a Bearer token.
 
@@ -362,7 +346,7 @@ the `default` app. An unknown key falls back to `default` (HTTP 200, not 401).
 
 ---
 
-## 12. Interpret the response
+## 11. Interpret the response
 
 A normal OpenAI `chat.completion` **plus** `glad_*` fields and a `geodesia` block:
 
@@ -434,7 +418,7 @@ print("".join(answer), "| blocked:", bool(verdict and verdict.get("brake")))
 
 ---
 
-## 13. Operations
+## 12. Operations
 
 ```bash
 cd geodesia-g1
@@ -464,7 +448,7 @@ docker compose down -v          # also wipe the DB/state volume (destroys apps, 
 
 ---
 
-## 14. Troubleshooting
+## 13. Troubleshooting
 
 | Symptom | Fix |
 |---|---|
@@ -478,7 +462,7 @@ docker compose down -v          # also wipe the DB/state volume (destroys apps, 
 
 ---
 
-## 15. Full environment-variable reference
+## 14. Full environment-variable reference
 
 **Install-time (in `.env` / `install.sh`):**
 
@@ -491,7 +475,6 @@ docker compose down -v          # also wipe the DB/state volume (destroys apps, 
 | `UPSTREAM_TYPE` | `ollama` | `ollama\|openai\|vllm\|sglang\|trtllm\|internal\|azure-openai\|bedrock\|vertex` |
 | `UPSTREAM_URL` | `http://localhost:11434` | your LLM base URL |
 | `UPSTREAM_MODEL` | `llama3.1:8b` | model name the LLM serves |
-| `DEEP_SCAN` | `on` | geometric MoE second-opinion judge |
 | `GATEWAY_URL` | `http://localhost:8800` | where g1-studio reaches the engine |
 | `WORKDIR` | `$PWD/geodesia-g1` | install directory |
 | `LICENSE` | (unset) | `GEO1.<b64>` \| path \| raw JSON |
@@ -503,7 +486,7 @@ docker compose down -v          # also wipe the DB/state volume (destroys apps, 
 | Var | Default | Meaning |
 |---|---|---|
 | `GW_DEVICE` | `cuda` (`cpu` with `--cpu`) | detector device |
-| `GW_DEEP_SCAN` / `GW_DEEP_SCAN_DEVICE` | `on` / `cuda` | deep scan on/off + device |
+| `GW_GLADH_CKPT` / `GW_GLADH_DEVICE` | (unset) / `auto` | thinking_level 1/2 availability + GLAD-H device |
 | `GW_BLOCK_INPUT` | `1` | block flagged prompts (vs score-only) |
 | `GW_INJECT_SYSTEM` | `1` | inject the safety system prompt |
 | `GW_DILUTION_GUARD` | `off` | `off\|shadow\|enforce` — adaptive-attack guard |

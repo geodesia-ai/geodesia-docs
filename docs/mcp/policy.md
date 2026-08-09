@@ -1,6 +1,6 @@
 # MCP Policy — per-App · per-Axis · per-Tool
 
-MCP enforcement is configured at **three levels of granularity**, all from G-1 Studio. Platform-wide settings (ports, modalities, deep-scan availability) live in **Settings → MCP**; everything that decides *what gets blocked* is **per Application**, under **Applications → *app* → MCP**.
+MCP enforcement is configured at **three levels of granularity**, all from G-1 Studio. Platform-wide settings (ports, modalities) live in **Settings → MCP**; everything that decides *what gets blocked* is **per Application**, under **Applications → *app* → MCP**.
 
 ![Diagram](../assets/diagrams/mcp-policy.svg){: .diagram }
 
@@ -13,7 +13,6 @@ Because policy is per Application, scoring uses that Application's **bound model
 | Setting | Meaning |
 |---|---|
 | **enabled** | MCP guard active for this Application |
-| **deep_scan** | escalate this app's MCP scans to [GLAD-Tapestry](../g1-proxy/deep-scan.md) |
 | **scan tool descriptions / results · verify args** | toggle each scan family |
 | **toolset signing** | anti rug-pull (approved-hash diff) |
 | **action_tool_description / _result / _args** | the default action per surface (`block` / `annotate` / `off` / `policy`) |
@@ -73,8 +72,8 @@ When **toolset signing** is on, Geodesia stores an HMAC of each approved tool de
 
 | Where | Scope |
 |---|---|
-| **Studio → Settings → MCP** | platform: enable, Guard Server port, chat-aware, deep-scan, listening endpoints |
+| **Studio → Settings → MCP** | platform: enable, Guard Server port, chat-aware, listening endpoints |
 | **Studio → Applications → *app* → MCP** | per-app surface actions, **per-axis** table, **per-tool** rules, allowlist, egress |
-| env/CLI | interceptors (`mcp_interceptors`), deep-scan model paths — security-sensitive, not remotely settable |
+| env/CLI | interceptors (`mcp_interceptors`) — security-sensitive, not remotely settable |
 
 See [Detection Axes](../g1-proxy/detection-axes.md) for what each axis detects and [Enforcement Modes](../g1-proxy/enforcement-modes.md) for how block vs annotate behaves end-to-end.

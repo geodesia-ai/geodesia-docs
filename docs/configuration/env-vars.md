@@ -163,18 +163,15 @@ See [Cost & Budget](../studio/cost.md) for the FinOps engine, budget bands, and 
 | `GEODESIA_SCORING_MODE` | `"embedded"` | `embedded` runs the GLAD-Hummingbird monitor **in-process** (zero behaviour change). `remote` swaps it for a thin HTTP client that talks to a separate scoring pool — for horizontal scale-out of detection compute. (`src/glad_minimal/scoring/`) |
 | `GEODESIA_SCORING_URL` | — | Base URL of the remote scoring server (`python -m glad_minimal.scoring.server`, e.g. `http://host:8810`). **Required** when `GEODESIA_SCORING_MODE=remote`. |
 
-### Deep Scan (GLAD-Tapestry)
+### Thinking Levels (GLAD-G + GLAD-H)
 
-Opt-in geometric MoE second opinion, blended into the safety and hallucination axes. **Off by default → never loaded, zero overhead.** See [Deep Scan](../g1-proxy/deep-scan.md).
+Opt-in second detector, blended per request into any axis. **Off by default (level 0) → GLAD-H never loaded, zero overhead.** See [Thinking Levels](../g1-proxy/thinking-levels.md).
 
 | Variable | Default | Description |
 |---|---|---|
-| `GW_DEEP_SCAN` | `off` | Platform availability switch. `on` makes GLAD-Tapestry loadable (still lazy-loaded on first use); also requires `deep_scan: true` per request. |
-| `GW_DEEP_SCAN_DIR` | — | Path to a **trained GLAD-Tapestry export** directory (preferred — geometry-head continuous scorer). |
-| `GW_DEEP_SCAN_MODEL` | `geodesia-guardian-8b` | Tapestry model id for the zero-shot fallback (when `GW_DEEP_SCAN_DIR` is unset). |
-| `GW_DEEP_SCAN_QUANT` | `4bit` | `4bit` (bnb nf4, ~5 GB VRAM, needs CUDA) or empty for bf16 (~16 GB). |
-| `GW_DEEP_SCAN_DEVICE` | `auto` | `auto` → CUDA → MPS → CPU. Pin to e.g. `cuda:0`. |
-| `GW_DEEP_SCAN_LORA` | — | Optional adapter directory for the geometric MoE model. |
+| `GW_GLADH_CKPT` | — | Path to the GLAD-H checkpoint. Unset → `thinking_level` 1/2 silently fall back to level 0. |
+| `GW_GLADH_DEVICE` | `auto` | `auto` → CUDA when visible, else CPU. GLAD-H runs in its own sub-process, with its own device selection. |
+| `GW_FUSION_BANK` | `runs/glad_bert/fusion_bank_thinking_v3_gladh_v1.json` | The calibrated fusion artifact (percentile maps + thresholds for Cascade and Max-OR). Missing/unreadable → same fallback as an unset checkpoint. |
 
 ### Live Web Search
 

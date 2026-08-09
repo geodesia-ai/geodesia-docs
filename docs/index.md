@@ -74,8 +74,8 @@ You do not need to retrain your model. You do not need to change your applicatio
 
 <div class="feature-card">
 <span class="feature-icon">🪡</span>
-<h3>Deep Scan (GLAD-Tapestry)</h3>
-<p>Opt-in geometric MoE second opinion for high-stakes Applications — blended confidently into the safety and hallucination axes. Off by default; zero overhead until enabled.</p>
+<h3>Thinking Levels</h3>
+<p>A per-request dial that blends in GLAD-H, a second independent detector, for a stronger verdict on borderline or high-stakes turns — Cascade gray-zone or Max-percentile-OR fusion. Off by default (level 0); zero overhead until requested.</p>
 </div>
 
 <div class="feature-card">

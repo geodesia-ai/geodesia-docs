@@ -77,7 +77,7 @@ The fastest path on a connected GPU host is to pull the **prebuilt, signed** Geo
 
 | Image | Role | Default tag |
 |---|---|---|
-| `g1-proxy` | The gateway (GLAD-Hummingbird detector + optional GLAD-Tapestry deep scan). **Needs the GPU.** | `cuda` |
+| `g1-proxy` | The gateway (GLAD-Hummingbird detector + optional GLAD-H second opinion via [Thinking Levels](g1-proxy/thinking-levels.md)). **Needs the GPU.** | `cuda` |
 | `g1-studio` | The G-1 Studio web UI / control plane. CPU-only. | `wolfi` |
 
 ### 1. Host prerequisites (amd64 + NVIDIA)
@@ -142,15 +142,16 @@ This pulls `${REG}/g1-proxy:cuda` and `${REG}/g1-studio:wolfi`, then starts:
     docker pull $REG/g1-studio:wolfi
     ```
 
-### 4. Enable Deep Scan on the proxy (optional)
+### 4. Enable Thinking Levels on the proxy (optional)
 
-To turn on the [GLAD-Tapestry](g1-proxy/deep-scan.md) deep-scan tier, add its env vars to the `g1-proxy` service (it needs ~5 GB of extra VRAM):
+To make `thinking_level` 1/2 available (GLAD-H as a second opinion, requested per chat), point `GW_GLADH_CKPT` at a GLAD-H checkpoint on the `g1-proxy` service:
 
 ```bash
-GW_DEEP_SCAN=on \
-GW_DEEP_SCAN_MODEL=geodesia-guardian-8b \
+GW_GLADH_CKPT=/app/runs/glad_bert/glad_bert_gladh_v1_psjbasft_live.pt \
   docker compose -f docker-compose.customer-registry.yml up -d
 ```
+
+See [Thinking Levels](g1-proxy/thinking-levels.md) for the full picture.
 
 ---
 

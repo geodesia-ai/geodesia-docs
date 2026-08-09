@@ -7,7 +7,7 @@ Six axes are **guardrails** (they decide whether a request or an answer is allow
 !!! note "GLAD-Hummingbird"
     These axes are produced by **GLAD-Hummingbird** — Geodesia's fast, model-agnostic companion detector that runs *outside* the served LLM. It is a geometric MoE model: low latency, runs on a small GPU, and scores all nine axes in the **same forward pass**, so adding an axis costs no extra latency.
 
-    For high-stakes deployments you can layer **GLAD-Tapestry** on top — an opt-in geometric MoE model that reads the full geometry of the exchange and acts as a confident second opinion on the safety and hallucination axes. See [Deep Scan (GLAD-Tapestry)](deep-scan.md).
+    For high-stakes deployments you can layer **GLAD-H** on top — a second, independent detector blended per request via [Thinking Levels](thinking-levels.md).
 
 ---
 
@@ -135,7 +135,7 @@ GW_PROMPT_BLOCK_AXES="prompt_safety,jailbreak,out_of_scope" \
 
 **`fact_seeking` gate:** The axis includes a gate that checks whether the question is genuinely fact-seeking (rather than creative, conversational, or instructional). Non-fact-seeking turns never flag on this axis regardless of their score.
 
-**Advisory by default:** the SLEDGE conformal calibration is what actually decides this axis at serving time; the threshold below is the display/advisory value. See [Deep Scan](deep-scan.md).
+**Advisory by default:** the SLEDGE conformal calibration is what actually decides this axis at serving time; the threshold below is the display/advisory value.
 
 **Calibrated default:** `0.58` (advisory)
 

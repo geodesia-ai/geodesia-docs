@@ -180,7 +180,7 @@ enters the memory unless it clears **four** independent gates:
     So the reviewer *screens* quickly and calibrated across everything, and *deliberates* slowly only
     on the small fraction that reached a disagreement — which is also the only place where anything
     irreversible happens. Cheap filters first, expensive ones on what survives. It is the same trade
-    the detector itself makes when it escalates a hard case to deep scan.
+    the detector itself makes in `thinking_level`'s Cascade — GLAD-H only for the borderline cases.
 
 Everything it writes is stamped as machine-made, so a reviewer can audit — or revoke — every automatic
 entry in one action without touching a single human decision. And if you would rather it never wrote

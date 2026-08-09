@@ -33,7 +33,7 @@ self-contained images, writes the config, and starts everything. This page is th
 |---|---|
 | Any | Docker + Docker Compose v2; an OpenAI-compatible upstream LLM returning `logprobs` |
 | `--gpu` (default) | NVIDIA GPU + `nvidia-container-toolkit` |
-| `--cpu` | nothing extra — GLAD-BERT **and** deep scan run on CPU |
+| `--cpu` | nothing extra — GLAD-BERT runs on CPU |
 
 ```bash
 docker --version && docker compose version
@@ -56,9 +56,9 @@ curl -s http://localhost:11434/api/tags   # your upstream (example: ollama)
 
 ## Device (`--cpu` / `--gpu`)
 
-- `--gpu` **(default)** — the companion detector and deep scan run on CUDA. Requires an NVIDIA GPU and the
+- `--gpu` **(default)** — the companion detector runs on CUDA. Requires an NVIDIA GPU and the
   container toolkit. Pulls the g1-proxy image tagged `TAG`.
-- `--cpu` — no GPU needed; GLAD-BERT **and** GLAD-Tapestry deep scan run on CPU. Pulls the g1-proxy image
+- `--cpu` — no GPU needed; GLAD-BERT runs on CPU. Pulls the g1-proxy image
   tagged `TAG-cpu`. (g1-studio is architecture-agnostic and always uses `TAG`.)
 
 The flag can appear anywhere; these are equivalent:
@@ -66,10 +66,6 @@ The flag can appear anywhere; these are equivalent:
 ./install.sh both --cpu LICENSE
 ./install.sh --cpu both LICENSE
 ```
-
-!!! note "Deep scan on CPU"
-    Deep scan defaults **on**. On `--cpu` it loads the deep-scan model in bf16 (~16 GB RAM) on first use and is
-    noticeably slower than GPU. Set `DEEP_SCAN=off` before installing to disable it.
 
 ---
 
@@ -119,7 +115,6 @@ All optional, with sensible defaults. Set them inline before the command.
 | `UPSTREAM_TYPE` | `ollama` | `ollama` · `openai` · `vllm` · `sglang` · `trtllm` · `internal` · `azure-openai` · `bedrock` · `vertex` |
 | `UPSTREAM_URL` | `http://localhost:11434` | your LLM base URL |
 | `UPSTREAM_MODEL` | `llama3.1:8b` | the model your LLM serves |
-| `DEEP_SCAN` | `on` | `on`/`off` — geometric MoE second-opinion judge |
 | `GATEWAY_URL` | `http://localhost:8800` | where g1-studio reaches the engine (for `g1-studio`-only installs) |
 | `WORKDIR` | `$PWD/geodesia-g1` | where the install files live |
 | `LICENSE` | (unset) | signed token / path / raw JSON |
@@ -147,9 +142,9 @@ UPSTREAM_TYPE=ollama UPSTREAM_URL=http://localhost:11434 UPSTREAM_MODEL=llama3.1
    `GOOGLE_APPLICATION_CREDENTIALS` → `gcloud` → assume the images are public/local.
 3. Pulls the images (`g1-proxy:TAG` or `TAG-cpu`, and/or `g1-studio:TAG`).
 4. Writes, into `WORKDIR` (default `./geodesia-g1`):
-   - **`.env`** (chmod 600) — your resolved `REG/TAG/DEVICE/UPSTREAM_*/DEEP_SCAN/...`
+   - **`.env`** (chmod 600) — your resolved `REG/TAG/DEVICE/UPSTREAM_*/...`
    - **`docker-compose.yml`** — the generated 1- or 2-service stack (host networking; `gpus: all` unless
-     `--cpu`; the engine gets `GW_BLOCK_INPUT=1`, `GW_INJECT_SYSTEM=1`, `GW_DEEP_SCAN`, the upstream binding,
+     `--cpu`; the engine gets `GW_BLOCK_INPUT=1`, `GW_INJECT_SYSTEM=1`, the upstream binding,
      and the license/caps env)
    - **`license.json`** (chmod 600) — if you passed a license
 5. Starts everything: `docker compose up -d --force-recreate` (so re-running the installer always applies the
@@ -225,7 +220,7 @@ mkdir -p ~/geodesia && cd ~/geodesia
 chmod +x install.sh
 
 UPSTREAM_TYPE=openai UPSTREAM_URL=http://localhost:8002 UPSTREAM_MODEL=ministral3 \
-DEEP_SCAN=on HTTP_PORT=8080 GATEWAY_PORT=8800 \
+HTTP_PORT=8080 GATEWAY_PORT=8800 \
 ./install.sh both 'GEO1.eyJwYXlsb2FkIjp7...'
 
 curl -s http://localhost:8800/health

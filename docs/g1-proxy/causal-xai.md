@@ -251,7 +251,6 @@ MuPAX LLM sees what leave-one-out cannot: **interactions**. When two words only 
 | `flagged_axes` | `string[]` | — | `dca_dual` only — the axes the **live verdict** flagged, so work is restricted to the side(s) that fired. An empty list is meaningful ("the verdict flagged nothing") and distinct from omitting the field. |
 | `thresholds` | `object` | — | `dca_dual` only — per-axis live decision thresholds, echoed per side for the "p vs threshold" display. |
 | `include_not_flagged` | `bool` | — | `dca_dual` only — keep the honest `not_flagged` stub for clean sides instead of omitting them. |
-| `deep_scan` | `bool` | — | Back the attribution with **GLAD-Tapestry** instead of GLAD-Hummingbird, when a trained Tapestry is loaded. |
 | `mupax_n_samples` / `mupax_samples` / `mc_samples` | `integer` | — | Monte-Carlo samples for MuPAX LLM. Default `200`. |
 | `mupax_threshold_percentile` | `float` | — | Fraction of top-χ units kept as causally significant (0–1). Default `0.2`. |
 
@@ -335,7 +334,7 @@ Each token carries `start` / `end` character offsets into the returned `text`, s
 | `tokens` / `top_tokens` | Per-unit rows: `effect`, `sufficiency`, `importance`, `responsibility`, `status` (`necessary` / `relevant` / `irrelevant`), `start` / `end` |
 | `necessary_tokens` | The certified minimal responsible set, in rank order |
 | `causal_edges` | Prompt→answer token links, when a token matrix was requested |
-| `detector` | `glad_bert` or `glad_tapestry` — which detector backed the attribution |
+| `detector` | `glad_bert` — which detector backed the attribution |
 
 ---
 

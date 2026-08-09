@@ -62,7 +62,7 @@ Persist the returned `hashes` as your approved set; pass them back as `approved_
 
 ### `glad.scan_resource`
 
-Scans an untrusted **result** (a tool's output or a file/resource) for indirect prompt injection — the `rag_jailbreak` axis is trained for exactly "hidden `assistant: do X` instructions inside context". With deep scan on, a [GLAD-Tapestry](../g1-proxy/deep-scan.md) pass adds a harmful-payload score (`safety_p`).
+Scans an untrusted **result** (a tool's output or a file/resource) for indirect prompt injection — the `rag_jailbreak` axis is trained for exactly "hidden `assistant: do X` instructions inside context".
 
 ```jsonc
 { "name": "glad.scan_resource",
@@ -127,7 +127,7 @@ When the certificate engine is enabled (`GW_CERTIFICATE=on`, `GW_CERT_KEY` set),
 `GET /v1/glad/mcp/status` on the chat gateway (or **Studio → Settings → MCP**) lists every listening MCP endpoint, the active modalities and the platform-wide policy:
 
 ```json
-{ "enabled": true, "chat_aware": true, "deep_scan": false,
+{ "enabled": true, "chat_aware": true,
   "servers": [ { "name": "guard", "kind": "guard_server", "port": 8810, "status": "listening" } ],
   "guard": { "enabled": true, "host": "0.0.0.0", "port": 8810 } }
 ```

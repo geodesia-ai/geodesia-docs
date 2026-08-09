@@ -1,14 +1,14 @@
 # Settings
 
 The **Settings** page in G-1 Studio configures the **platform-wide** gateway (the Geodesia G1-Proxy
-service): upstream binding, Constitutional Intelligence, the numeric solver, deep scan, your licence and
+service): upstream binding, Constitutional Intelligence, the numeric solver, your licence and
 the database. Everything that is **per-Application** — model binding, detection policy, thresholds,
 closed-book calibration, RAG, cost and governance — lives under **Applications → pick an app → Edit**, not
 here.
 
 !!! info "What Save does — and what it doesn't"
     Clicking **Save configuration** writes the config to the gateway (`POST /v1/glad/gateway/config`) and
-    **hot-reloads** the detector, numeric solver and deep-scan judge on the next request — no restart
+    **hot-reloads** the detector and numeric solver on the next request — no restart
     needed. The **one exception is the bind host/port**: the gateway picks its listening port at process
     start from `GW_PORT` (the container launch), so a new bind takes effect only after you **recreate the
     container** (see [Changing the bind port](#changing-the-bind-port)). The Save status line tells you
@@ -50,12 +50,10 @@ every request. Turn it off only if you supply your own system prompt. **Applies 
 Off / PoT / strong / API modes for numeric-reasoning verification. **Applies live** (the model loads lazily
 on the first numeric request; a strong solver may pull a 7B model on first use).
 
-### Deep Scan (GLAD-Tapestry 8B)
+### Thinking Levels (GLAD-H second opinion)
 
-Enables the geometric MoE second opinion on safety and hallucination/grounding. **Applies live** (loads on
-first use). It runs on the **GPU** by default; on a GPU that can't also hold the LLM + companion (e.g. a
-16 GB card) install with `--deep-scan-cpu` so it runs on CPU/RAM instead — see
-[Deep Scan](../g1-proxy/deep-scan.md) and the [Installer](../installer.md).
+`thinking_level` 1/2 blend in GLAD-H, a second detector, per request. Platform availability is set via
+`GW_GLADH_CKPT` (env/CLI only, not from this page) — see [Thinking Levels](../g1-proxy/thinking-levels.md).
 
 ### Plan & License
 
@@ -89,12 +87,11 @@ different host.
 
 | You changed… | What to do |
 |---|---|
-| Deep scan · numeric solver · Constitutional Intelligence · thresholds · upstream | **Just Save** — hot-reloaded on the next request. |
+| Numeric solver · Constitutional Intelligence · thresholds · upstream | **Just Save** — hot-reloaded on the next request. |
 | **Bind host / port** | Save, then **recreate the container** with the new `GATEWAY_PORT` (above). |
 | **Database** (SQLite ↔ PostgreSQL) | Save, then `docker compose up -d --force-recreate g1-proxy g1-studio`. |
-| Deep-scan **device** (GPU ↔ CPU) | Re-run the installer with/without `--deep-scan-cpu` (env `DEEP_SCAN_DEVICE`), which recreates the container. |
+| **Thinking level availability** (`GW_GLADH_CKPT`) | Env/CLI only — recreate the container with the new value. |
 
 !!! note "Full restart / clean reinstall"
     To restart the whole stack: `docker compose restart` (or `up -d --force-recreate`). For a clean
-    reinstall from scratch see the [Installer](../installer.md) — e.g. on a 16 GB GPU:
-    `./install.sh both --gpu --deep-scan-cpu 'GEO1.<licence>'`.
+    reinstall from scratch see the [Installer](../installer.md) — e.g. `./install.sh both --gpu 'GEO1.<licence>'`.

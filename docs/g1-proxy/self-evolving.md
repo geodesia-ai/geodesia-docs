@@ -136,7 +136,7 @@ At scoring time the detector embeds the current input onto its manifold and comp
 
 The match is a cosine similarity on the unit sphere with a **high floor** (`τ`, default `0.88`). That is deliberate: this is **exact-pattern recall**, not fuzzy generalisation. Generalising is the slow loop's job, and confusing the two is how a memory turns into an unaudited second model.
 
-**Per model, per tenant.** Each detector builds its **own** bank from the same shared corpus using its own embedding function — GLAD-Hummingbird and GLAD-Tapestry hold different vectors of the same incidents. A row whose axis a model does not have is simply skipped. Banks are rebuilt only when the corpus version changes, so a request pays nothing while the corpus is stable.
+**Per model, per tenant.** The bank is built from the shared corpus using GLAD-Hummingbird's own embedding function. A row whose axis the model does not have is simply skipped. Banks are rebuilt only when the corpus version changes, so a request pays nothing while the corpus is stable.
 
 **Per Application.** `policy.feedback_learning` opts a single Application in without flipping the global default, so one tenant can learn from its own corrections while another stays byte-identical.
 

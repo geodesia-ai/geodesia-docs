@@ -63,14 +63,14 @@ Both services share a single **Geodesia detection engine**, which comes in two c
 
 | Tier | Name | What it is | When it runs |
 |---|---|---|---|
-| **Always-on** | **GLAD-Hummingbird** | A geometric MoE model. Reads the prompt, context, and answer and produces the nine independent [detection axes](g1-proxy/detection-axes.md) in a single forward pass. Fast and lightweight — milliseconds per request on a small GPU (or CPU). | Every request |
-| **Opt-in** | **GLAD-Tapestry** | A geometric MoE model. Reads the *full geometry* of the exchange and returns a confident second opinion that is blended into the safety and hallucination axes. Off by default — never loaded, zero overhead. | When **Deep Scan** is enabled (see [Deep Scan](g1-proxy/deep-scan.md)) |
+| **Always-on** | **GLAD-Hummingbird (GLAD-G)** | A geometric MoE model. Reads the prompt, context, and answer and produces the nine independent [detection axes](g1-proxy/detection-axes.md) in a single forward pass. Fast and lightweight — milliseconds per request on a small GPU (or CPU). | Every request |
+| **Opt-in** | **GLAD-H** | A second, independent detector on a different backbone. Blended into GLAD-Hummingbird's verdict per request via [Thinking Levels](g1-proxy/thinking-levels.md) — invoked only on borderline axes (level 1) or always (level 2). Off by default (level 0) — never loaded, zero overhead. | When `thinking_level` 1 or 2 is requested |
 
 GLAD-Hummingbird is **model-agnostic**: the same checkpoint works against any upstream, from a locally hosted model to the OpenAI API.
 
 The one exception is the **closed-book fabrication axis**, which additionally uses per-token log-probabilities from the upstream LLM to compute uncertainty signals. If the upstream does not expose log-probabilities (e.g., Ollama < 0.12, or cloud providers such as Bedrock/Vertex), this axis is automatically disabled and the gateway operates with the remaining axes. Most OpenAI-compatible servers — and Ollama ≥ 0.12 — do expose them, so this axis is on by default.
 
-GLAD-Tapestry is a **second opinion**, not a replacement: it can only *raise* risk, and only when it is confident. A confident Tapestry verdict dominates the blended axis; an unsure one barely moves the GLAD-Hummingbird score. This keeps the always-on path fast while letting high-stakes deployments pay for extra assurance only where they want it.
+GLAD-H is a **second opinion**, not a replacement: Cascade (level 1) blends it in only on axes where GLAD-Hummingbird's own score is borderline; Max-OR (level 2) takes the stronger of the two verdicts on every axis. This keeps the always-on path fast while letting high-stakes deployments pay for extra assurance only where they want it.
 
 ---
 

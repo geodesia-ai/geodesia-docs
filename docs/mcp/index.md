@@ -2,7 +2,7 @@
 
 The **Model Context Protocol (MCP)** lets an AI host (Claude Desktop, an IDE, an agent runtime) connect to external **tools**, **resources** and **prompts** over JSON-RPC. That power is also a new attack surface: the model no longer just *answers* — it *calls tools*, *reads untrusted data*, and *acts*. The MCP specification is explicit that it **cannot enforce security at the protocol level** and leaves consent, tool safety and data-egress control to the implementer.
 
-Geodesia G-1 fills exactly that gap. Starting G1-Proxy starts an **MCP security layer** alongside the LLM chat gateway: the same always-on [GLAD-Hummingbird](../g1-proxy/detection-axes.md) detector (and the optional [GLAD-Tapestry](../g1-proxy/deep-scan.md) deep scan) now vets **every MCP surface** — tool descriptions, tool-call arguments, tool/resource *results* and final answers — before they can act, and explains *why* it flagged something with [Causal XAI](../g1-proxy/causal-xai.md).
+Geodesia G-1 fills exactly that gap. Starting G1-Proxy starts an **MCP security layer** alongside the LLM chat gateway: the same always-on [GLAD-Hummingbird](../g1-proxy/detection-axes.md) detector now vets **every MCP surface** — tool descriptions, tool-call arguments, tool/resource *results* and final answers — before they can act, and explains *why* it flagged something with [Causal XAI](../g1-proxy/causal-xai.md).
 
 !!! abstract "One sentence"
     Geodesia turns "trust the tool" into a **measurable, per-axis, per-tool, per-application verdict** — with an optional signed certificate — that any MCP host can consult or that the gateway can enforce inline.
@@ -29,7 +29,7 @@ Each MCP message carries untrusted content in a specific *role*. Geodesia places
 |---|---|---|---|
 | `tools/list` description / schema | tool poisoning / rug-pull | prompt + context | `jailbreak`, `prompt_safety`, `rag_jailbreak` (+ signature diff) |
 | `tools/call` **arguments** | model intent / exfil payload | answer | `answer_safety`, `jailbreak` + intent policy |
-| `tools/call` / `resources/read` **result** | indirect injection | context | `rag_jailbreak`, `prompt_safety` (+ deep scan) |
+| `tools/call` / `resources/read` **result** | indirect injection | context | `rag_jailbreak`, `prompt_safety` |
 | final answer (post-tool) | fabrication / unsafe output | answer | `halluc_context`, `answer_safety`, `halluc_closedbook` |
 
 ---
@@ -64,7 +64,7 @@ Geodesia exposes MCP security in three complementary forms. They share one scori
 
 ## Always-on, configurable
 
-The MCP layer is **on by default** and configured from **G-1 Studio → Settings → MCP** (platform-wide: ports, modalities, deep-scan) and **Applications → *app* → MCP** (per-application enforcement policy). When disabled, chat behaviour is byte-identical to a gateway without MCP.
+The MCP layer is **on by default** and configured from **G-1 Studio → Settings → MCP** (platform-wide: ports, modalities) and **Applications → *app* → MCP** (per-application enforcement policy). When disabled, chat behaviour is byte-identical to a gateway without MCP.
 
 | Port (default) | Service |
 |---|---|
