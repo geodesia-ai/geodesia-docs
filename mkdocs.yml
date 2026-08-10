@@ -141,10 +141,13 @@ nav:
     - Policy Lens (Counterfactual Tuning): studio/policy-lens.md
     - Cost & FinOps: studio/cost.md
     - Control Plane API: studio/control-plane-api.md
+    - Complete API Map: studio/api-reference.md
+    - UI Component Reference: studio/ui-reference.md
     - Licensing & Entitlements: studio/licensing.md
     - Cloud Upstreams & Scale-Out: studio/cloud-upstreams.md
   - G1-Proxy:
     - Introduction: g1-proxy/index.md
+    - Complete API Map: g1-proxy/api-reference.md
     - Configuration: g1-proxy/configuration.md
     - Upstream Backends: g1-proxy/backends.md
     - Framework Compatibility: g1-proxy/compatibility.md
@@ -153,7 +156,7 @@ nav:
     - Enforcement Modes: g1-proxy/enforcement-modes.md
     - Detection Axes: g1-proxy/detection-axes.md
     - Token & Cost Control: g1-proxy/cost-control.md
-    - Thinking Levels (GLAD-G + GLAD-H): g1-proxy/thinking-levels.md
+    - Thinking Levels: g1-proxy/thinking-levels.md
     - Live Web Search: g1-proxy/web-search.md
     - Personal Safety: g1-proxy/personal-safety.md
     - Self-Evolving Security: g1-proxy/self-evolving.md

@@ -1,6 +1,6 @@
 # Managing Applications
 
-In Geodesia G-1 **Studio**, an **Application** is the unit you manage: one upstream LLM with GLAD-Hummingbird in the middle, owning its own **policy** (9-axis thresholds + enforcement, plus its declared scope), **threshold profile**, **RAG knowledge base**, **cost center**, and **governance** record. You select the active Application from the topbar App switcher, and every other surface — Dashboard, Oversight, FRIA, Reports, Knowledge Base, Cost — scopes to it.
+In Geodesia G-1 **Studio**, an **Application** is the unit you manage: one upstream LLM with G1-Hummingbird in the middle, owning its own **policy** (9-axis thresholds + enforcement, plus its declared scope), **threshold profile**, **RAG knowledge base**, **cost center**, and **governance** record. You select the active Application from the topbar App switcher, and every other surface — Dashboard, Oversight, FRIA, Reports, Knowledge Base, Cost — scopes to it.
 
 Studio is a backward-compatible evolution of the single-upstream gateway: an existing deployment surfaces as a single Application named `default`, with zero behaviour change.
 
@@ -75,7 +75,7 @@ See [Token & Cost Control](../g1-proxy/cost-control.md#complexity-routing-model-
 
 ### `policy` — detection thresholds and enforcement
 
-The policy is scored across the **nine** GLAD-Hummingbird axes. Each axis has its own threshold (probability space, `0.0`–`1.0`) and its own enforcement mode.
+The policy is scored across the **nine** G1-Hummingbird axes. Each axis has its own threshold (probability space, `0.0`–`1.0`) and its own enforcement mode.
 
 | Field | Type | Default | Meaning |
 |---|---|---|---|
@@ -119,7 +119,7 @@ The two `optional_detectors` are off by default: `causal_xai` adds causal token 
 | `currency` | `string` | `"EUR"` | Currency for all rates and budgets. |
 | `input_per_mtok` | `float` | `0.0` | Cost per **million input tokens**. |
 | `output_per_mtok` | `float` | `0.0` | Cost per **million output tokens**. |
-| `glad_compute_per_mtok` | `float` | `0.0` | Cost per million tokens for GLAD scoring compute. |
+| `glad_compute_per_mtok` | `float` | `0.0` | Cost per million tokens for detection compute. |
 | `complex_input_per_mtok` | `float` \| `null` | `null` | Model B input rate. `null` ⇒ inherits the Model A rate, so an Application that has not set it still bills correctly. |
 | `complex_output_per_mtok` | `float` \| `null` | `null` | Model B output rate. `null` ⇒ inherits the Model A rate. |
 | `budget_month` | `float` | `0.0` | Monthly budget for this Application. |

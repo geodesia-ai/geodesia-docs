@@ -15,7 +15,7 @@
 
 **Geodesia G-1** is a **validating gateway** that sits in front of any large language model (LLM) and provides a comprehensive quality and compliance layer. It is fully **OpenAI-compatible** — your existing application sends requests to Geodesia G-1 exactly as it would to OpenAI, and the gateway forwards them to your chosen underlying model (vLLM, Ollama, SGLang, OpenAI, TensorRT-LLM, and others) after enriching both the input and output with safety and reliability signals.
 
-The platform is now **Application-oriented** — with **G-1 Studio**, one shared LLM and GLAD-Hummingbird detector can serve many isolated Applications, each with its own policy, thresholds, RAG collection, compliance posture, and cost center.
+The platform is now **Application-oriented** — with **G-1 Studio**, one shared LLM and G1-Hummingbird detector can serve many isolated Applications, each with its own policy, thresholds, RAG collection, compliance posture, and cost center.
 
 You do not need to retrain your model. You do not need to change your application code. You plug Geodesia G-1 in, and your LLM immediately gains:
 
@@ -39,7 +39,7 @@ You do not need to retrain your model. You do not need to change your applicatio
 <div class="feature-card">
 <span class="feature-icon">🔬</span>
 <h3>9-Axis Detection</h3>
-<p><strong>GLAD-Hummingbird</strong> scores context faithfulness, closed-book fabrication, prompt safety, answer safety, jailbreak, <code>rag_jailbreak</code> (context-injection firewall), profanity, out-of-scope and prompt complexity — nine independent axes, calibrated thresholds, <strong>one forward pass</strong>.</p>
+<p><strong>G1-Hummingbird</strong> scores context faithfulness, closed-book fabrication, prompt safety, answer safety, jailbreak, <code>rag_jailbreak</code> (context-injection firewall), profanity, out-of-scope and prompt complexity — nine independent axes, calibrated thresholds, <strong>one forward pass</strong>.</p>
 </div>
 
 <div class="feature-card">
@@ -63,7 +63,7 @@ You do not need to retrain your model. You do not need to change your applicatio
 <div class="feature-card">
 <span class="feature-icon">🔌</span>
 <h3>MCP Security Layer</h3>
-<p>Starting G1-Proxy starts an <a href="mcp/">MCP security gateway</a>: GLAD vets every tool description, tool-call argument and tool <em>result</em> — stopping tool poisoning, rug-pulls, indirect injection and exfiltration before an agent acts.</p>
+<p>Starting G1-Proxy starts an <a href="mcp/">MCP security gateway</a>: G1-Hummingbird vets every tool description, tool-call argument and tool <em>result</em> — stopping tool poisoning, rug-pulls, indirect injection and exfiltration before an agent acts.</p>
 </div>
 
 <div class="feature-card">
@@ -75,7 +75,7 @@ You do not need to retrain your model. You do not need to change your applicatio
 <div class="feature-card">
 <span class="feature-icon">🪡</span>
 <h3>Thinking Levels</h3>
-<p>A per-request dial that blends in GLAD-H, a second independent detector, for a stronger verdict on borderline or high-stakes turns — Cascade gray-zone or Max-percentile-OR fusion. Off by default (level 0); zero overhead until requested.</p>
+<p>A per-request dial — <code>thinking_level</code> <code>0</code>–<code>3</code> — that buys a stricter verdict on borderline or high-stakes turns, up to <strong>MAX</strong> at level 3. Off by default; zero overhead until requested.</p>
 </div>
 
 <div class="feature-card">
@@ -87,7 +87,7 @@ You do not need to retrain your model. You do not need to change your applicatio
 <div class="feature-card">
 <span class="feature-icon">🏢</span>
 <h3>G-1 Studio</h3>
-<p>Multi-Application platform — one LLM + GLAD-Hummingbird serves many isolated Applications, each with its own policy, thresholds, RAG, compliance posture, and <strong>cost center / FinOps</strong> budget.</p>
+<p>Multi-Application platform — one LLM + G1-Hummingbird serves many isolated Applications, each with its own policy, thresholds, RAG, compliance posture, and <strong>cost center / FinOps</strong> budget.</p>
 </div>
 
 <div class="feature-card">
@@ -145,6 +145,9 @@ Every chat message goes through this pipeline:
 | Set up multiple Applications | [G-1 Studio](studio/index.md) |
 | Track cost & budgets | [Cost & FinOps](studio/cost.md) |
 | Call the chat endpoint | [Chat API](g1-proxy/chat-api.md) |
+| **See every G1-Proxy endpoint** | [G1-Proxy API Map](g1-proxy/api-reference.md) |
+| **See every G-1 Studio endpoint** | [Studio API Map](studio/api-reference.md) |
+| **Find the API behind a Studio UI control** | [UI Component Reference](studio/ui-reference.md) |
 | Upload documents for RAG | [Knowledge Base](rag/index.md) |
 | Set up compliance for the EU AI Act | [FRIA](compliance/fria.md) |
 | Configure detection thresholds | [Detection Thresholds](reference/thresholds.md) |

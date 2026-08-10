@@ -1,18 +1,21 @@
-# Gateway — Introduction
+# G1-Proxy — Introduction
 
-The **Geodesia Gateway** is an OpenAI-compatible HTTP proxy that adds real-time AI validation to any LLM backend. It listens for chat requests, screens them, forwards them to the configured upstream model, validates the response, and returns the result — with a `geodesia` field attached containing the full detection payload.
+!!! tip "Looking for the full endpoint list?"
+    Every route G1-Proxy exposes, in one page: **[Complete API Map](api-reference.md)**.
+
+**G1-Proxy** is an OpenAI-compatible HTTP proxy that adds real-time AI validation to any LLM backend. It listens for chat requests, screens them, forwards them to the configured upstream model, validates the response, and returns the result — with a `geodesia` field attached containing the full detection payload.
 
 ## Key Capabilities
 
 | Capability | Description |
 |---|---|
 | **Drop-in compatibility** | Accepts `POST /v1/chat/completions` (OpenAI) and `POST /api/chat` (Ollama). Any client that works with OpenAI works unchanged. |
-| **5-axis detection** | Scores every request across context faithfulness, closed-book fabrication, prompt safety, answer safety, and jailbreak. |
+| **9-axis detection** | Scores every request across context faithfulness, closed-book fabrication, prompt safety, answer safety, jailbreak, `rag_jailbreak`, profanity, out-of-scope and prompt complexity — in a single forward pass. See [Detection Axes](detection-axes.md). |
 | **Streaming support** | Fully streaming — tokens are relayed in real-time. Mid-stream braking stops a harmful response before it finishes. |
 | **Enforcement modes** | `blocking` withholds flagged content. `passthrough` returns the answer but annotates the response with the detection verdict. |
 | **Per-request thresholds** | Override detection thresholds on a per-call basis via `threshold_overrides`. |
 | **Knowledge Base** | Built-in RAG: upload documents, retrieve relevant passages, verify citations claim-by-claim. |
-| **Live Web Search** | Optional `web_search` per request: searches the live web, screens every page through the GLAD-BERT firewall, and grounds the answer in the safe pages. Tavily key → reliable results; DuckDuckGo key-less fallback. See [Live Web Search](web-search.md). |
+| **Live Web Search** | Optional `web_search` per request: searches the live web, screens every page through the G1-Hummingbird firewall, and grounds the answer in the safe pages. Tavily key → reliable results; DuckDuckGo key-less fallback. See [Live Web Search](web-search.md). |
 | **Causal XAI** | Token-level attribution — entirely black-box, no access to model internals or GPU memory required. |
 | **Config persistence** | Backend selection, model, and thresholds are written to a JSON file. Setup survives restarts and container rebuilds. |
 | **Compliance logging** | Every request is written to the shared SQLite audit database so the compliance dashboard stays current. |
@@ -63,7 +66,7 @@ Every standard OpenAI request body is accepted verbatim. Geodesia adds the follo
 
 | Field | Type | Description |
 |---|---|---|
-| `context` | string | Explicit grounding context text. GLAD scores the answer against this to detect faithfulness violations. |
+| `context` | string | Explicit grounding context text. G1-Hummingbird scores the answer against this to detect faithfulness violations. |
 | `mode` / `glad_mode` | `"block"` \| `"passthrough"` | Per-request enforcement mode. Overrides the gateway's configured `block_input` / `block_output`. |
 | `threshold_overrides` | object | Per-axis detection thresholds (probability 0–1) that override the calibrated defaults for this request only. |
 | `rag` | object | RAG configuration: `collection_id`, `top_k`, `rerank`, `verify`. See [Knowledge Base](../rag/index.md). |

@@ -30,7 +30,7 @@ Article 5 prohibits certain AI applications (social scoring, real-time biometric
 
 | Requirement | Geodesia G-1 Feature |
 |---|---|
-| Identify and analyze known and foreseeable risks | [Detection axes](../g1-proxy/detection-axes.md) — 5-axis risk monitoring |
+| Identify and analyze known and foreseeable risks | [Detection axes](../g1-proxy/detection-axes.md) — nine-axis risk monitoring |
 | Evaluate risks from deployment context | [FRIA](../compliance/fria.md) — deployment context section |
 | Implement risk management measures | [Thresholds](../reference/thresholds.md) — configurable detection thresholds |
 | Testing with real-world data | [Human oversight decisions](../compliance/oversight.md) — ground-truth feedback loop |
@@ -62,7 +62,7 @@ The [Deployer Manual](../compliance/reports.md#deployer-transparency-manual) (`P
 | Automatic logging | Every inference call written to the database automatically |
 | Log integrity | [HMAC audit chain](../compliance/audit-chain.md) — tamper-evident |
 | Log retention | [Retention policy](../compliance/reports.md#data-retention) — configurable per data type |
-| Log accessibility | `GET /v1/glad/chain/entries` — query and export |
+| Log accessibility | `GET /v1/glad/chain/status` (ledger snapshot) + `GET /v1/glad/apps/{app_id}/export` (full per-call export) |
 
 ---
 

@@ -21,7 +21,7 @@ All agent flow endpoints are prefixed with `/v1/agent-flow/`.
 Returns the list of available demo pipeline types.
 
 ```bash
-curl http://localhost:8199/v1/agent-flow/demos
+curl http://localhost:8080/v1/agent-flow/demos
 ```
 
 ```json
@@ -56,7 +56,7 @@ curl http://localhost:8199/v1/agent-flow/demos
 Returns the full trace structure for a pipeline type — what steps it runs, what each step produces, and what Geodesia G-1 evaluates at each point.
 
 ```bash
-curl http://localhost:8199/v1/agent-flow/trace/rag_qa
+curl http://localhost:8080/v1/agent-flow/trace/rag_qa
 ```
 
 This returns a static schema describing the pipeline — useful for building visualizations or planning integration.
@@ -68,7 +68,7 @@ This returns a static schema describing the pipeline — useful for building vis
 Execute a complete agent pipeline of the given type and return the full trace with detection scores at each step.
 
 ```bash
-curl -X POST http://localhost:8199/v1/agent-flow/run/rag_qa \
+curl -X POST http://localhost:8080/v1/agent-flow/run/rag_qa \
   -H "Content-Type: application/json" \
   -d '{
     "prompt": "What is the capital of France?",
@@ -131,7 +131,7 @@ curl -X POST http://localhost:8199/v1/agent-flow/run/rag_qa \
 Run a PSS (Positional Semantic Stability) attribution pass over a complete agent pipeline. PSS is computed per pipeline step, allowing you to trace which parts of the input affected which parts of each step's output.
 
 ```bash
-curl -X POST http://localhost:8199/v1/agent-flow/compute_pss/rag_qa \
+curl -X POST http://localhost:8080/v1/agent-flow/compute_pss/rag_qa \
   -H "Content-Type: application/json" \
   -d '{
     "prompt": "What is the capital of France?",
@@ -154,7 +154,7 @@ import httpx
 
 # Run a full pipeline and check that hallucination detection is active
 response = httpx.post(
-    "http://localhost:8199/v1/agent-flow/run/rag_qa",
+    "http://localhost:8080/v1/agent-flow/run/rag_qa",
     json={
         "prompt": "What is the boiling point of water?",
         "collection_id": "science-kb"

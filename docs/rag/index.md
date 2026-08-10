@@ -30,155 +30,211 @@ Documents are organised into **collections**. A collection is a named group of d
 
 ## API Reference
 
-All RAG endpoints are mounted at `/v1/glad/rag/` on the gateway.
+Every RAG route is mounted at `/v1/glad/rag/` on **G1-Proxy** — reached as `/gw/v1/glad/rag/…` through the unified port on 8080, or directly on `:8800` in a split deployment.
 
-### GET /v1/glad/rag/status
-
-Returns whether the RAG service is loaded and ready.
-
-```bash
-curl http://localhost:8800/v1/glad/rag/status
-```
-
-```json
-{"ok": true, "embed_model": "BAAI/bge-m3", "device": "cuda:0", "store_dir": "runs/rag_store"}
-```
+!!! warning "Collections belong to Applications"
+    Send **`X-Geodesia-App: <app_id>`** on every call. Operations on a collection owned by a different Application return **404**, not 403 — the API does not leak the existence of another tenant's data. Omit the header (or send `default`) and you get the unscoped, single-tenant view.
 
 ---
 
-### POST /v1/glad/rag/collections
+### The upload flow, end to end
 
-Create a new document collection.
+The one thing worth reading before the endpoint list: **uploading is asynchronous**. `POST …/documents` returns **`202 Accepted`** as soon as the bytes are in, and the parse → chunk → embed → index pipeline runs in the background. You poll `/ingest/progress` until it reports `done`.
 
-**Request:**
-```json
-{"name": "company-policies", "description": "Internal HR and legal policies"}
-```
+That is deliberate. Embedding runs at roughly a second per chunk on CPU; a synchronous upload would hold the connection open for minutes and get cut by any proxy with an origin timeout — which surfaces to the user as an unexplained network failure rather than a slow upload.
 
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `name` | `string` | ✅ | Human-readable name for the collection. |
-| `description` | `string` | — | Optional description. |
+=== "curl"
 
-**Response:**
-```json
-{"collection_id": "c_a3f7b2d1", "name": "company-policies", "created_at": "2026-06-10T12:00:00Z"}
-```
+    ```bash
+    APP="support_bot"
+    BASE="http://localhost:8080/gw/v1/glad/rag"
 
----
+    # 1. create a collection
+    CID=$(curl -s -X POST "$BASE/collections" \
+      -H "Content-Type: application/json" -H "X-Geodesia-App: $APP" \
+      -d '{"name": "company-policies"}' | jq -r .collection_id)
 
-### GET /v1/glad/rag/collections
+    # 2. upload — returns 202 immediately
+    curl -s -X POST "$BASE/collections/$CID/documents" \
+      -H "X-Geodesia-App: $APP" \
+      -F "file=@/path/to/policy.pdf" -F "name=Refund policy 2026"
 
-List all collections.
+    # 3. poll until the background ingest finishes
+    until [ "$(curl -s "$BASE/ingest/progress" -H "X-Geodesia-App: $APP" | jq -r .stage)" = "done" ]; do
+      curl -s "$BASE/ingest/progress" -H "X-Geodesia-App: $APP" | jq -c '{stage, detail, pct}'
+      sleep 2
+    done
+    ```
 
-```bash
-curl http://localhost:8800/v1/glad/rag/collections
-```
+=== "Python"
 
-**Response:**
-```json
-[
-  {
-    "collection_id": "c_a3f7b2d1",
-    "name": "company-policies",
-    "description": "Internal HR and legal policies",
-    "document_count": 3,
-    "chunk_count": 142,
-    "created_at": "2026-06-10T12:00:00Z"
-  }
-]
-```
+    ```python
+    import time, httpx
 
----
+    c = httpx.Client(base_url="http://localhost:8080/gw/v1/glad/rag",
+                     headers={"X-Geodesia-App": "support_bot"}, timeout=120)
 
-### DELETE /v1/glad/rag/collections/{collection_id}
+    coll = c.post("/collections", json={"name": "company-policies"}).json()
+    cid = coll["collection_id"]
 
-Delete a collection and all its documents and embeddings.
+    with open("policy.pdf", "rb") as fh:
+        r = c.post(f"/collections/{cid}/documents",
+                   files={"file": ("policy.pdf", fh, "application/pdf")},
+                   data={"name": "Refund policy 2026"})
+    assert r.status_code == 202          # accepted, not finished
 
-```bash
-curl -X DELETE http://localhost:8800/v1/glad/rag/collections/c_a3f7b2d1
-```
+    while True:
+        p = c.get("/ingest/progress").json()
+        print(p["stage"], p["detail"], f"{p['pct']}%")
+        if p["stage"] == "error":
+            raise RuntimeError(p["error"])
+        if p["stage"] == "done":
+            break
+        time.sleep(2)
 
----
+    hits = c.post(f"/collections/{cid}/query",
+                  json={"query": "What is the refund window?", "top_k": 5}).json()
+    print(hits["n_sources"], "sources")
+    print(hits["context"][:400])
+    ```
 
-### POST /v1/glad/rag/collections/{collection_id}/documents
+=== "TypeScript"
 
-Upload a document to a collection. The document is automatically parsed, chunked, and embedded.
+    ```ts
+    const BASE = "http://localhost:8080/gw/v1/glad/rag"
+    const APP = { "X-Geodesia-App": "support_bot" }
 
-```bash
-curl -X POST \
-  http://localhost:8800/v1/glad/rag/collections/c_a3f7b2d1/documents \
-  -F "file=@/path/to/policy.pdf"
-```
+    const coll = await fetch(`${BASE}/collections`, {
+      method: "POST",
+      headers: { ...APP, "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "company-policies" }),
+    }).then(r => r.json())
 
-**Multipart fields:**
+    // Multipart: let the browser set the boundary — do NOT force a JSON content-type.
+    const form = new FormData()
+    form.append("file", file)                    // a File from an <input type="file">
+    form.append("name", "Refund policy 2026")
 
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `file` | file | ✅ | The document to upload. Supported: PDF, DOCX, PPTX, MD, HTML, XLSX, CSV, TXT. Maximum 100 MB. |
-| `title` | string | — | Optional document title. If omitted, the filename is used. |
+    const up = await fetch(`${BASE}/collections/${coll.collection_id}/documents`, {
+      method: "POST", headers: APP, body: form,
+    })
+    if (up.status !== 202 && !up.ok) throw new Error(await up.text())
 
-**Response:**
+    for (;;) {
+      const p = await fetch(`${BASE}/ingest/progress`, { headers: APP }).then(r => r.json())
+      if (p.stage === "error") throw new Error(p.error)
+      if (p.stage === "done") break
+      await new Promise(r => setTimeout(r, 2000))
+    }
+
+    const hits = await fetch(`${BASE}/collections/${coll.collection_id}/query`, {
+      method: "POST",
+      headers: { ...APP, "Content-Type": "application/json" },
+      body: JSON.stringify({ query: "What is the refund window?", top_k: 5 }),
+    }).then(r => r.json())
+    console.log(hits.n_sources, hits.context)
+    ```
+
+**What comes back from the query**
+
 ```json
 {
-  "document_id": "doc_b5c2e1a3",
-  "title": "policy.pdf",
-  "chunk_count": 47,
-  "status": "indexed"
+  "context": "Our return policy allows refunds within 30 days of purchase…",
+  "sources": [
+    {
+      "text": "Our return policy allows refunds within 30 days of purchase…",
+      "score": 0.94,
+      "document_id": "doc_b5c2e1a3",
+      "title": "Refund policy 2026",
+      "page": 3
+    }
+  ],
+  "n_sources": 4
 }
 ```
 
-**Parsing notes:**
-- PDF and DOCX files are parsed with **Docling** (IBM's multi-format parser), which preserves reading order, headings, and tables better than simple text extraction.
-- Large files may take several seconds to process. Embeddings are computed synchronously; the response is returned when indexing is complete.
+`context` is the concatenated passage text, ready to hand straight to `context` on a [chat request](../g1-proxy/chat-api.md). `sources` is the same material itemised, for citations and for showing the user where the answer came from.
 
 ---
 
-### DELETE /v1/glad/rag/collections/{collection_id}/documents/{document_id}
+### Endpoints
 
-Delete a single document and cascade-remove its embedded chunks.
+#### `GET /v1/glad/rag/status`
 
-```bash
-curl -X DELETE \
-  http://localhost:8800/v1/glad/rag/collections/c_a3f7b2d1/documents/doc_b5c2e1a3
-```
+Whether the stack is up, which parser is active, and what it accepts.
 
----
-
-### POST /v1/glad/rag/collections/{collection_id}/query
-
-Query a collection directly (without a full chat request). Returns the most relevant chunks for a given question.
-
-**Request:**
 ```json
 {
-  "query": "What is the refund window?",
-  "top_k": 5,
-  "rerank": true
+  "ok": true,
+  "parser": "docling",
+  "supported": [".csv", ".docx", ".html", ".md", ".pdf", ".pptx", ".txt", ".xlsx"],
+  "n_collections": 3
 }
 ```
+
+`parser` is `docling` when the full multi-format parser is available and `fallback` when it is not — worth checking, because the fallback preserves reading order and tables far less well. A failure returns `{"ok": false, "error": "…"}` with HTTP 200, so branch on `ok`, not on the status code.
+
+#### `POST /v1/glad/rag/collections`
+
+Body: `{"name": "company-policies"}`. `name` is the only field — it defaults to `"Untitled"`. Returns the created collection.
+
+#### `GET /v1/glad/rag/collections`
+
+Returns `{"collections": [ … ]}` — an object, not a bare array.
+
+#### `GET /v1/glad/rag/collections/{collection_id}`
+
+One collection with its documents. **404** if it does not exist *or* belongs to another Application.
+
+#### `DELETE /v1/glad/rag/collections/{collection_id}`
+
+Deletes the collection, its documents and its embeddings. Returns `{"ok": true}`; **404** if unknown.
+
+#### `POST /v1/glad/rag/collections/{collection_id}/documents`
+
+**Multipart.** Returns **202** and ingests in the background.
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `file` | file | ✅ | The document. Supported extensions are whatever `/status` reports. |
+| `name` | string | — | Display title. Falls back to the filename. |
+
+Response: `{"status": "accepted", "file": "policy.pdf"}`.
+
+| Status | Meaning |
+|---|---|
+| `202` | Accepted; poll `/ingest/progress`. |
+| `400` | Empty file. |
+| `404` | Unknown collection, or one owned by another Application. |
+| `413` | Over the upload cap — 50 MB by default, `GW_RAG_MAX_UPLOAD_BYTES`. |
+| `415` | Unsupported file type. |
+
+!!! warning "One ingest at a time"
+    Progress is tracked as a single global state, so `/ingest/progress` describes **the most recent upload**, not a specific one. Upload documents sequentially — wait for `done` before starting the next — or you will not be able to tell whose progress you are reading.
+
+#### `GET /v1/glad/rag/ingest/progress`
+
+```json
+{ "active": true, "file": "policy.pdf", "stage": "embedding", "detail": "31/47", "pct": 66, "error": null }
+```
+
+`stage` runs `parsing` → `chunking` → `embedding` → `indexing` → `done`, or lands on `error` with `error` set. `idle` means nothing has been uploaded yet.
+
+#### `DELETE /v1/glad/rag/collections/{collection_id}/documents/{doc_id}`
+
+Removes the document and cascade-deletes its chunks. `{"ok": true}`, or **404** for an unknown collection or document.
+
+#### `POST /v1/glad/rag/collections/{collection_id}/query`
+
+Retrieve without sending a chat turn — useful for testing a collection and for building your own pipeline.
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `query` | `string` | ✅ | The question or search query. |
-| `top_k` | `integer` | `5` | Number of chunks to return (after reranking). |
-| `rerank` | `boolean` | `true` | Whether to apply the cross-encoder reranker (BGE-reranker-v2-m3) after initial retrieval. Reranking improves relevance at the cost of an additional model forward pass. |
+| `query` | `string` | ✅ | The question. |
+| `top_k` | `integer` | *(server default)* | Passages to return after reranking. |
+| `rerank` | `boolean` | *(server default)* | Cross-encoder rerank after retrieval. Better relevance, one extra forward pass. |
 
-**Response:**
-```json
-{
-  "chunks": [
-    {
-      "text": "Our return policy allows refunds within 30 days of purchase...",
-      "score": 0.94,
-      "document_id": "doc_b5c2e1a3",
-      "document_title": "policy.pdf",
-      "page": 3,
-      "heading": "Return Policy"
-    }
-  ]
-}
-```
+Omitting `top_k` or `rerank` uses the server's configured defaults rather than a fixed number — send them explicitly if you need determinism.
 
 ---
 

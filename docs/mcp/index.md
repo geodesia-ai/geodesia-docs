@@ -2,7 +2,7 @@
 
 The **Model Context Protocol (MCP)** lets an AI host (Claude Desktop, an IDE, an agent runtime) connect to external **tools**, **resources** and **prompts** over JSON-RPC. That power is also a new attack surface: the model no longer just *answers* — it *calls tools*, *reads untrusted data*, and *acts*. The MCP specification is explicit that it **cannot enforce security at the protocol level** and leaves consent, tool safety and data-egress control to the implementer.
 
-Geodesia G-1 fills exactly that gap. Starting G1-Proxy starts an **MCP security layer** alongside the LLM chat gateway: the same always-on [GLAD-Hummingbird](../g1-proxy/detection-axes.md) detector now vets **every MCP surface** — tool descriptions, tool-call arguments, tool/resource *results* and final answers — before they can act, and explains *why* it flagged something with [Causal XAI](../g1-proxy/causal-xai.md).
+Geodesia G-1 fills exactly that gap. Starting G1-Proxy starts an **MCP security layer** alongside the LLM chat gateway: the same always-on [G1-Hummingbird](../g1-proxy/detection-axes.md) detector now vets **every MCP surface** — tool descriptions, tool-call arguments, tool/resource *results* and final answers — before they can act, and explains *why* it flagged something with [Causal XAI](../g1-proxy/causal-xai.md).
 
 !!! abstract "One sentence"
     Geodesia turns "trust the tool" into a **measurable, per-axis, per-tool, per-application verdict** — with an optional signed certificate — that any MCP host can consult or that the gateway can enforce inline.
@@ -56,7 +56,7 @@ Geodesia exposes MCP security in three complementary forms. They share one scori
 
 -   :material-tune: **[Policy: per-app · per-axis · per-tool](policy.md)**
 
-    Configure enforcement at three levels from G-1 Studio — per Application, per GLAD axis, and per individual tool (trust / block / egress).
+    Configure enforcement at three levels from G-1 Studio — per Application, per detection axis, and per individual tool (trust / block / egress).
 
 </div>
 

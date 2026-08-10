@@ -136,7 +136,7 @@ At scoring time the detector embeds the current input onto its manifold and comp
 
 The match is a cosine similarity on the unit sphere with a **high floor** (`τ`, default `0.88`). That is deliberate: this is **exact-pattern recall**, not fuzzy generalisation. Generalising is the slow loop's job, and confusing the two is how a memory turns into an unaudited second model.
 
-**Per model, per tenant.** The bank is built from the shared corpus using GLAD-Hummingbird's own embedding function. A row whose axis the model does not have is simply skipped. Banks are rebuilt only when the corpus version changes, so a request pays nothing while the corpus is stable.
+**Per model, per tenant.** The bank is built from the shared corpus using G1-Hummingbird's own embedding function. A row whose axis the model does not have is simply skipped. Banks are rebuilt only when the corpus version changes, so a request pays nothing while the corpus is stable.
 
 **Per Application.** `policy.feedback_learning` opts a single Application in without flipping the global default, so one tenant can learn from its own corrections while another stays byte-identical.
 
@@ -284,53 +284,224 @@ Being explicit about the limits is what makes the rest trustworthy.
 
 ## REST API
 
-All routes are mounted under **`/v1/glad/feedback`** on the gateway. The Application is resolved from `application_id` in the body/query or the `X-Geodesia-App` header (default `default`).
+All routes are mounted under **`/v1/glad/feedback`** on **G1-Proxy** — reached as `/gw/v1/glad/feedback/…` through the unified port. The Application is resolved from `application_id` in the body/query or the `X-Geodesia-App` header (default `default`).
+
+### Create a flag
+
+**What it does.** Records that a served turn was judged wrong, in plain language. It lands as `status: "pending"` for a curator, unless `GW_FEEDBACK_AUTOAPPROVE=on` and the problem maps cleanly to an axis — then it goes straight into the engine.
+
+=== "curl"
+
+    ```bash
+    curl -s http://localhost:8080/gw/v1/glad/feedback \
+      -H "Content-Type: application/json" \
+      -H "X-Geodesia-App: acme" \
+      -d '{
+        "region":     "answer",
+        "problem":    "fabricated",
+        "note":       "invented a citation",
+        "prompt":     "Who won the 1923 Paris Review prize?",
+        "answer":     "The 1923 Paris Review prize went to …",
+        "message_id": "msg_42",
+        "session_id": "sess_7"
+      }'
+    ```
+
+=== "Python"
+
+    ```python
+    import httpx
+
+    c = httpx.Client(base_url="http://localhost:8080/gw",
+                     headers={"X-Geodesia-App": "acme"}, timeout=30)
+
+    # Read the vocabulary instead of hard-coding it — axes can be added per deployment.
+    schema = c.get("/v1/glad/feedback/schema").json()
+    print([p["key"] for p in schema["problems"]])
+
+    flag = c.post("/v1/glad/feedback", json={
+        "region":  "answer",
+        "problem": "fabricated",
+        "note":    "invented a citation",
+        "prompt":  "Who won the 1923 Paris Review prize?",
+        "answer":  "The 1923 Paris Review prize went to …",
+        "session_id": "sess_7",
+    }).json()
+    print(flag["id"], flag["status"])
+    ```
+
+=== "TypeScript"
+
+    ```ts
+    const H = { "Content-Type": "application/json", "X-Geodesia-App": "acme" }
+    const base = "http://localhost:8080/gw"
+
+    const schema = await fetch(`${base}/v1/glad/feedback/schema`, { headers: H }).then(r => r.json())
+    console.log(schema.problems.map((p: any) => p.key))
+
+    const flag = await fetch(`${base}/v1/glad/feedback`, {
+      method: "POST",
+      headers: H,
+      body: JSON.stringify({
+        region: "answer",
+        problem: "fabricated",
+        note: "invented a citation",
+        prompt: "Who won the 1923 Paris Review prize?",
+        answer: "The 1923 Paris Review prize went to …",
+        session_id: "sess_7",
+      }),
+    }).then(r => r.json())
+    console.log(flag.id, flag.status)
+    ```
+
+**What comes back** — the stored row, with its generated id and current `status`.
+
+#### Request fields
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `region` | `string` | ✅ | `prompt` or `answer` — which side of the turn was wrong. |
+| `problem` | `string` | — | A plain-language problem key from `/schema`. Mapped to an axis server-side. |
+| `axis` | `string` | — | Name the axis directly. **Overrides** the problem→axis map. For API callers who know the vocabulary. |
+| `verdict` | `string` | — | `false_negative` (should have fired) or `false_positive` (fired wrongly). |
+| `note` | `string` | — | Free text for the curator. |
+| `prompt` / `context` / `answer` | `string` | — | The turn itself. Supply them so the correction can be replayed and, later, trained on. |
+| `message_id` / `session_id` | `string` | — | Link back to the served turn. |
+| `application_id` | `string` | — | Same as the `X-Geodesia-App` header. |
+| `scores` | `object` | — | The detection payload the turn was served with, so the curator sees what the detector thought at the time. |
+
+!!! tip "Read `/schema`, don't hard-code axes"
+    `GET /v1/glad/feedback/schema` returns `{axes, prompt_axes, answer_axes, problems, problem_to_axis, verdicts, regions}`. A deployment can ship extra axes; a client that reads the schema keeps working, one with a hard-coded list quietly drops them.
+
+### Review a flag (curator)
+
+**What it does.** Approves, rejects or re-opens a flag. Approving is what makes a correction real: it names the axis, states which way the detector was wrong, and — optionally — records a **contrastive benign twin**, the near-identical harmless case that must *not* flip.
+
+=== "curl"
+
+    ```bash
+    curl -s http://localhost:8080/gw/v1/glad/feedback/fb_9c1f2a7b4e0d6a18/review \
+      -H "Content-Type: application/json" \
+      -d '{
+        "status":   "approved",
+        "axis":     "halluc_closedbook",
+        "verdict":  "false_negative",
+        "reviewer": "anna@acme.com"
+      }'
+    ```
+
+=== "Python"
+
+    ```python
+    c.post("/v1/glad/feedback/fb_9c1f2a7b4e0d6a18/review", json={
+        "status": "approved",
+        "axis": "halluc_closedbook",
+        "verdict": "false_negative",
+        "reviewer": "anna@acme.com",
+        # contrastive twin — the benign case that must NOT flip
+        "twin_prompt": "Who won the 1923 Nobel Prize in Literature?",
+        "twin_answer": "W. B. Yeats.",
+        "attack_family": "fabricated_award",
+        "weight": 1.0,
+    })
+    ```
+
+=== "TypeScript"
+
+    ```ts
+    await fetch(`${base}/v1/glad/feedback/fb_9c1f2a7b4e0d6a18/review`, {
+      method: "POST",
+      headers: H,
+      body: JSON.stringify({
+        status: "approved",
+        axis: "halluc_closedbook",
+        verdict: "false_negative",
+        reviewer: "anna@acme.com",
+      }),
+    })
+    ```
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `status` | `string` | ✅ | `approved` \| `rejected` \| `pending`. |
+| `axis` | `string` | — | The axis this correction belongs to. |
+| `verdict` | `string` | — | `false_negative` \| `false_positive`. |
+| `reviewer` | `string` | — | Who decided. |
+| `note` | `string` | — | Curator note. |
+| `weight` | `float` | — | How strongly this exemplar should count. |
+| `twin_prompt` / `twin_answer` | `string` | — | The contrastive benign twin. |
+| `attack_family` | `string` | — | Groups related corrections. |
+
+### Push a correction into the engine
+
+**What it does.** `memory` refreshes the episodic exemplar bank and takes effect on the **next request** — no restart, no training. `weights` exports the approved corpus and launches the configured trainer as a subprocess; poll the returned job.
+
+=== "curl"
+
+    ```bash
+    # instant: refresh the exemplar bank
+    curl -s -X POST http://localhost:8080/gw/v1/glad/feedback/retrain \
+      -H "Content-Type: application/json" \
+      -d '{"mode": "memory", "application_id": "acme"}'
+
+    # heavy: export corpus + launch the trainer
+    JOB=$(curl -s -X POST http://localhost:8080/gw/v1/glad/feedback/retrain \
+      -H "Content-Type: application/json" \
+      -d '{"mode": "weights"}' | jq -r .job_id)
+
+    curl -s "http://localhost:8080/gw/v1/glad/feedback/retrain/status?job_id=$JOB" | jq
+    ```
+
+=== "Python"
+
+    ```python
+    import time
+
+    job = c.post("/v1/glad/feedback/retrain", json={"mode": "weights"}).json()
+    while True:
+        st = c.get("/v1/glad/feedback/retrain/status", params={"job_id": job["job_id"]}).json()
+        print(st["status"], st.get("log_tail", "")[-200:])
+        if st["status"] in ("completed", "failed"):
+            break
+        time.sleep(10)
+    ```
+
+=== "TypeScript"
+
+    ```ts
+    const job = await fetch(`${base}/v1/glad/feedback/retrain`, {
+      method: "POST", headers: H, body: JSON.stringify({ mode: "weights" }),
+    }).then(r => r.json())
+
+    for (;;) {
+      const st = await fetch(
+        `${base}/v1/glad/feedback/retrain/status?job_id=${encodeURIComponent(job.job_id)}`,
+        { headers: H },
+      ).then(r => r.json())
+      if (st.status === "completed" || st.status === "failed") break
+      await new Promise(r => setTimeout(r, 10_000))
+    }
+    ```
+
+### Full route list
 
 | Method | Path | Purpose |
 |---|---|---|
 | `GET` | `/v1/glad/feedback/schema` | Axis vocabulary + plain-language `problem → axis` map. |
-| `POST` | `/v1/glad/feedback` | Create a flag (`status=pending`). |
-| `GET` | `/v1/glad/feedback` | List / filter the queue (`status`, `application_id`, `axis`, `region`, `limit`, `offset`). |
-| `GET` | `/v1/glad/feedback/stats` | Pending / approved / rejected counts. |
-| `POST` | `/v1/glad/feedback/{id}/review` | Curator action — approve (axis + verdict), reject, re-open. |
+| `POST` | `/v1/glad/feedback` | Create a flag. |
+| `GET` | `/v1/glad/feedback` | List / filter the queue: `status`, `application_id`, `axis`, `region`, `limit` (≤ 1000), `offset`. |
+| `GET` | `/v1/glad/feedback/stats` | Pending / approved / rejected / total counts. |
+| `POST` | `/v1/glad/feedback/{id}/review` | Curator action. |
 | `DELETE` | `/v1/glad/feedback/{id}` | Drop a row. |
-| `GET` | `/v1/glad/feedback/export` | Download the approved corpus as JSONL. |
+| `GET` | `/v1/glad/feedback/export` | The decided corpus as JSONL. Defaults to `status=approved`. |
 | `GET` | `/v1/glad/feedback/bank/status` | Exemplar-bank version + approved count. |
-| `POST` | `/v1/glad/feedback/retrain` | Trigger a re-train (`memory` \| `weights`). |
+| `POST` | `/v1/glad/feedback/retrain` | `{mode: "memory" \| "weights", application_id?}`. |
 | `GET` | `/v1/glad/feedback/retrain/status?job_id=…` | Job state + log tail. |
 | `GET` | `/v1/glad/feedback/retrain/jobs` | All re-train jobs. |
-
-### Create a flag
-
-```bash
-curl -s http://localhost:8800/v1/glad/feedback \
-  -H "Content-Type: application/json" \
-  -H "X-Geodesia-App: acme" \
-  -d '{
-    "region": "answer",
-    "problem": "fabricated",
-    "note": "invented a citation",
-    "prompt": "Who won the 1923 Paris Review prize?",
-    "answer": "The 1923 Paris Review prize went to ...",
-    "message_id": "msg_42",
-    "session_id": "sess_7"
-  }'
-```
-
-### Review a flag (curator)
-
-```bash
-curl -s http://localhost:8800/v1/glad/feedback/fb_9c1f2a7b4e0d6a18/review \
-  -H "Content-Type: application/json" \
-  -d '{
-    "status": "approved",
-    "axis": "halluc_closedbook",
-    "verdict": "false_negative",
-    "reviewer": "anna@acme.com"
-  }'
-```
-
-To record a contrastive benign twin at review time, add `weight`, `twin_prompt` / `twin_answer` and `attack_family`.
+| `GET` | `/v1/glad/feedback/auto/status` | Idle-judge state: installed, running, queue depths, disagreements, promotions. |
+| `GET` `PUT` | `/v1/glad/feedback/auto/config` | Read / patch the idle-judge configuration. |
+| `GET` | `/v1/glad/feedback/auto/prompt-preview?axis=…` | **Read-only** — the exact prompt the judge will see. |
+| `GET` | `/v1/glad/feedback/auto/items?state=…&limit=…` | What the judge queued, scored or promoted. |
 
 ---
 

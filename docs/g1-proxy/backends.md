@@ -121,7 +121,7 @@ See **[Cloud Upstreams](../studio/cloud-upstreams.md)** for the full per-provide
 
 ### Ollama
 
-Ollama is a popular tool for running open-source models locally. **Ollama ≥ 0.12 exposes per-token log-probabilities** on its OpenAI-compatible `/v1` endpoint, which the gateway probes automatically — so the closed-book axis (full 5-axis mode) works out of the box. On **older Ollama (< 0.12)** the gateway runs in 4-axis mode, and you can recover the closed-book axis with a log-prob sidecar (see [Framework Compatibility → Ollama](compatibility.md#ollama)).
+Ollama is a popular tool for running open-source models locally. **Ollama ≥ 0.12 exposes per-token log-probabilities** on its OpenAI-compatible `/v1` endpoint, which the proxy probes automatically — so the closed-book axis works out of the box. On **older Ollama (< 0.12)** that axis reports `available: false`, and you can recover it with a log-prob sidecar (see [Framework Compatibility → Ollama](compatibility.md#ollama)).
 
 ```bash
 curl -X POST http://localhost:8800/v1/glad/gateway/config \

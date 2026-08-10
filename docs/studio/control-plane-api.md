@@ -9,6 +9,107 @@ Every control-plane route is mounted under **`/v1/glad`** — right next to the 
 
 ---
 
+## Call it — create an Application end to end
+
+**What it does.** Creates an Organization, an Application bound to your upstream, sets its policy, and mints the key your application will authenticate with. Four calls; after them the Application is live on the data plane.
+
+=== "curl"
+
+    ```bash
+    BASE=http://localhost:8080
+    JSON='-H Content-Type:application/json'
+
+    ORG=$(curl -s $BASE/v1/glad/orgs $JSON \
+      -d '{"name":"Acme Legal","max_applications":5}' | jq -r .org_id)
+
+    APP=$(curl -s $BASE/v1/glad/apps $JSON -d "{
+      \"name\": \"Contract Reviewer\",
+      \"org_id\": \"$ORG\",
+      \"config\": {\"binding\": {\"upstream_type\":\"ollama\",
+                                 \"base_url\":\"http://localhost:11434\",
+                                 \"model\":\"llama3.1:8b\"}}
+    }" | jq -r .app_id)
+
+    curl -s -X PUT $BASE/v1/glad/apps/$APP/policy $JSON \
+      -d '{"policy":{"thresholds":{"prompt_safety":0.75},"scope":"Reviews commercial contracts."}}'
+
+    KEY=$(curl -s $BASE/v1/glad/apps/$APP/keys $JSON -d '{"role":"invoke"}' | jq -r .api_key)
+    echo "$KEY"   # shown once — store it now
+    ```
+
+=== "Python"
+
+    ```python
+    import httpx
+
+    c = httpx.Client(base_url="http://localhost:8080", timeout=30)
+    # If a platform token is configured:
+    # c.headers["X-Geodesia-Admin-Key"] = os.environ["GEODESIA_ADMIN_TOKEN"]
+
+    org = c.post("/v1/glad/orgs", json={"name": "Acme Legal", "max_applications": 5}).json()
+
+    app = c.post("/v1/glad/apps", json={
+        "name": "Contract Reviewer",
+        "org_id": org["org_id"],
+        "config": {"binding": {"upstream_type": "ollama",
+                               "base_url": "http://localhost:11434",
+                               "model": "llama3.1:8b"}},
+    }).json()
+    app_id = app["app_id"]
+
+    # Ask the server which axes this checkpoint actually has before writing a policy.
+    meta = c.get("/v1/glad/apps/meta").json()
+    print("axes:", meta["axes"])
+
+    c.put(f"/v1/glad/apps/{app_id}/policy", json={"policy": {
+        "thresholds": {"prompt_safety": 0.75},
+        "scope": "Reviews commercial contracts.",   # required for the out_of_scope axis
+    }})
+
+    key = c.post(f"/v1/glad/apps/{app_id}/keys", json={"role": "invoke"}).json()
+    print(key["api_key"])          # returned ONCE — store it now
+    ```
+
+=== "TypeScript"
+
+    ```ts
+    const BASE = "http://localhost:8080"
+    const H = { "Content-Type": "application/json" }
+    const post = (p: string, b: unknown) =>
+      fetch(BASE + p, { method: "POST", headers: H, body: JSON.stringify(b) }).then(r => r.json())
+
+    const org = await post("/v1/glad/orgs", { name: "Acme Legal", max_applications: 5 })
+
+    const app = await post("/v1/glad/apps", {
+      name: "Contract Reviewer",
+      org_id: org.org_id,
+      config: { binding: { upstream_type: "ollama", base_url: "http://localhost:11434", model: "llama3.1:8b" } },
+    })
+
+    await fetch(`${BASE}/v1/glad/apps/${app.app_id}/policy`, {
+      method: "PUT", headers: H,
+      body: JSON.stringify({ policy: { thresholds: { prompt_safety: 0.75 },
+                                       scope: "Reviews commercial contracts." } }),
+    })
+
+    const key = await post(`/v1/glad/apps/${app.app_id}/keys`, { role: "invoke" })
+    console.log(key.api_key)       // returned ONCE — store it now
+    ```
+
+**What comes back** — the Application record, and from the last call a key you can immediately use on the data plane:
+
+```bash
+curl -s http://localhost:8080/gw/v1/chat/completions \
+  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+  -d '{"model":"llama3.1:8b","stream":false,
+       "messages":[{"role":"user","content":"Is this NDA mutual?"}]}'
+```
+
+!!! tip "Read `/v1/glad/apps/meta` before writing a policy"
+    It returns the axes the **served checkpoint** actually has. `PUT …/policy` rejects any axis it does not know, so building the policy from `meta` is the difference between a working call and a `400`.
+
+---
+
 ## Authentication & RBAC
 
 The control plane has four roles, in ascending privilege:
@@ -252,7 +353,7 @@ curl -s http://localhost:8080/v1/glad/apps/contract_reviewer_4f2a9c/keys \
 The key is the Application's runtime identity on the data plane. Pass it as a Bearer token on a chat request to route that request through this Application:
 
 ```bash
-curl -s http://localhost:8080/v1/chat/completions \
+curl -s http://localhost:8080/gw/v1/chat/completions \
   -H "Authorization: Bearer g1k_live_8sQ3...x8Qv" \
   -H "Content-Type: application/json" \
   -d '{"model":"llama3.1:8b","stream":false,"messages":[{"role":"user","content":"Summarise clause 4."}]}'
@@ -316,7 +417,7 @@ The gateway resolves that identifier to the Application's config — its upstrea
 **Route via the header (or `application_id` in the body):**
 
 ```bash
-curl -s http://localhost:8080/v1/chat/completions \
+curl -s http://localhost:8080/gw/v1/chat/completions \
   -H "X-Geodesia-App: contract_reviewer_4f2a9c" \
   -H "Content-Type: application/json" \
   -d '{"model":"llama3.1:8b","stream":false,"messages":[{"role":"user","content":"Is this NDA mutual?"}]}'
@@ -325,7 +426,7 @@ curl -s http://localhost:8080/v1/chat/completions \
 **Route via an Application API key (no header needed):**
 
 ```bash
-curl -s http://localhost:8080/v1/chat/completions \
+curl -s http://localhost:8080/gw/v1/chat/completions \
   -H "Authorization: Bearer g1k_live_8sQ3...x8Qv" \
   -H "Content-Type: application/json" \
   -d '{"model":"llama3.1:8b","stream":false,"messages":[{"role":"user","content":"Is this NDA mutual?"}]}'

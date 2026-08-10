@@ -37,7 +37,7 @@ Two containers, one command:
                               g1-studio :8080  ◀── you manage apps/keys here
 ```
 
-Images are **self-contained** (GLAD-BERT detector + RAG all baked in). You only
+Images are **self-contained** (G1-Hummingbird detector + RAG all baked in). You only
 need to provide an **upstream LLM** that speaks the OpenAI API and returns `logprobs`.
 
 ---
@@ -486,7 +486,8 @@ docker compose down -v          # also wipe the DB/state volume (destroys apps, 
 | Var | Default | Meaning |
 |---|---|---|
 | `GW_DEVICE` | `cuda` (`cpu` with `--cpu`) | detector device |
-| `GW_GLADH_CKPT` / `GW_GLADH_DEVICE` | (unset) / `auto` | thinking_level 1/2 availability + GLAD-H device |
+| `GW_GLADH_CKPT` / `GW_GLADH_DEVICE` | (unset) / `auto` | Capability pack + device for [thinking levels](g1-proxy/thinking-levels.md) 1–2 |
+| `GW_GLADA_CKPT` / `GW_GLADA_DEVICE` | (unset) / `auto` | Capability pack + device for thinking level 3 (MAX) |
 | `GW_BLOCK_INPUT` | `1` | block flagged prompts (vs score-only) |
 | `GW_INJECT_SYSTEM` | `1` | inject the safety system prompt |
 | `GW_DILUTION_GUARD` | `off` | `off\|shadow\|enforce` — adaptive-attack guard |

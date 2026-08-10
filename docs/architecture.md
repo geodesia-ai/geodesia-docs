@@ -61,16 +61,16 @@ The Product Backend can run without a loaded language model. Compliance pages, d
 
 Both services share a single **Geodesia detection engine**, which comes in two cooperating tiers:
 
-| Tier | Name | What it is | When it runs |
-|---|---|---|---|
-| **Always-on** | **GLAD-Hummingbird (GLAD-G)** | A geometric MoE model. Reads the prompt, context, and answer and produces the nine independent [detection axes](g1-proxy/detection-axes.md) in a single forward pass. Fast and lightweight — milliseconds per request on a small GPU (or CPU). | Every request |
-| **Opt-in** | **GLAD-H** | A second, independent detector on a different backbone. Blended into GLAD-Hummingbird's verdict per request via [Thinking Levels](g1-proxy/thinking-levels.md) — invoked only on borderline axes (level 1) or always (level 2). Off by default (level 0) — never loaded, zero overhead. | When `thinking_level` 1 or 2 is requested |
+| Mode | What runs | When |
+|---|---|---|
+| **Standard** | **G1-Hummingbird** reads the prompt, context and answer and produces the nine independent [detection axes](g1-proxy/detection-axes.md) in a single forward pass. Fast and lightweight — milliseconds per request on a small GPU (or CPU). | Every request |
+| **Extended thinking** | The same nine axes, scored with additional depth. Requested per request through [Thinking Levels](g1-proxy/thinking-levels.md) (`thinking_level` `1`–`3`, `3` = MAX). Off by default — the extra capacity is never loaded, so it costs nothing until asked for. | When `thinking_level` ≥ 1 is requested |
 
-GLAD-Hummingbird is **model-agnostic**: the same checkpoint works against any upstream, from a locally hosted model to the OpenAI API.
+G1-Hummingbird is **model-agnostic**: the same checkpoint works against any upstream, from a locally hosted model to the OpenAI API.
 
 The one exception is the **closed-book fabrication axis**, which additionally uses per-token log-probabilities from the upstream LLM to compute uncertainty signals. If the upstream does not expose log-probabilities (e.g., Ollama < 0.12, or cloud providers such as Bedrock/Vertex), this axis is automatically disabled and the gateway operates with the remaining axes. Most OpenAI-compatible servers — and Ollama ≥ 0.12 — do expose them, so this axis is on by default.
 
-GLAD-H is a **second opinion**, not a replacement: Cascade (level 1) blends it in only on axes where GLAD-Hummingbird's own score is borderline; Max-OR (level 2) takes the stronger of the two verdicts on every axis. This keeps the always-on path fast while letting high-stakes deployments pay for extra assurance only where they want it.
+Extended thinking is **additional depth on the same nine axes**, not a different product: level 1 only spends it on the turns the standard path is unsure about, levels 2 and 3 spend it on every turn. The response shape, the axis names and the thresholds are identical at every level — which keeps the standard path fast while letting high-stakes deployments buy extra assurance exactly where they want it.
 
 ---
 

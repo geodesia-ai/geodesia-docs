@@ -37,13 +37,36 @@ Three things are tracked locally and checked on every chat:
 
 ### Reading the active plan and usage
 
-Query the gateway for the current entitlement plus today's usage. This is **read-only** — it never increments the chat counter.
+**What it does.** `GET /v1/glad/gateway/entitlements` on **G1-Proxy** returns the active plan and today's usage. It is **read-only** — polling it never increments the chat counter.
 
-```bash
-curl -s http://localhost:8800/gw/v1/glad/gateway/entitlements | python3 -m json.tool
-```
+=== "curl"
 
-**Response shape** (from `entitlements.status()`):
+    ```bash
+    curl -s http://localhost:8080/gw/v1/glad/gateway/entitlements | jq
+    ```
+
+=== "Python"
+
+    ```python
+    import httpx
+
+    ent = httpx.get("http://localhost:8080/gw/v1/glad/gateway/entitlements").json()
+    left = ent["chats_remaining_today"]
+    print(f"{ent['tier']} — {left if left is not None else 'unlimited'} chats left today")
+    if left is not None and left < 5:
+        print("approaching the daily cap")
+    ```
+
+=== "TypeScript"
+
+    ```ts
+    const ent = await fetch("http://localhost:8080/gw/v1/glad/gateway/entitlements")
+      .then(r => r.json())
+    const left = ent.chats_remaining_today          // null = unlimited
+    console.log(ent.tier, left ?? "unlimited")
+    ```
+
+**What comes back**
 
 ```json
 {
@@ -131,11 +154,38 @@ Open **Settings → Plan & License**, paste the license key, and apply. The page
 
 Apply a license:
 
-```bash
-curl -s -X POST http://localhost:8800/gw/v1/glad/gateway/license \
-  -H "Content-Type: application/json" \
-  -d '{"license": "<raw-json-or-base64>"}'
-```
+=== "curl"
+
+    ```bash
+    curl -s -X POST http://localhost:8080/gw/v1/glad/gateway/license \
+      -H "Content-Type: application/json" \
+      -d '{"license": "<raw-json-or-base64>"}' | jq
+    ```
+
+=== "Python"
+
+    ```python
+    import httpx
+
+    r = httpx.post("http://localhost:8080/gw/v1/glad/gateway/license",
+                   json={"license": open("license.b64").read().strip()}, timeout=30)
+    if r.status_code == 400:
+        raise SystemExit(f"rejected: {r.json()['detail']}")
+    plan = r.json()
+    print("now on:", plan["tier"], "until", plan["expires"])
+    ```
+
+=== "TypeScript"
+
+    ```ts
+    const res = await fetch("http://localhost:8080/gw/v1/glad/gateway/license", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ license: licenseKey }),
+    })
+    if (res.status === 400) throw new Error((await res.json()).detail)
+    const plan = await res.json()
+    ```
 
 The request body accepts the license under any of the keys `license`, `token`, or `key`. On success the endpoint returns the new `status()` plan; an invalid or expired signature returns **HTTP 400** with the reason in `detail`.
 
@@ -145,7 +195,7 @@ The request body accepts the license under any of the keys `license`, `token`, o
 Clear the installed license (return to FREE):
 
 ```bash
-curl -s -X DELETE http://localhost:8800/gw/v1/glad/gateway/license
+curl -s -X DELETE http://localhost:8080/gw/v1/glad/gateway/license
 ```
 
 This removes `license.json` and returns the (now free-tier) plan.

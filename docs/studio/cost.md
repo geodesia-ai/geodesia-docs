@@ -50,7 +50,7 @@ cost_total  = cost_input + cost_output + cost_glad
 | `output_per_mtok` | App `cost.output_per_mtok` (€/Mtok for completion tokens) |
 | `glad_compute_per_mtok` | App `cost.glad_compute_per_mtok` — optional charge for Geodesia scoring compute (defaults to `0`) |
 | `currency` | App `cost.currency` (default `EUR`) |
-| `glad_tokens` | The gateway records `prompt_tokens + completion_tokens` as the GLAD-compute basis |
+| `glad_tokens` | The gateway records `prompt_tokens + completion_tokens` as the detection-compute basis |
 
 Negative rates are rejected at config validation; missing rates default to `0`, so an Application with no rates configured simply accumulates token counts at zero cost.
 
@@ -85,7 +85,7 @@ The immutable record of what each call cost, including the **rate snapshot**.
 | `kind` | TEXT | Call kind (default `chat`) |
 | `prompt_tokens` | INT | Input tokens (real or estimated) |
 | `completion_tokens` | INT | Output tokens (real or estimated) |
-| `glad_tokens` | INT | Tokens charged to GLAD compute |
+| `glad_tokens` | INT | Tokens charged to detection compute (the column name is part of the stored schema) |
 | `rate_input` / `rate_output` / `rate_glad` | REAL | **Snapshotted** €/Mtok rates |
 | `cost_input` / `cost_output` / `cost_glad` | REAL | Per-component cost |
 | `cost_total` | REAL | Sum of the three |

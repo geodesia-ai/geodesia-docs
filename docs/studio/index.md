@@ -9,7 +9,7 @@
 
 ## What is an Application?
 
-An **Application** is **1 LLM + GLAD-Hummingbird in the middle**, owning everything that makes that LLM safe, compliant, and accountable:
+An **Application** is **1 LLM + G1-Hummingbird in the middle**, owning everything that makes that LLM safe, compliant, and accountable:
 
 <div class="feature-grid">
 
@@ -22,7 +22,7 @@ An **Application** is **1 LLM + GLAD-Hummingbird in the middle**, owning everyth
 <div class="feature-card">
 <span class="feature-icon">🛡️</span>
 <h3>Policy</h3>
-<p>Per-axis thresholds and enforcement modes across the 6 detection axes, plus <code>block_input</code>, system-prompt injection, and the streaming brake.</p>
+<p>Per-axis thresholds and enforcement modes across the nine detection axes, plus <code>block_input</code>, system-prompt injection, and the streaming brake.</p>
 </div>
 
 <div class="feature-card">
@@ -72,7 +72,7 @@ Applications are grouped under **Organizations**. An organization carries the li
 G-1 Studio cleanly separates **management** from **serving**:
 
 - **Control plane** — `/v1/glad/apps/*`. Create and configure Applications and Organizations, mint API keys, edit policy, read cost / metrics / forecast. See [Control-Plane API](control-plane-api.md).
-- **Data plane** — the chat path. Each request resolves its Application, GLAD-Hummingbird scores the 9 axes in one pass, the request is routed to that app's LLM (or to its cheaper / stronger second model, see [Token & Cost Control](../g1-proxy/cost-control.md)), and the call is logged with its cost.
+- **Data plane** — the chat path. Each request resolves its Application, G1-Hummingbird scores the 9 axes in one pass, the request is routed to that app's LLM (or to its cheaper / stronger second model, see [Token & Cost Control](../g1-proxy/cost-control.md)), and the call is logged with its cost.
 
 ![Diagram](../assets/diagrams/studio-index.svg){: .diagram }
 <p class="diagram-caption">The control plane writes Application config; the data plane reads it on every chat request to score, route, and bill against the right Application.</p>
@@ -81,7 +81,7 @@ G-1 Studio cleanly separates **management** from **serving**:
 
 ## The 9 detection axes
 
-GLAD-Hummingbird scores every request across **nine** independent axes — in a single forward pass — grouped by **where** in the request lifecycle they run. Each axis has its own threshold and enforcement mode in the app's policy.
+G1-Hummingbird scores every request across **nine** independent axes — in a single forward pass — grouped by **where** in the request lifecycle they run. Each axis has its own threshold and enforcement mode in the app's policy.
 
 | Region | Axes | Runs |
 |---|---|---|
@@ -150,6 +150,8 @@ The following areas are **global and not app-scoped**:
 | Configure an Application end-to-end | [Applications](applications.md) |
 | Set budgets and read cost / forecast | [Cost & FinOps](cost.md) |
 | Call the management endpoints | [Control-Plane API](control-plane-api.md) |
+| See **every** endpoint Studio exposes | [Complete API Map](api-reference.md) |
+| Find which API call is behind a UI control | [UI Component Reference](ui-reference.md) |
 | Understand tiers and `max_applications` | [Licensing](licensing.md) |
 | Bind a cloud LLM (Bedrock, Vertex, Azure) | [Cloud Upstreams](cloud-upstreams.md) |
-| Understand the 6 detection axes | [Detection Axes](../g1-proxy/detection-axes.md) |
+| Understand the nine detection axes | [Detection Axes](../g1-proxy/detection-axes.md) |

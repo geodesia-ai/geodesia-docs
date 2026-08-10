@@ -1,161 +1,159 @@
 # Evaluate Endpoint
 
-The evaluate endpoint generates a response from the loaded model and scores it in a single call. It is the core API for direct batch evaluation workflows where you supply a prompt and want both the generated answer and its full detection scores in one HTTP round-trip.
+**What it does.** `POST /v1/glad/evaluate` on **G1-Proxy** generates an answer from your upstream LLM *and* scores it, in one HTTP round-trip. It is the batch-workflow twin of the [Chat API](../g1-proxy/chat-api.md): same pipeline, same detection, but you send a bare `prompt` instead of a message array and you get the full detection payload back rather than a chat-shaped body.
+
+Reach for it when you are scoring a corpus, running an offline evaluation, or wiring detection into something that is not a chat client.
 
 ---
 
-## POST /glad/evaluate
+## Call it
 
-### Request Body (`EvaluateRequest`)
+=== "curl"
 
-| Field | Type | Required | Default | Description |
-|---|---|---|---|---|
-| `model_path` | `string` | ✅ | — | Absolute path to the model checkpoint directory. Relative paths are resolved against the working directory. |
-| `prompt` | `string` | ✅ | — | The user's input prompt. Minimum length: 1 character. |
-| `context` | `string` | — | `null` | Optional grounding context. When provided, the `halluc_context` (faithfulness) axis scores the answer against this text. |
-| `generation_config` | `object` | — | See below | Parameters that control how the model generates the answer. |
-| `session_id` | `string` | — | auto-generated | Logical grouping for a conversation. Multiple calls with the same `session_id` are linked in the audit trail. |
-| `system_prompt_text` | `string` | — | `null` | The exact system or constitutional prompt prepended at generation time. Used by the MuPAX LLM explainability engine to exclude those tokens from attribution, so explanations cover only user text and the generated answer. |
-| `explain` | `boolean` | — | `false` | When `true` and the server has explainability enabled, compute per-token MuPAX LLM attribution and include it in the response under `xai.mupax_halluc` / `xai.mupax_safety`. |
-| `explain_mode` | `string` | — | `"standard"` | `"standard"` returns χ attribution per answer token. `"causal"` additionally computes a token→token causal matrix for the highest-importance flagged answer token — answering "which prompt tokens caused this specific answer token?" |
-| `credit_tiers` | `array[string]` | — | `["mupax"]` when `explain=true` | Which attribution methods to run. Options: `"gradient"` (fast, deterministic), `"learned"` (learned attribution head if present), `"mupax"` (statistically robust Monte Carlo), `"pss"` (Positional Semantic Stability — consistency-based, ~N× generation cost). |
-| `pss_n_samples` | `integer` | — | `5` | Number of extra generation samples for PSS attribution. Range 2–16. Each extra sample costs roughly one generation pass. |
-| `pss_temperature` | `float` | — | `0.7` | Sampling temperature for PSS resamples. Must be > 0. |
-| `pss_match_mode` | `string` | — | `"ngram"` | PSS alignment algorithm. Options: `"ngram"` (combines n-gram containment + entity strict match), `"strict"` (exact surface match), `"fuzzy"` (Levenshtein distance), `"entity"` (entity-only), `"claim"` (sentence-level bidirectional). |
-| `threshold_overrides` | `object` | — | `null` | Runtime threshold overrides in probability space. Supported keys: `prompt_safety`, `answer_safety`, `halluc`, `combined_halluc`. |
-| `bypass_prompt_block_for_generation` | `boolean` | — | `false` | When `true`, an unsafe-prompt detection does not abort generation. The model still generates a response, all scores are computed, but no content is withheld. Used by the "passthrough" review mode. |
-| `enable_edfl_isr` | `boolean` | — | `false` | **Experimental.** Compute the EDFL/ISR sufficiency gate for evidence-grounded binary questions. Only applies when an evidence list is available through the agent-flow layer. Requires 3–12× more computation. |
+    ```bash
+    curl -s http://localhost:8080/gw/v1/glad/evaluate \
+      -H "Content-Type: application/json" \
+      -H "X-Geodesia-App: support_bot" \
+      -d '{
+        "model": "my-model",
+        "prompt": "How tall is the Eiffel Tower?",
+        "context": "The Eiffel Tower was built between 1887 and 1889 and stands 330 metres tall."
+      }' | jq '{
+        answer:   .choices[0].message.content,
+        decision: .glad_decision,
+        axes:     .geodesia.axis_energy
+      }'
+    ```
 
-### `generation_config` Fields
+=== "Python"
 
-| Field | Type | Default | Description |
-|---|---|---|---|
-| `max_new_tokens` | `integer` | `160` | Maximum tokens to generate. |
-| `temperature` | `float` | `0.7` | Sampling temperature. |
-| `top_p` | `float` | `0.9` | Nucleus sampling probability. |
-| `do_sample` | `boolean` | `true` | Whether to use sampling. When `false`, generation is greedy (deterministic). |
+    ```python
+    import httpx
 
----
+    rows = [
+        {"prompt": "How tall is the Eiffel Tower?",
+         "context": "The Eiffel Tower … stands 330 metres tall."},
+        {"prompt": "Summarise our refund policy.", "context": ""},
+    ]
 
-### Response Body (`EvaluateResponse`)
+    with httpx.Client(base_url="http://localhost:8080/gw",
+                      headers={"X-Geodesia-App": "support_bot"},
+                      timeout=120) as c:
+        for row in rows:
+            r = c.post("/v1/glad/evaluate", json={"model": "my-model", **row}).json()
+            axes = r["geodesia"]["axis_energy"]
+            flagged = [a for a, e in axes.items() if e.get("flag")]
+            print(f"{r['glad_decision']:8s} flagged={flagged or '-'}  {row['prompt'][:40]}")
+    ```
+
+=== "TypeScript"
+
+    ```ts
+    const rows = [
+      { prompt: "How tall is the Eiffel Tower?", context: "…stands 330 metres tall." },
+      { prompt: "Summarise our refund policy.", context: "" },
+    ]
+
+    for (const row of rows) {
+      const r = await fetch("http://localhost:8080/gw/v1/glad/evaluate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Geodesia-App": "support_bot" },
+        body: JSON.stringify({ model: "my-model", ...row }),
+      }).then(r => r.json())
+
+      const flagged = Object.entries(r.geodesia.axis_energy)
+        .filter(([, e]: any) => e.flag)
+        .map(([a]) => a)
+      console.log(r.glad_decision, flagged, row.prompt.slice(0, 40))
+    }
+    ```
+
+### What comes back
+
+An OpenAI-shaped body carrying the full detection payload — the same structure the [Chat API](../g1-proxy/chat-api.md#what-comes-back) returns:
 
 ```json
 {
-  "session_id": "sess_abc123",
-  "call_id": "call_def456",
-  "timestamp": "2026-06-10T14:23:00.123Z",
-  "prompt_blocked": false,
-  "response": "The capital of France is Paris.",
-  "block_reason": null,
-  "context_truncated": false,
-  "safety": { ... },
-  "hallucination": { ... },
-  "model_metadata": { ... },
-  "generation_diagnostics": { ... },
-  "xai": null,
-  "reasoning_trace": { ... }
+  "choices": [
+    { "index": 0,
+      "message": { "role": "assistant", "content": "It stands 330 metres tall." },
+      "finish_reason": "stop" }
+  ],
+  "glad_decision": "passed",
+  "glad_mode": "blocking",
+  "geodesia": {
+    "axis_energy": {
+      "halluc_context":    { "p_detector": 0.07, "flag": false, "threshold": 0.6475, "available": true },
+      "halluc_closedbook": { "p_detector": 0.04, "flag": false, "threshold": 0.58,   "available": true },
+      "prompt_safety":     { "p_detector": 0.01, "flag": false, "threshold": 0.9215, "available": true },
+      "answer_safety":     { "p_detector": 0.02, "flag": false, "threshold": 0.7295, "available": true },
+      "jailbreak":         { "p_detector": 0.00, "flag": false, "threshold": 0.9997, "available": true },
+      "rag_jailbreak":     { "p_detector": 0.03, "flag": false, "threshold": 0.2501, "available": true },
+      "profanity":         { "p_detector": 0.00, "flag": false, "threshold": 0.90,   "available": true },
+      "out_of_scope":      { "p_detector": 0.02, "flag": false, "threshold": 0.90,   "available": true },
+      "prompt_complexity": { "p_detector": 0.18, "flag": false, "threshold": 0.50,   "available": true }
+    },
+    "brake": false,
+    "dominant_axis": "prompt_complexity"
+  }
 }
 ```
 
-| Field | Description |
-|---|---|
-| `session_id` | Session identifier (provided or auto-generated) |
-| `call_id` | Unique identifier for this specific call |
-| `timestamp` | ISO 8601 timestamp |
-| `prompt_blocked` | `true` if the prompt was blocked before generation |
-| `response` | The model's generated answer. `null` if `prompt_blocked` is `true`. |
-| `block_reason` | Human-readable reason for blocking, or `null` |
-| `context_truncated` | `true` if the provided context was truncated to fit the model's context window |
-| `safety` | Safety detection results. See below. |
-| `hallucination` | Hallucination detection results. See below. |
-| `model_metadata` | Checkpoint information |
-| `generation_diagnostics` | Timing and token count diagnostics |
-| `xai` | Explainability results when `explain=true`. Contains `mupax_halluc`, `mupax_safety`, `mupax_halluc_causal` depending on `explain_mode` and `credit_tiers`. |
-| `reasoning_trace` | Internal scoring trace for debugging |
-
-### `safety` Object
-
-| Field | Description |
-|---|---|
-| `prompt_unsafe_logit` | Raw logit score for prompt unsafety (uncalibrated) |
-| `prompt_unsafe_score` | Probability [0, 1] for prompt unsafety |
-| `answer_unsafe_logit` | Raw logit score for answer unsafety (uncalibrated) |
-| `answer_unsafe_score` | Probability [0, 1] for answer unsafety |
-| `decision` | `"safe"`, `"unsafe"`, or `"blocked"` |
-| `decision_rule` | Which rule triggered the decision |
-| `threshold_used` | The detection threshold that was applied |
-| `combined_answer_safety_score` | Calibrated combined safety score (0–1). This is the production score used for decisions. |
-| `combined_answer_safety_threshold` | The threshold for the combined score |
-| `combined_answer_safety_triggered` | Whether the combined threshold was exceeded |
-| `combined_answer_safety_per_signal` | Per-signal breakdown. Each signal shows `raw_logit`, `zscore`, `weight`, `contribution`. |
-
-### `hallucination` Object
-
-| Field | Description |
-|---|---|
-| `hallucination_score` | Primary hallucination probability [0, 1] |
-| `decision` | `"grounded"` or `"hallucinated"` |
-| `threshold_used` | The threshold applied |
-| `context_provided` | Whether context was provided (affects which axes run) |
-| `combined_halluc_score` | Calibrated combined hallucination score (0–1). This is the production score. |
-| `combined_halluc_threshold` | The threshold for the combined score |
-| `combined_halluc_triggered` | Whether the combined threshold was exceeded |
-| `combined_halluc_per_signal` | Per-signal breakdown with contributions from all 10 internal signals. Each: `raw_logit`, `zscore`, `weight`, `contribution`. |
-| `combined_halluc_n_signals` | Number of signals included in the combined score |
-| `nsp_commission_score` | Narrative Semantic Probe — commission error score |
-| `nsp_coverage_score` | NSP — coverage score |
-| `nsp_assertiveness_score` | NSP — assertiveness score |
-| `drift_score` | Contextual drift score across generation layers |
-| `closed_book_fabrication_score` | Closed-book fabrication probability (when context is absent) |
-| `closed_book_fabrication_reason` | Human-readable reason for the closed-book score |
-| `edfl_isr` | EDFL/ISR sufficiency gate result (when `enable_edfl_isr=true`). Fields: `isr`, `delta_bar`, `decision` (`answer`/`abstain`/`disabled`). |
+Never streamed: this endpoint always returns a single JSON body, whatever `stream` you send.
 
 ---
 
-## GET /glad/finetune/status/{job_id}
-
-Returns the status of an active or completed fine-tuning job.
-
-```bash
-curl http://localhost:8199/glad/finetune/status/job_abc123
-```
-
-```json
-{
-  "job_id": "job_abc123",
-  "status": "running",
-  "progress": 0.34,
-  "current_step": 340,
-  "total_steps": 1000,
-  "last_loss": 0.0423
-}
-```
-
-| Field | Description |
-|---|---|
-| `status` | `"queued"`, `"running"`, `"completed"`, or `"failed"` |
-| `progress` | Fraction completed (0–1), present only while `"running"` |
-| `current_step` | Current training step |
-| `total_steps` | Total steps in the job |
-| `last_loss` | Most recent training loss |
-| `output_path` | Path to the output checkpoint (when `"completed"`) |
-| `error` | Error message (when `"failed"`) |
-
----
-
-## POST /glad/export_audit
-
-Exports an audit bundle for one or more inference sessions.
-
-### Request Body (`ExportAuditRequest`)
+## Request reference
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `session_id` | `string` | ⚠️ One of these two | Export all calls from this session. |
-| `call_ids` | `array[string]` | ⚠️ One of these two | Export a specific list of call IDs. |
-| `client_info` | `object` | — | Deployer information for the report cover page: `company_name`, `system_name`, `deployment_date`, `responsible_person`, `contact_email`. |
-| `regulatory_framework` | `array[string]` | — | List of regulatory frameworks to include in the audit report. Defaults to `["EU_AI_ACT"]`. See [Supported Laws](../regulatory/index.md) for valid codes. |
-| `include_raw_scores` | `boolean` | — | Whether to include raw numeric scores in the export. Default `false`. |
-| `include_compliance_bundle` | `boolean` | — | Whether to include the full compliance artifact bundle (hash chain, watermarks, FRIA reference). Default `true`. |
-| `compliance_context` | `object` | — | Additional metadata to include in compliance reports. |
-| `output_path` | `string` | — | Absolute file path to write the export. If omitted, the file is written to a temp directory and returned as a file download. |
+| `prompt` | `string` | ✅¹ | The input to score. |
+| `messages` | `array` | ✅¹ | An OpenAI message array, if you would rather send conversation shape. **Wins over `prompt`** when both are present. |
+| `model` | `string` | — | Defaults to the Application's binding, or the gateway's configured model. |
+| `context` | `string` | — | Grounding text. Drives the `halluc_context` axis and is injected into the generation. |
+| `rag` | `object` | — | Retrieve the context instead of supplying it: `{collection_id, top_k, rerank, verify}`. |
+| `mode` / `glad_mode` | `string` | — | `block` or `passthrough` for this call. |
+| `threshold_overrides` | `object` | — | Per-axis thresholds. **Only the five base axes** are honoured — see [Chat API](../g1-proxy/chat-api.md#geodesia-extension-fields). |
+| `thinking_level` | `integer` | — | `0`–`3` (`3` = MAX). See [Thinking Levels](../g1-proxy/thinking-levels.md). |
+| `domain` | `string` | — | Domain-conditional calibration bucket for the closed-book axis. |
+| `application_id` / `app_id` | `string` | — | Same as the `X-Geodesia-App` header. |
+| `pii_guard` | `boolean` | — | Per-request PII redaction override. |
+
+¹ Send one of `prompt` or `messages`. Everything else on the body that is not a Geodesia control field is forwarded to the upstream as a generation parameter.
+
+!!! note "`pass_extra` is fixed at 1 here"
+    Unlike the chat endpoint, `/v1/glad/evaluate` always runs a single generation pass. If you want closed-book self-consistency sampling, use `POST /v1/chat/completions` with `pass_extra` or `self_consistency`.
+
+---
+
+## Scoring without generating
+
+If you already have both the prompt **and** the answer and only want them scored — replaying stored traffic, evaluating another system's output, testing a threshold change — do **not** use this endpoint: it will generate a fresh answer. Use the attribution endpoint instead, which scores text you supply:
+
+```bash
+curl -s http://localhost:8080/gw/v1/glad/causal-explainability/analyze \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt":   "How tall is the Eiffel Tower?",
+    "response": "It is 1200 metres tall and located in Berlin.",
+    "context":  "The Eiffel Tower … stands 330 metres tall.",
+    "method":   "dca"
+  }'
+```
+
+See [Explainability](explainability.md) and [Causal Explainability](../g1-proxy/causal-xai.md).
+
+---
+
+## Studio-local research endpoints
+
+G-1 Studio also exposes an older, **local-model** evaluation surface at `/glad/evaluate`, `/glad/export_audit` and `/glad/finetune`. These are mounted outside `/v1`, so the unified port on 8080 does not route to them — they are reachable only on Studio's own port (`:8199` by default) and they require a research checkpoint loaded in-process. In the packaged product the Studio backend runs **without** a GPU model, so they are not the path to build on.
+
+| Method | Path | What it does |
+|---|---|---|
+| `POST` | `/glad/evaluate` | Generate + score against the locally loaded checkpoint. Body: `{model_path, prompt, context?, generation_config?, session_id?, explain?, credit_tiers?, threshold_overrides?, …}`. |
+| `POST` | `/glad/export_audit` | Export an audit bundle. Body: `{session_id \| call_ids, client_info?, regulatory_framework?, include_raw_scores?, include_compliance_bundle?, output_path?}`. |
+| `POST` | `/glad/finetune` | Submit a fine-tuning job. **202** with a `job_id`. |
+| `GET` | `/glad/finetune/status/{job_id}` | `{job_id, status, progress?, current_step?, total_steps?, last_loss?, output_path?, error?}`. `status` is `queued` \| `running` \| `completed` \| `failed`; **404** on an unknown job. |
+
+For anything production, use `POST /v1/glad/evaluate` on G1-Proxy — it scores against your real upstream, honours Application policy, and writes to the compliance ledger.

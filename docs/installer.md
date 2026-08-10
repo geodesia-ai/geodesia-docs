@@ -33,7 +33,7 @@ self-contained images, writes the config, and starts everything. This page is th
 |---|---|
 | Any | Docker + Docker Compose v2; an OpenAI-compatible upstream LLM returning `logprobs` |
 | `--gpu` (default) | NVIDIA GPU + `nvidia-container-toolkit` |
-| `--cpu` | nothing extra — GLAD-BERT runs on CPU |
+| `--cpu` | nothing extra — G1-Hummingbird runs on CPU |
 
 ```bash
 docker --version && docker compose version
@@ -58,7 +58,7 @@ curl -s http://localhost:11434/api/tags   # your upstream (example: ollama)
 
 - `--gpu` **(default)** — the companion detector runs on CUDA. Requires an NVIDIA GPU and the
   container toolkit. Pulls the g1-proxy image tagged `TAG`.
-- `--cpu` — no GPU needed; GLAD-BERT runs on CPU. Pulls the g1-proxy image
+- `--cpu` — no GPU needed; G1-Hummingbird runs on CPU. Pulls the g1-proxy image
   tagged `TAG-cpu`. (g1-studio is architecture-agnostic and always uses `TAG`.)
 
 The flag can appear anywhere; these are equivalent:

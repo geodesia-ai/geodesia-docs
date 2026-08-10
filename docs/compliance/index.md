@@ -1,6 +1,6 @@
 # Compliance Platform
 
-The Geodesia G-1 Compliance Platform provides the complete toolchain to operate, audit, and govern an AI system in compliance with the EU AI Act and 12 other global regulatory frameworks. It is accessible via the **Product Backend API** (`/v1/glad/*`) and the built-in web interface.
+The Geodesia G-1 Compliance Platform provides the complete toolchain to operate, audit, and govern an AI system in compliance with the EU AI Act and 12 other global regulatory frameworks. It runs on **G-1 Studio** (`/v1/glad/*`) and is exposed both as an API and through the built-in web interface. The complete endpoint list is in the [Studio API map](../studio/api-reference.md); which UI control calls what is in the [UI Component Reference](../studio/ui-reference.md).
 
 ---
 
@@ -12,12 +12,12 @@ The Geodesia G-1 Compliance Platform provides the complete toolchain to operate,
 | [FRIA](fria.md) | `/v1/glad/fria` | Fundamental Rights Impact Assessment — EU AI Act Article 27 dossier creation, management, and PDF/DOCX export |
 | [Human Oversight](oversight.md) | `/v1/glad/oversight` | Queue of flagged calls requiring human review; tiered escalation (Operator → AI Responsible); decision recording |
 | [Kill Switch](kill-switch.md) | `/v1/glad/kill-switch` | Instant service suspension; compliance-aware deactivation within configured time windows |
-| [Audit Chain](audit-chain.md) | `/v1/glad/chain` | HMAC-linked append-only log; cryptographic integrity verification |
-| [Watermark](watermark.md) | `/v1/glad/watermark` | HMAC-SHA256 latent AI watermark; verification endpoint |
+| [Audit Chain](audit-chain.md) | `/v1/glad/chain/status`, `/v1/glad/chain/verify` | HMAC-linked append-only log; cryptographic integrity verification |
+| [Watermark](watermark.md) | `/v1/glad/watermark/verify` | HMAC-SHA256 latent AI watermark; verification endpoint |
 | [Reports](reports.md) | `/v1/glad/report`, `/v1/glad/deployer-manual` | PDF/DOCX audit bundles and deployer transparency manuals |
-| Models | `/v1/glad/models` | Available checkpoint catalog; model switching |
+| Models | `/v1/glad/models/available`, `/v1/glad/models/switch` | Available checkpoint catalog; model switching |
 | [Threshold Prefs](../reference/thresholds.md) | `/v1/glad/threshold-prefs` | Deployer-specific detection thresholds stored in the database |
-| Retention | `/v1/glad/retention` | Data retention policy status and management |
+| Retention | `/v1/glad/retention/status` | Data retention policy state and what is past its window |
 | Provider Identity | `/v1/glad/provider-identity` | Machine-readable provider identity (for AI Act Article 13) |
 | License Tokens | `/v1/glad/license-tokens` | Customer license token management |
 

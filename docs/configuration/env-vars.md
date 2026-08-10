@@ -156,26 +156,28 @@ An admin can alternatively authenticate with a control-plane API key (`Authoriza
 
 See [Cost & Budget](../studio/cost.md) for the FinOps engine, budget bands, and the projection chart.
 
-### Remote GLAD-Hummingbird scoring
+### Remote G1-Hummingbird scoring
 
 | Variable | Default | Description |
 |---|---|---|
-| `GEODESIA_SCORING_MODE` | `"embedded"` | `embedded` runs the GLAD-Hummingbird monitor **in-process** (zero behaviour change). `remote` swaps it for a thin HTTP client that talks to a separate scoring pool — for horizontal scale-out of detection compute. (`src/glad_minimal/scoring/`) |
+| `GEODESIA_SCORING_MODE` | `"embedded"` | `embedded` runs the G1-Hummingbird monitor **in-process** (zero behaviour change). `remote` swaps it for a thin HTTP client that talks to a separate scoring pool — for horizontal scale-out of detection compute. (`src/glad_minimal/scoring/`) |
 | `GEODESIA_SCORING_URL` | — | Base URL of the remote scoring server (`python -m glad_minimal.scoring.server`, e.g. `http://host:8810`). **Required** when `GEODESIA_SCORING_MODE=remote`. |
 
-### Thinking Levels (GLAD-G + GLAD-H)
+### Thinking Levels
 
-Opt-in second detector, blended per request into any axis. **Off by default (level 0) → GLAD-H never loaded, zero overhead.** See [Thinking Levels](../g1-proxy/thinking-levels.md).
+Per-request depth dial (`thinking_level` `0`–`3`, `3` = MAX). **Off by default (level 0) → the extra capacity is never loaded, zero overhead.** See [Thinking Levels](../g1-proxy/thinking-levels.md).
 
 | Variable | Default | Description |
 |---|---|---|
-| `GW_GLADH_CKPT` | — | Path to the GLAD-H checkpoint. Unset → `thinking_level` 1/2 silently fall back to level 0. |
-| `GW_GLADH_DEVICE` | `auto` | `auto` → CUDA when visible, else CPU. GLAD-H runs in its own sub-process, with its own device selection. |
-| `GW_FUSION_BANK` | `runs/glad_bert/fusion_bank_thinking_v3_gladh_v1.json` | The calibrated fusion artifact (percentile maps + thresholds for Cascade and Max-OR). Missing/unreadable → same fallback as an unset checkpoint. |
+| `GW_GLADH_CKPT` | — | Capability pack that unlocks thinking levels **1–2**. Unset → those levels silently fall back to level 0. |
+| `GW_GLADH_DEVICE` | `auto` | Device for the level-1/2 pack. `auto` → CUDA when visible, else CPU. Runs in its own sub-process, with its own device selection. |
+| `GW_GLADA_CKPT` | — | Capability pack that unlocks thinking level **3 (MAX)**. Unset → a level-3 request is served at the deepest level available. |
+| `GW_GLADA_DEVICE` | `auto` | Device for the level-3 pack. |
+| `GW_FUSION_BANK` | `runs/glad_bert/fusion_bank_thinking_v3_gladh_v1.json` | Calibration artifact that keeps every level on the same probability scale as level 0, so thresholds do not have to be re-tuned per level. Missing/unreadable → same fallback as an unset pack. |
 
 ### Live Web Search
 
-On by default; the chat searches the live web, screens every page through the GLAD-BERT firewall, and grounds the answer in the safe pages. A **Tavily** API key gives reliable, rate-limit-free results; without one, the key-less DuckDuckGo engine is used as a fallback. See [Live Web Search](../g1-proxy/web-search.md).
+On by default; the chat searches the live web, screens every page through the G1-Hummingbird firewall, and grounds the answer in the safe pages. A **Tavily** API key gives reliable, rate-limit-free results; without one, the key-less DuckDuckGo engine is used as a fallback. See [Live Web Search](../g1-proxy/web-search.md).
 
 | Variable | Default | Description |
 |---|---|---|

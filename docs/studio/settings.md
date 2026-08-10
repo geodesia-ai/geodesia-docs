@@ -50,10 +50,11 @@ every request. Turn it off only if you supply your own system prompt. **Applies 
 Off / PoT / strong / API modes for numeric-reasoning verification. **Applies live** (the model loads lazily
 on the first numeric request; a strong solver may pull a 7B model on first use).
 
-### Thinking Levels (GLAD-H second opinion)
+### Thinking Levels
 
-`thinking_level` 1/2 blend in GLAD-H, a second detector, per request. Platform availability is set via
-`GW_GLADH_CKPT` (env/CLI only, not from this page) — see [Thinking Levels](../g1-proxy/thinking-levels.md).
+A per-request depth dial (`thinking_level` `0`–`3`, `3` = MAX). Which levels this deployment can serve is set
+by `GW_GLADH_CKPT` / `GW_GLADA_CKPT` (env/CLI only, not from this page) — see
+[Thinking Levels](../g1-proxy/thinking-levels.md).
 
 ### Plan & License
 

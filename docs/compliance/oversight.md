@@ -23,167 +23,289 @@ Oversight configuration is set in [config.yaml](../configuration/index.md#human-
 
 ## Endpoints
 
+All four live on **G-1 Studio** under `/v1/glad/oversight/…`.
+
+A review is identified by its **`review_id`** (`REV-…`), not by the call it is about. One call can have several reviews — an escalation creates a new one at the next level, linked by `parent_review_id`.
+
+---
+
 ### GET /v1/glad/oversight/pending
 
-Returns all calls currently in the oversight queue awaiting human review.
+**What it does.** Returns the queue of reviews still awaiting a human, oldest first, each joined with a preview of the call it is about and the per-axis risk that put it there. This is what the **Oversight** page renders.
 
-```bash
-curl "http://localhost:8199/v1/glad/oversight/pending?deployer_id=acme-corp"
+=== "curl"
+
+    ```bash
+    curl -s "http://localhost:8080/v1/glad/oversight/pending?application_id=support_bot&limit=50" | jq
+    ```
+
+=== "Python"
+
+    ```python
+    import httpx
+
+    queue = httpx.get(
+        "http://localhost:8080/v1/glad/oversight/pending",
+        params={"application_id": "support_bot", "limit": 50},
+    ).json()
+    for r in queue:
+        print(r["review_id"], r["review_level"], r["review_trigger"], r["prompt"][:60])
+    ```
+
+=== "TypeScript"
+
+    ```ts
+    const q = new URLSearchParams({ application_id: "support_bot", limit: "50" })
+    const queue = await fetch(`http://localhost:8080/v1/glad/oversight/pending?${q}`).then(r => r.json())
+    queue.forEach((r: any) => console.log(r.review_id, r.review_level, r.review_trigger))
+    ```
+
+**What comes back** — a bare JSON **array**, not an envelope:
+
+```json
+[
+  {
+    "review_id": "REV-9C1F2A7B4E0D6A18B3C1",
+    "call_id": "call_abc123",
+    "review_level": 1,
+    "review_role": "operator",
+    "review_trigger": "safety_score_high:0.812",
+    "review_status": "pending",
+    "created_at": "2026-06-10T10:23:00Z",
+    "parent_review_id": null,
+    "prompt": "…",
+    "response_text": "…",
+    "hallucination_score": 0.14,
+    "safety_score": 0.81
+  }
+]
 ```
 
-#### Query Parameters
+#### Query parameters
 
 | Parameter | Default | Description |
 |---|---|---|
-| `deployer_id` | — | Filter to a specific deployer. |
-| `severity` | — | Filter by severity: `"low"`, `"medium"`, `"high"`. |
-| `limit` | `20` | Maximum results to return. |
-| `offset` | `0` | Pagination offset. |
-| `since` | — | ISO 8601 timestamp — return only calls flagged after this time. |
+| `review_level` | — | Only reviews at this escalation level (`1`, `2`, `3`). |
+| `limit` | `50` | Maximum rows. |
+| `application_id` | — | Scope the queue to one Application. The literal `all` is treated as "no filter". |
 
-#### Response
-
-```json
-{
-  "pending": [
-    {
-      "call_id": "call_abc123",
-      "session_id": "sess_xyz",
-      "timestamp": "2026-06-10T10:23:00Z",
-      "prompt": "...",
-      "response": "...",
-      "trigger_axis": "answer_safety",
-      "trigger_score": 0.61,
-      "trigger_threshold": 0.50,
-      "severity": "medium",
-      "review_deadline": "2026-06-11T10:23:00Z",
-      "escalation_level": "operator"
-    }
-  ],
-  "total": 14,
-  "oldest_pending_age_hours": 3.2
-}
-```
+#### Notable fields
 
 | Field | Description |
 |---|---|
-| `trigger_axis` | The detection axis that triggered the review queue |
-| `trigger_score` | The score value that exceeded the oversight threshold |
-| `trigger_threshold` | The oversight threshold that was exceeded |
-| `severity` | Computed severity based on how far the score exceeds the threshold |
-| `review_deadline` | Deadline for review (configurable in `human_oversight.review_deadline_hours`) |
-| `escalation_level` | Current escalation level: `"operator"` → `"ai_responsible"` |
+| `review_trigger` | Why this call queued, as `reason:score` — e.g. `safety_score_high:0.812`, `hallucination_score_high:0.774`, `prompt_blocked`, `combined_safety_triggered:…`, or `escalated_from:REV-…`. |
+| `review_level` | `1` operator → `2` AI responsible → `3` (Italy Law 132/2025 notification level). |
+| `prompt` / `response_text` | Stored previews of the call, joined from the call log. Empty strings when the call row is gone. |
+| `hallucination_score` / `safety_score` | Per-axis risk in `[0,1]`, reconstructed from the call's stored axis probabilities. |
+
+!!! note "Reviewer identity is hashed"
+    `reviewer_id` and reviewer notes are **hashed before storage** — the queue returns `reviewer_id_hash`, never the plaintext. That is deliberate: the audit trail proves *that* a human decided without retaining their identity as personal data.
 
 ---
 
 ### GET /v1/glad/oversight/summary
 
-Returns oversight statistics without individual call details — useful for dashboards.
+**What it does.** Counters for a dashboard tile — no per-call detail, no parameters.
 
-```bash
-curl "http://localhost:8199/v1/glad/oversight/summary?deployer_id=acme-corp"
-```
+=== "curl"
 
-#### Response
+    ```bash
+    curl -s http://localhost:8080/v1/glad/oversight/summary | jq
+    ```
+
+=== "Python"
+
+    ```python
+    import httpx
+    s = httpx.get("http://localhost:8080/v1/glad/oversight/summary").json()
+    print(f"{s['pending']} pending / {s['total_reviews']} total")
+    ```
+
+=== "TypeScript"
+
+    ```ts
+    const s = await fetch("http://localhost:8080/v1/glad/oversight/summary").then(r => r.json())
+    console.log(`${s.pending} pending / ${s.total_reviews} total`)
+    ```
+
+**What comes back**
 
 ```json
 {
-  "pending_count": 14,
-  "reviewed_today": 8,
-  "overdue_count": 2,
-  "avg_review_time_hours": 1.4,
-  "by_axis": {
-    "answer_safety": 5,
-    "halluc_context": 7,
-    "jailbreak": 2
-  },
-  "by_decision": {
-    "confirmed_block": 3,
-    "overridden_allow": 2,
-    "confirmed_allow": 3
-  }
+  "total_reviews": 142,
+  "pending": 14,
+  "completed": 126,
+  "by_level": { "1": 120, "2": 20, "3": 2 },
+  "italy_132_notified": 2,
+  "italy_132_pending_notification": 0,
+  "thresholds": { "safety": 0.70, "hallucination": 0.75 }
 }
 ```
+
+`by_level` is keyed by level as a **string**. `thresholds` echoes the oversight trigger thresholds currently in force — these are the thresholds that put calls *in the queue*, not the ones that block them.
+
+---
+
+### POST /v1/glad/oversight/review
+
+**What it does.** Creates a pending review by hand. You rarely need this — reviews are created automatically when a call crosses an oversight threshold. Use it to queue a call for a second pair of eyes on demand.
+
+=== "curl"
+
+    ```bash
+    curl -s -X POST http://localhost:8080/v1/glad/oversight/review \
+      -H "Content-Type: application/json" \
+      -d '{
+        "call_id": "call_abc123",
+        "review_trigger": "manual:customer_complaint",
+        "review_level": 1
+      }' | jq
+    ```
+
+=== "Python"
+
+    ```python
+    import httpx
+
+    review = httpx.post(
+        "http://localhost:8080/v1/glad/oversight/review",
+        json={"call_id": "call_abc123", "review_trigger": "manual:customer_complaint", "review_level": 1},
+    ).json()
+    print(review["review_id"])
+    ```
+
+=== "TypeScript"
+
+    ```ts
+    const review = await fetch("http://localhost:8080/v1/glad/oversight/review", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ call_id: "call_abc123", review_trigger: "manual:customer_complaint" }),
+    }).then(r => r.json())
+    ```
+
+**What comes back** — the created review row, including the generated `review_id` you will need to decide it.
+
+#### Request fields
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `call_id` | `string` | ✅ | The call to review. |
+| `review_trigger` | `string` | ✅ | Free-text reason, stored verbatim in the audit trail. |
+| `review_level` | `integer` | — | Default `1`. `1` operator, `2` AI responsible, `3` Italy 132 notification level. |
+| `reviewer_id` | `string` | — | Pre-assign a reviewer. **Hashed** before storage. |
 
 ---
 
 ### POST /v1/glad/oversight/decide
 
-Record a human review decision for a queued call.
+**What it does.** Records a human decision on a pending review and closes it. Deciding `escalated` automatically opens a new review one level up (up to level 3), linked by `parent_review_id`.
 
-```bash
-curl -X POST http://localhost:8199/v1/glad/oversight/decide \
-  -H "Content-Type: application/json" \
-  -d '{
-    "call_id": "call_abc123",
-    "reviewer_id": "maria.rossi@acme.com",
-    "decision": "confirmed_block",
-    "notes": "Confirmed jailbreak attempt. User account flagged for follow-up."
-  }'
-```
+=== "curl"
 
-#### Request Fields
+    ```bash
+    curl -s -X POST http://localhost:8080/v1/glad/oversight/decide \
+      -H "Content-Type: application/json" \
+      -d '{
+        "review_id": "REV-9C1F2A7B4E0D6A18B3C1",
+        "decision": "approved",
+        "reviewer_id": "maria.rossi@acme.com",
+        "reviewer_notes": "Confirmed jailbreak attempt. Account flagged for follow-up."
+      }' | jq
+    ```
+
+=== "Python"
+
+    ```python
+    import httpx
+
+    r = httpx.post(
+        "http://localhost:8080/v1/glad/oversight/decide",
+        json={
+            "review_id": "REV-9C1F2A7B4E0D6A18B3C1",
+            "decision": "approved",
+            "reviewer_id": "maria.rossi@acme.com",
+            "reviewer_notes": "Confirmed jailbreak attempt.",
+        },
+    )
+    r.raise_for_status()          # 404 when the review_id does not exist
+    print(r.json()["review_status"])
+    ```
+
+=== "TypeScript"
+
+    ```ts
+    const res = await fetch("http://localhost:8080/v1/glad/oversight/decide", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        review_id: "REV-9C1F2A7B4E0D6A18B3C1",
+        decision: "approved",
+        reviewer_id: "maria.rossi@acme.com",
+        reviewer_notes: "Confirmed jailbreak attempt.",
+      }),
+    })
+    if (res.status === 404) throw new Error("unknown review_id")
+    const updated = await res.json()
+    ```
+
+**What comes back** — the updated review row (`review_status` now `completed`, or `escalated`). **404** if the `review_id` does not exist.
+
+#### Request fields
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `call_id` | `string` | ✅ | The call ID to review. Must be in the oversight queue. |
-| `reviewer_id` | `string` | ✅ | Identifier of the human reviewer (email or user ID). Recorded permanently. |
-| `decision` | `string` | ✅ | The reviewer's decision. See [Decision Values](#decision-values). |
-| `notes` | `string` | — | Free-text justification for the decision. Stored in the audit trail. |
-| `escalate` | `boolean` | — | If `true`, escalates to the next oversight level before the decision is final. |
+| `review_id` | `string` | ✅ | The review to close — *not* the `call_id`. |
+| `decision` | `string` | ✅ | One of the four values below. |
+| `reviewer_id` | `string` | — | Who decided. **Hashed** before storage. Alias: `reviewer`. |
+| `reviewer_notes` | `string` | — | Justification. **Hashed** before storage. Alias: `notes`. |
+| `override_justification` | `string` | — | Stored in clear. Use this when the human overrules the system and the reason itself must remain auditable. |
 
-#### Decision Values
+#### Decision values
 
-| Value | Description |
+| Value | Effect |
 |---|---|
-| `confirmed_block` | Reviewer confirms the system's block decision was correct. |
-| `confirmed_allow` | Reviewer confirms the system's pass decision was correct. |
-| `overridden_allow` | Reviewer overrides a block — the response is released to the user. |
-| `overridden_block` | Reviewer overrides a pass — marks the response as harmful in the audit trail. |
-| `escalated` | Reviewer escalates to a higher oversight level without deciding. |
-| `needs_more_info` | Reviewer cannot decide with available information; marks for follow-up. |
+| `approved` | The system's decision stands. Review closes as `completed`. |
+| `rejected` | The human overrules the system. Review closes as `completed`; pair it with `override_justification`. |
+| `modified` | The outcome was changed by hand. Review closes as `completed`. |
+| `escalated` | Review closes as `escalated` **and a new review is opened one level up** (no new review past level 3). |
 
 ---
 
-### GET /v1/glad/oversight/review/{call_id}
+## Configuration
 
-Retrieve the full review record for a call, including history of decisions and escalations.
-
-```bash
-curl http://localhost:8199/v1/glad/oversight/review/call_abc123
-```
-
----
-
-## Oversight Configuration
-
-Oversight behavior is configured in [config.yaml](../configuration/index.md#human-oversight):
+Oversight behaviour is configured in [config.yaml](../configuration/index.md#human-oversight) under `human_oversight`. The whole block is four keys:
 
 ```yaml
 human_oversight:
-  enabled: true
-  required: true                  # Whether oversight is required or optional
-  tiers:                          # Escalation tiers
-    - level: operator
-      review_window_hours: 24     # Time before escalating
-    - level: ai_responsible
-      review_window_hours: 72
-  oversight_threshold: 0.7        # Score above which calls enter the queue
-  review_deadline_hours: 48       # Hard deadline before a call becomes "overdue"
-  auto_escalate: true             # Automatically escalate overdue reviews
-  notification_email: "compliance@acme.com"
+  safety_threshold: 0.70          # safety risk at/above which a call is queued
+  halluc_threshold: 0.75          # hallucination risk at/above which a call is queued
+  auto_trigger: true              # queue automatically; false = reviews only when created by API
+  italy_132_level3_notify: true   # stamp level-3 reviews as notified (Italy Law 132/2025)
 ```
+
+Per Application, the same three knobs live under `governance.human_oversight` in the app config and override the global default — see [Managing Applications](../studio/applications.md):
+
+```json
+{ "governance": { "human_oversight": { "auto_trigger": true, "safety_threshold": 0.70, "halluc_threshold": 0.75 } } }
+```
+
+!!! info "Oversight thresholds are not blocking thresholds"
+    These decide what enters the **review queue**. What gets *blocked* is decided by the Application's per-axis policy thresholds ([Detection Thresholds](../reference/thresholds.md)). Setting the oversight threshold below the blocking threshold is the standard supervisory posture: borderline calls pass through to the user *and* land in the queue.
 
 ---
 
 ## Escalation
 
-When a review is not completed within `review_window_hours`, the call automatically escalates to the next tier:
+Escalation is **decision-driven, not time-driven**: there is no background job that ages a review out. A review moves up a level when a human decides `escalated` on it, which closes that review and opens a fresh one at the next level, linked by `parent_review_id`.
 
-1. **Operator** — First-level reviewer (typical: support team lead)
-2. **AI Responsible** — Designated AI oversight officer (EU AI Act Article 26)
+| Level | Role | Meaning |
+|---|---|---|
+| `1` | `operator` | First-line reviewer. Where automatic reviews are created. |
+| `2` | `ai_responsible` | Designated AI oversight officer — EU AI Act Art. 26. |
+| `3` | `ai_responsible` | Terminal level. Reaching it stamps the review as notified under Italy Law 132/2025; deciding `escalated` here creates no further review. |
 
-Escalated calls retain full history. Both the original flag and all escalation events are permanently recorded in the audit chain.
+Every level keeps its own row, so the full escalation history of a call is recoverable by walking `parent_review_id`. All of it is written to the [audit chain](audit-chain.md).
 
 ---
 
@@ -195,4 +317,4 @@ Escalated calls retain full history. Both the original flag and all escalation e
 | Queue visibility | Art. 14(4)(c) — interpreting outputs |
 | Decision recording | Art. 14(1) — adequate oversight measures |
 | Escalation chain | Art. 14(5) — AI literacy requirement |
-| Deadline tracking | Art. 14(2) — appropriate time and resources |
+| Escalation levels & roles | Art. 14(2) — appropriate competence and authority |

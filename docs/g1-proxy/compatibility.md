@@ -218,7 +218,7 @@ curl -X POST http://localhost:8800/v1/glad/gateway/config \
 
 ### Ollama
 
-The easiest local runtime. **Ollama ≥ 0.12 exposes per-token log-probabilities** on its OpenAI-compatible `/v1/chat/completions` endpoint, so Geodesia runs in **full 5-axis mode automatically** — the gateway probes that endpoint on the first request and turns the closed-book fabrication axis on with no extra configuration.
+The easiest local runtime. **Ollama ≥ 0.12 exposes per-token log-probabilities** on its OpenAI-compatible `/v1/chat/completions` endpoint, so the **closed-book fabrication axis is enabled automatically** — the proxy probes that endpoint on the first request and turns it on with no extra configuration.
 
 ```bash
 curl -X POST http://localhost:8800/v1/glad/gateway/config \
@@ -477,7 +477,7 @@ Every response carries a `geodesia{}` block — your richest telemetry source. S
 | **`geodesia{}` payload** | Per-call axis scores, brake decision, dominant axis, latency | Parse from each API response (see [Response Format](../reference/response-format.md)) |
 | **`/health`** | Liveness, upstream, log-prob mode, active axes | Poll on an interval; alert on `ok=false` or `axes` drop |
 | **Compliance dashboard** | Aggregated pass / block / flag counts, per-axis rates | `GET :8199/v1/glad/dashboard` |
-| **Audit chain** | Tamper-evident per-call ledger | `GET :8199/v1/glad/chain/entries` |
+| **Audit chain** | Tamper-evident per-call ledger | `GET /v1/glad/chain/status` · `GET /v1/glad/chain/verify` |
 | **Container logs** | Startup, log-prob probe, upstream errors | `docker logs` / `kubectl logs` |
 
 **Alerts worth wiring:**

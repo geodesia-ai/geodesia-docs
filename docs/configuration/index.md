@@ -41,7 +41,7 @@ Defines the catalog of available model checkpoints. Each entry can be selected b
 ```yaml
 models:
   - name: gemma4_e2b_default
-    description: "Gemma 4 E2B — full 5-axis detection"
+    description: "Gemma 4 E2B — closed-book axis available"
     path: runs/api_product_model_v3
     device: cuda:0
     axes:

@@ -4,10 +4,10 @@ Geodesia G-1 scores every request across **nine independent detection axes**. Ea
 
 Six axes are **guardrails** (they decide whether a request or an answer is allowed). Three are newer axes that answer operational questions instead — *is this offensive?*, *is this even our job?*, *is this hard enough to need the expensive model?* — and two of those three are what turn the gateway into a [token- and cost-control layer](cost-control.md).
 
-!!! note "GLAD-Hummingbird"
-    These axes are produced by **GLAD-Hummingbird** — Geodesia's fast, model-agnostic companion detector that runs *outside* the served LLM. It is a geometric MoE model: low latency, runs on a small GPU, and scores all nine axes in the **same forward pass**, so adding an axis costs no extra latency.
+!!! note "G1-Hummingbird"
+    These axes are produced by **G1-Hummingbird** — Geodesia's fast, model-agnostic companion detector that runs *outside* the served LLM. It is a geometric MoE model: low latency, runs on a small GPU, and scores all nine axes in the **same forward pass**, so adding an axis costs no extra latency.
 
-    For high-stakes deployments you can layer **GLAD-H** on top — a second, independent detector blended per request via [Thinking Levels](thinking-levels.md).
+    For high-stakes deployments the same nine axes can be scored with extra depth, per request, via [Thinking Levels](thinking-levels.md) — up to `thinking_level: 3` (MAX).
 
 ---
 

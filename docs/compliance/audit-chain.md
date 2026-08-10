@@ -54,120 +54,140 @@ Every entry in the chain has an `event_type`. The following events are automatic
 
 ## Endpoints
 
+Both endpoints live on **G-1 Studio** (`/v1/glad/...`). They take no parameters and no body — the ledger is global to the deployment.
+
+---
+
 ### GET /v1/glad/chain/status
 
-Returns the current audit chain status.
+**What it does.** Returns a snapshot of the ledger: how many entries it holds, the first and last chain hashes, whether the chain currently verifies, and the newest entries in a UI-friendly shape. This is the call the **Audit & Chain** page polls.
 
-```bash
-curl http://localhost:8199/v1/glad/chain/status
-```
+=== "curl"
 
-#### Response
+    ```bash
+    curl -s http://localhost:8080/v1/glad/chain/status | jq
+    ```
+
+=== "Python"
+
+    ```python
+    import httpx
+
+    st = httpx.get("http://localhost:8080/v1/glad/chain/status").json()
+    print(st["total_entries"], "entries, integrity:", st["chain_integrity"])
+    for e in st["entries"][:5]:
+        print(e["entry_index"], e["timestamp"], e["event_type"], e["chain_hash"][:12])
+    ```
+
+=== "TypeScript"
+
+    ```ts
+    const st = await fetch("http://localhost:8080/v1/glad/chain/status").then(r => r.json())
+    console.log(st.total_entries, "entries, integrity:", st.chain_integrity)
+    ```
+
+**What comes back**
 
 ```json
 {
+  "count": 14821,
   "total_entries": 14821,
-  "latest_entry_id": "chain_abc123",
-  "latest_timestamp": "2026-06-10T10:23:45Z",
-  "integrity": "ok",
-  "first_entry_at": "2026-04-22T09:00:00Z",
-  "deployer_id": "acme-corp"
+  "first_hash": "7f2d4e1c…",
+  "last_hash": "a8b3c1f0…",
+  "chain_integrity": true,
+  "broken_at": null,
+  "verified_count": 14821,
+  "entries": [
+    {
+      "index": 14820,
+      "entry_index": 14820,
+      "call_id": "call_xyz",
+      "timestamp": "2026-06-10T10:23:45Z",
+      "event_type": "call",
+      "payload_hash": "3c9a…",
+      "prev_chain_hash": "7f2d…",
+      "chain_hash": "a8b3…",
+      "metadata": {}
+    }
+  ],
+  "recent": []
 }
 ```
 
 | Field | Description |
 |---|---|
-| `total_entries` | Total number of entries in the chain |
-| `latest_entry_id` | ID of the most recent entry |
-| `integrity` | `"ok"` if the chain is intact; `"tampered"` if any entry fails verification |
-| `first_entry_at` | When the chain was first written to |
+| `count` / `total_entries` | Total entries in the ledger. Same number, two names, for backwards compatibility. |
+| `first_hash` / `last_hash` | Chain hash of the genesis and the newest entry. `null` on an empty ledger. |
+| `chain_integrity` | `true` when a full re-verification passes. Computing this re-walks the whole chain — see the performance note under `/chain/verify`. |
+| `broken_at` | `entry_index` of the first entry that failed verification, or `null`. |
+| `verified_count` | How many entries verified before the walk stopped. |
+| `entries` / `recent` | The newest **20** entries (same array under two keys). Each carries `entry_index`, `call_id`, `timestamp`, `event_type`, `payload_hash`, `prev_chain_hash`, `chain_hash`, `metadata`. |
+
+!!! note "`event_type` comes from metadata"
+    An entry's `event_type` is read from its stored metadata (`event_type`, then `type`, then `source`). Entries written without any of those report the literal string `"call"`.
 
 ---
 
 ### GET /v1/glad/chain/verify
 
-Performs full cryptographic verification of the audit chain — recomputes every HMAC from the genesis entry and checks that each `entry_hash` and `prev_hash` match.
+**What it does.** Performs the full cryptographic verification: recomputes every entry HMAC from the genesis entry and checks that each `chain_hash` matches. Returns as soon as it finds a break, reporting where.
 
-```bash
-curl http://localhost:8199/v1/glad/chain/verify
-```
+=== "curl"
 
-!!! warning "Performance"
-    Full chain verification reads and recomputes the HMAC of every entry. For very large deployments (>100K entries), this may take several seconds. Use `depth` to limit the verification window for routine checks.
+    ```bash
+    curl -s http://localhost:8080/v1/glad/chain/verify | jq
+    ```
 
-#### Query Parameters
+=== "Python"
 
-| Parameter | Default | Description |
-|---|---|---|
-| `deployer_id` | — | Limit verification to one deployer's entries. |
-| `depth` | `full` | Number of entries to verify from the tail, or `"full"` for the entire chain. |
+    ```python
+    import httpx
 
-#### Response
+    v = httpx.get("http://localhost:8080/v1/glad/chain/verify", timeout=60).json()
+    if not v["valid"]:
+        raise SystemExit(f"ledger tampered at entry {v['broken_at']}")
+    print(f"{v['verified_count']}/{v['total_count']} entries verified")
+    ```
+
+=== "TypeScript"
+
+    ```ts
+    const v = await fetch("http://localhost:8080/v1/glad/chain/verify").then(r => r.json())
+    if (!v.valid) throw new Error(`ledger tampered at entry ${v.broken_at}`)
+    ```
+
+**What comes back**
 
 ```json
 {
-  "verified": true,
-  "entries_checked": 14821,
-  "first_tampered_entry": null,
-  "duration_ms": 412,
-  "chain_hash": "a8b3c1..."
+  "valid": true,
+  "broken_at": null,
+  "verified_count": 14821,
+  "total_count": 14821
 }
 ```
 
 | Field | Description |
 |---|---|
-| `verified` | `true` if the chain is intact |
-| `entries_checked` | Number of entries that were verified |
-| `first_tampered_entry` | If `verified` is `false`, the ID and timestamp of the first tampered entry |
-| `chain_hash` | A single hash representing the entire chain state. Share this with auditors for spot-checking without giving access to the full log. |
+| `valid` | `true` if the whole chain re-verified. |
+| `broken_at` | `entry_index` of the first entry whose recomputed hash did not match, or `null`. |
+| `verified_count` | Entries verified before the walk stopped. On a valid chain this equals `total_count`. |
+| `total_count` | Entries considered. `0` on an empty ledger, which verifies as `valid: true`. |
+
+!!! warning "Performance"
+    Verification reads and recomputes the HMAC of **every** entry — there is no partial-verification parameter. On very large deployments (> 100K entries) this takes several seconds. Run it on a schedule, not on every page load.
 
 ---
 
-### GET /v1/glad/chain/entries
+## Exporting the chain
 
-Retrieve entries from the audit chain. Supports filtering and pagination.
+There is **no** query/pagination endpoint on the ledger — `chain/status` returns the newest 20 entries and nothing else. To get a full, filtered export, use one of:
 
-```bash
-curl "http://localhost:8199/v1/glad/chain/entries?event_type=prompt_blocked&limit=50"
-```
-
-#### Query Parameters
-
-| Parameter | Description |
+| You want | Use |
 |---|---|
-| `event_type` | Filter to a specific event type |
-| `since` | ISO 8601 timestamp — entries after this time |
-| `until` | ISO 8601 timestamp — entries before this time |
-| `call_id` | Filter to entries for a specific call |
-| `session_id` | Filter to entries for a session |
-| `deployer_id` | Filter to a specific deployer |
-| `limit` | Maximum results (default 100, max 1000) |
-| `offset` | Pagination offset |
-
-#### Response Entry Structure
-
-```json
-{
-  "entry_id": "chain_abc123",
-  "timestamp": "2026-06-10T10:23:45Z",
-  "event_type": "inference_call",
-  "deployer_id": "acme-corp",
-  "call_id": "call_xyz",
-  "session_id": "sess_xyz",
-  "payload": {
-    "prompt_blocked": false,
-    "answer_blocked": false,
-    "trigger_axis": null,
-    "scores_summary": {
-      "prompt_safety": 0.12,
-      "answer_safety": 0.08,
-      "halluc_context": 0.23
-    }
-  },
-  "entry_hash": "a8b3c1...",
-  "prev_hash": "7f2d4e..."
-}
-```
+| Everything one Application ever saw, as a database file | `GET /v1/glad/apps/{app_id}/export?fmt=sqlite` (also `csv`, `jsonl`) — see [Managing Applications](../studio/applications.md) |
+| A regulator-ready dossier with the chain snapshot, FRIA and call statistics | `POST /v1/glad/report` — see [Reports & Manuals](reports.md) |
+| A per-call decision record | `GET /v1/glad/apps/{app_id}/messages` |
 
 ---
 
@@ -184,13 +204,8 @@ curl "http://localhost:8199/v1/glad/chain/entries?event_type=prompt_blocked&limi
 
 ---
 
-## Exporting the Audit Chain
+## For regulatory submission
 
-For regulatory submission, export the full chain or a time-bounded slice:
-
-```bash
-curl "http://localhost:8199/v1/glad/chain/entries?since=2026-01-01T00:00:00Z&limit=1000" \
-  > audit_chain_q1_2026.json
-```
-
-For a complete audit bundle including FRIA, chain snapshot, and call statistics, use [POST /v1/glad/report](reports.md).
+For a complete audit bundle including FRIA, chain snapshot and call statistics, use
+[`POST /v1/glad/report`](reports.md). For the raw per-call records of one Application,
+`GET /v1/glad/apps/{app_id}/export?fmt=sqlite`.

@@ -23,112 +23,211 @@ The kill switch does **not** affect:
 
 ## Endpoints
 
+Three routes on **G-1 Studio**. All of them are scoped by `deployer_id`, which defaults to `"default"` — a single-deployer install can ignore it entirely.
+
+!!! note "The deployer id is hashed"
+    Responses carry `deployer_id_hash`, never the id you sent. You address the switch by the plaintext id; the ledger stores only its hash. That is what lets the audit trail prove *which* system was suspended without retaining the identifier as personal data.
+
+---
+
 ### GET /v1/glad/kill-switch/status
 
-Returns the current kill switch state.
+**What it does.** Returns whether the system is suspended, and — because CA SB 942 gives you 72 hours to actually suspend after an activation is requested — whether you are still inside that window.
 
-```bash
-curl http://localhost:8199/v1/glad/kill-switch/status
-```
+=== "curl"
 
-#### Response
+    ```bash
+    curl -s "http://localhost:8080/v1/glad/kill-switch/status?deployer_id=default" | jq
+    ```
+
+=== "Python"
+
+    ```python
+    import httpx
+
+    st = httpx.get("http://localhost:8080/v1/glad/kill-switch/status",
+                   params={"deployer_id": "default"}).json()
+    print(st["status"])                       # "active" | "suspended"
+    if not st["sb942_compliant"]:
+        print(f"SB 942 window exceeded: {st['elapsed_hours']:.1f}h since activation")
+    ```
+
+=== "TypeScript"
+
+    ```ts
+    const st = await fetch("http://localhost:8080/v1/glad/kill-switch/status?deployer_id=default")
+      .then(r => r.json())
+    if (st.status === "suspended") console.warn("service is suspended")
+    ```
+
+**What comes back**
 
 ```json
 {
-  "active": false,
-  "last_activated_at": null,
-  "last_deactivated_at": "2026-06-09T08:00:00Z",
-  "activated_by": null,
-  "reason": null,
-  "regulatory_framework": null,
-  "auto_deactivate_at": null
+  "deployer_id_hash": "9c1f2a7b4e0d6a18",
+  "status": "active",
+  "last_event_id": "KS-3F9A1C7B2E5D8046A1B2",
+  "last_updated": "2026-06-10T12:00:00+00:00",
+  "sb942_compliant": true,
+  "elapsed_hours": null
 }
 ```
 
 | Field | Description |
 |---|---|
-| `active` | Whether the kill switch is currently engaged |
-| `last_activated_at` | ISO 8601 timestamp of last activation |
-| `last_deactivated_at` | ISO 8601 timestamp of last deactivation |
-| `activated_by` | Identity of the person or system that activated the switch |
-| `reason` | The reason provided at activation |
-| `regulatory_framework` | The regulatory framework cited at activation (e.g., `"CA_SB_942"`) |
-| `auto_deactivate_at` | ISO 8601 timestamp for scheduled automatic deactivation, if set |
+| `status` | `"active"` (serving) or `"suspended"` (killed). A deployer that has never used the switch reads `"active"`. |
+| `last_event_id` | The `KS-…` id of the most recent activate/deactivate/test event, or `null`. |
+| `last_updated` | When the state last changed. |
+| `sb942_compliant` | `false` only when an activation was recorded, the system is **still not** suspended, and more than 72 hours have passed. |
+| `elapsed_hours` | Hours since the last activation event. `null` when there has never been one. |
+
+#### Query parameters
+
+| Parameter | Default | Description |
+|---|---|---|
+| `deployer_id` | `"default"` | Which deployer's switch to read. |
 
 ---
 
 ### POST /v1/glad/kill-switch/activate
 
-Engage the kill switch.
+**What it does.** Suspends the deployer's system and writes the event to the ledger. Takes effect immediately — there is no confirmation step and no scheduled auto-release.
 
-```bash
-curl -X POST http://localhost:8199/v1/glad/kill-switch/activate \
-  -H "Content-Type: application/json" \
-  -d '{
-    "reason": "Regulatory audit in progress — service suspended as required by CA SB 942",
-    "activated_by": "compliance-officer@acme.com",
-    "regulatory_framework": "CA_SB_942",
-    "auto_deactivate_hours": 72
-  }'
-```
+=== "curl"
 
-#### Request Fields
+    ```bash
+    curl -s -X POST http://localhost:8080/v1/glad/kill-switch/activate \
+      -H "Content-Type: application/json" \
+      -d '{
+        "deployer_id":  "default",
+        "reason":       "Regulatory audit in progress — service suspended per CA SB 942",
+        "activated_by": "compliance-officer@acme.com"
+      }' | jq
+    ```
 
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `reason` | `string` | ✅ | Required justification for activation. Stored permanently in the audit chain. |
-| `activated_by` | `string` | ✅ | Identifier of the person or system activating the switch (email, user ID, or service name). |
-| `regulatory_framework` | `string` | — | The legal basis for activation (e.g., `"CA_SB_942"`, `"EU_AI_ACT"`). |
-| `auto_deactivate_hours` | `integer` | — | If provided, the kill switch automatically deactivates after this many hours. Range: 1–8760 (one year). The CA SB 942 compliance window is 72 hours. |
-| `notify` | `boolean` | — | Whether to send a notification to the configured compliance email. Default `true`. |
+=== "Python"
 
-#### Response
+    ```python
+    import httpx
+
+    def emergency_suspend(reason: str, officer: str, deployer_id: str = "default"):
+        r = httpx.post("http://localhost:8080/v1/glad/kill-switch/activate", json={
+            "deployer_id": deployer_id,
+            "reason": reason,
+            "activated_by": officer,
+        }, timeout=30)
+        r.raise_for_status()
+        ev = r.json()
+        print(f"suspended — event {ev['event_id']} at {ev['timestamp']}")
+        return ev
+    ```
+
+=== "TypeScript"
+
+    ```ts
+    const ev = await fetch("http://localhost:8080/v1/glad/kill-switch/activate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        deployer_id: "default",
+        reason: "Regulatory audit in progress",
+        activated_by: "compliance-officer@acme.com",
+      }),
+    }).then(r => r.json())
+    console.log(ev.event_id, ev.new_status)   // "suspended"
+    ```
+
+**What comes back** — the recorded event:
 
 ```json
 {
-  "status": "activated",
-  "activated_at": "2026-06-10T12:00:00Z",
-  "auto_deactivate_at": "2026-06-13T12:00:00Z",
-  "audit_chain_entry": "ks_event_abc123"
+  "event_id": "KS-3F9A1C7B2E5D8046A1B2",
+  "deployer_id_hash": "9c1f2a7b4e0d6a18",
+  "event_type": "activated",
+  "timestamp": "2026-06-10T12:00:00+00:00",
+  "reason": "Regulatory audit in progress — service suspended per CA SB 942",
+  "activated_by": "compliance-officer@acme.com",
+  "new_status": "suspended"
 }
 ```
+
+#### Request fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `deployer_id` | `string` | `"default"` | Which deployer to suspend. |
+| `reason` | `string` | `""` | Justification, stored verbatim. Not enforced by the API — **enforce it in your own tooling**, because a suspension with no recorded reason is an audit gap. |
+| `activated_by` | `string` | `null` | Who or what activated it. |
+
+!!! warning "No auto-release"
+    Activation is permanent until something calls `deactivate`. There is no timer, no expiry and no scheduled re-enable — if you want a 72-hour window, your own scheduler has to close it.
 
 ---
 
 ### POST /v1/glad/kill-switch/deactivate
 
-Disengage the kill switch and resume normal operation.
+**What it does.** Resumes service. Same body as activate; the recorded `event_type` is `deactivated` and `new_status` is `active`.
 
-```bash
-curl -X POST http://localhost:8199/v1/glad/kill-switch/deactivate \
-  -H "Content-Type: application/json" \
-  -d '{
-    "reason": "Audit complete. Service resuming normal operation.",
-    "deactivated_by": "compliance-officer@acme.com"
-  }'
-```
+=== "curl"
 
-#### Request Fields
+    ```bash
+    curl -s -X POST http://localhost:8080/v1/glad/kill-switch/deactivate \
+      -H "Content-Type: application/json" \
+      -d '{
+        "deployer_id":  "default",
+        "reason":       "Audit complete. Resuming normal operation.",
+        "activated_by": "compliance-officer@acme.com"
+      }' | jq
+    ```
 
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `reason` | `string` | ✅ | Justification for deactivation. |
-| `deactivated_by` | `string` | ✅ | Identity of the person or system deactivating. |
+=== "Python"
+
+    ```python
+    httpx.post("http://localhost:8080/v1/glad/kill-switch/deactivate", json={
+        "deployer_id": "default",
+        "reason": "Audit complete.",
+        "activated_by": "compliance-officer@acme.com",
+    }).raise_for_status()
+    ```
+
+=== "TypeScript"
+
+    ```ts
+    await fetch("http://localhost:8080/v1/glad/kill-switch/deactivate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ deployer_id: "default", reason: "Audit complete.",
+                             activated_by: "compliance-officer@acme.com" }),
+    })
+    ```
+
+!!! info "`activated_by`, not `deactivated_by`"
+    Both endpoints share one request model. The field is `activated_by` on deactivation too — the event's `event_type` is what distinguishes the two.
 
 ---
 
-## Kill Switch Configuration
+## Per-Application kill
 
-Configure default kill switch behavior in [config.yaml](../configuration/index.md):
+The routes above suspend a **deployer** — the whole deployment. To stop one Application while the rest keep serving, use the control-plane kill instead:
+
+```bash
+curl -s -X POST http://localhost:8080/v1/glad/apps/support_bot/kill \
+  -H "X-Geodesia-Admin-Key: $GEODESIA_ADMIN_TOKEN"
+```
+
+That sets the Application's status to `killed`. `pause` / `resume` are the reversible pair for planned work. See [Managing Applications](../studio/applications.md).
+
+---
+
+## Configuration
 
 ```yaml
 kill_switch:
   enabled: true
-  require_reason: true            # Reject activation requests without a reason
-  max_auto_deactivate_hours: 8760 # Maximum allowed auto-deactivation window
-  notification_email: "compliance@acme.com"
-  audit_all_events: true          # Write every activation/deactivation to the HMAC chain
+  sb942_compliance_hours: 72   # window the SB 942 check measures against
 ```
+
+Those are the only two keys. There is no reason requirement, no notification address and no maximum window in the configuration — everything else is policy you enforce around the API.
 
 ---
 
@@ -137,32 +236,7 @@ kill_switch:
 | Law | Requirement | Kill Switch Coverage |
 |---|---|---|
 | EU AI Act Art. 14 | Human operators must be able to interrupt the system | Immediate global interrupt |
-| EU AI Act Art. 14(4)(a) | Override capability at any time | Yes — deactivates all inference |
-| CA SB 942 | Suspend service within 72 hours on regulatory request | `auto_deactivate_hours: 72` |
-| ISO 42001 §8.4 | Incident response and operational continuity | Audit-logged activation events |
+| EU AI Act Art. 14(4)(a) | Override capability at any time | Yes — suspends all inference for the deployer |
+| CA SB 942 | Suspend service within 72 hours of a regulatory request | `sb942_compliant` / `elapsed_hours` on the status endpoint measure exactly this |
+| ISO 42001 §8.4 | Incident response and operational continuity | Every event written to the [audit chain](audit-chain.md) |
 | NIST AI RMF GOVERN 1.7 | Mechanisms for disabling AI systems | Yes — documented stop capability |
-
----
-
-## Integration: Programmatic Activation
-
-The kill switch can be activated by your monitoring or incident response pipeline:
-
-```python
-import httpx
-
-async def emergency_suspend(reason: str, officer: str):
-    async with httpx.AsyncClient() as client:
-        resp = await client.post(
-            "http://localhost:8199/v1/glad/kill-switch/activate",
-            json={
-                "reason": reason,
-                "activated_by": officer,
-                "regulatory_framework": "CA_SB_942",
-                "auto_deactivate_hours": 72,
-            }
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        print(f"Kill switch activated. Auto-deactivation at: {data['auto_deactivate_at']}")
-```

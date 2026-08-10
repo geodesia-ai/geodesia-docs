@@ -21,7 +21,7 @@ Because policy is per Application, scoring uses that Application's **bound model
 
 ## 2 · Per Axis
 
-Override the action and threshold for each of the six GLAD axes *within MCP scans*. The table in the MCP tab has one row per axis:
+Override the action and threshold for each of the six detection axes *within MCP scans*. The table in the MCP tab has one row per axis:
 
 | Field | Values | Effect |
 |---|---|---|

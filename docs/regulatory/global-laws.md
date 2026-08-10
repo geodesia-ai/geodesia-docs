@@ -12,7 +12,7 @@ This page provides a concise mapping of each supported regulatory framework (out
 |---|---|---|
 | §5.2 | AI policy | `config.yaml` — applicable laws, purpose, scope |
 | §6.1 | Risk assessment | [FRIA](../compliance/fria.md) |
-| §8.4 | Impact assessment | [FRIA — impact sections](../compliance/fria.md#fria-section-reference) |
+| §8.4 | Impact assessment | [FRIA — impact sections](../compliance/fria.md#dossier-section-reference) |
 | §8.5 | AI system lifecycle | Model switching, threshold management |
 | §9.1 | Monitoring and measurement | [Dashboard](../compliance/dashboard.md), audit chain |
 | §9.3 | Management review | [Compliance report](../compliance/reports.md) |

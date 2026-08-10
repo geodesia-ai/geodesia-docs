@@ -1,6 +1,6 @@
 # Live Web Search
 
-Geodesia G-1 can answer a chat turn from the **live internet**. When web search is enabled and a request asks for it, the gateway searches the web, **screens every page through the GLAD-BERT firewall**, keeps only the safe pages as grounding context, and then answers from them — citing the sources. Blocked pages (prompt-injection, manipulation, or unsafe content) are never shown to the model.
+Geodesia G-1 can answer a chat turn from the **live internet**. When web search is enabled and a request asks for it, the gateway searches the web, **screens every page through the G1-Hummingbird firewall**, keeps only the safe pages as grounding context, and then answers from them — citing the sources. Blocked pages (prompt-injection, manipulation, or unsafe content) are never shown to the model.
 
 !!! abstract "Why it's safe by default"
     The web is the single richest source of [prompt-injection](detection-axes.md) attacks. Every fetched page is scored on the **`rag_jailbreak`** (context-injection firewall), **`answer_safety`**, **`prompt_safety`** and **`jailbreak`** axes using the model's calibrated thresholds *before* a single token reaches the upstream model. A page that trips any axis is dropped, so a poisoned page can neither hijack the prompt nor surface harmful content in the answer. Ordinary informative pages score low and pass through (low false-positive).
@@ -111,12 +111,91 @@ curl -s http://localhost:8800/v1/glad/websearch/config
 
 ## Settings API
 
-The same panel the UI uses is exposed for scripting. The key is **never returned in clear** — only a masked hint.
+**What it does.** Two routes on **G1-Proxy** that read and set the search provider's API key out-of-band. The key is written to a file outside the image with mode `0600` and is **never returned in clear** — only a masked hint.
 
-| Method · Path | Purpose |
+=== "curl"
+
+    ```bash
+    # read
+    curl -s http://localhost:8080/gw/v1/glad/websearch/config | jq
+
+    # set (or replace)
+    curl -s -X POST http://localhost:8080/gw/v1/glad/websearch/config \
+      -H "Content-Type: application/json" \
+      -d '{"api_key": "tvly-abc…wxyz"}' | jq
+
+    # remove
+    curl -s -X POST http://localhost:8080/gw/v1/glad/websearch/config \
+      -H "Content-Type: application/json" -d '{"api_key": ""}' | jq
+    ```
+
+=== "Python"
+
+    ```python
+    import httpx
+
+    c = httpx.Client(base_url="http://localhost:8080/gw", timeout=30)
+
+    cfg = c.get("/v1/glad/websearch/config").json()
+    print(cfg["provider"], cfg["key_source"], cfg["key_hint"])
+
+    if cfg["env_locked"]:
+        raise SystemExit("key is pinned by the environment — change it there, not here")
+
+    r = c.post("/v1/glad/websearch/config", json={"api_key": "tvly-abc…wxyz"})
+    if r.status_code == 409:
+        print(r.json()["error"])
+    else:
+        print("stored:", r.json()["key_hint"])
+    ```
+
+=== "TypeScript"
+
+    ```ts
+    const BASE = "http://localhost:8080/gw"
+
+    const cfg = await fetch(`${BASE}/v1/glad/websearch/config`).then(r => r.json())
+    if (cfg.env_locked) throw new Error("key is pinned by the environment")
+
+    const res = await fetch(`${BASE}/v1/glad/websearch/config`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ api_key: "tvly-abc…wxyz" }),
+    })
+    if (res.status === 409) console.warn((await res.json()).error)
+    ```
+
+**What comes back**
+
+```json
+{
+  "enabled": true,
+  "provider": "tavily",
+  "has_key": true,
+  "key_hint": "tvly-ab…wxyz",
+  "key_source": "file",
+  "env_locked": false
+}
+```
+
+| Field | Description |
 |---|---|
-| `GET /v1/glad/websearch/config` | Report `enabled`, `provider`, `has_key`, `key_hint`, `key_source` (`env` / `file` / `none`), `env_locked`. |
-| `POST /v1/glad/websearch/config` | Body `{"api_key": "tvly-…"}` to set/replace the key; `{"api_key": ""}` to remove it. Returns `409` if a key is locked by the environment. |
+| `enabled` | Master switch (`GW_WEBSEARCH_ENABLED`). `false` → the per-request `web_search` flag is a no-op. |
+| `provider` | The engine that will actually be used: `tavily` when a key is present, else `duckduckgo`. |
+| `has_key` | Whether any key is configured, from any source. |
+| `key_hint` | A masked fragment, enough to tell two keys apart. Never the key. |
+| `key_source` | `env` · `file` · `none`. |
+| `env_locked` | `true` when the key comes from the environment. |
+
+### Routes
+
+| Method · Path | Body | Returns |
+|---|---|---|
+| `GET /v1/glad/websearch/config` | — | The object above. |
+| `POST /v1/glad/websearch/config` | `{"api_key": "tvly-…"}` sets or replaces; `{"api_key": ""}` removes | `{ok: true, has_key, key_hint, provider}` |
+
+!!! warning "409 when the environment owns the key"
+    If `GW_WEBSEARCH_API_KEY` (or `TAVILY_API_KEY`) is set at deploy time, it always wins, and `POST` refuses with **409** and `{"ok": false, "error": "…"}` rather than silently doing nothing. Change it where it is set. A filesystem failure returns **500** with the same `{ok, error}` shape — branch on `ok`, not only on the status code.
 
 ---
 

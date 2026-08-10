@@ -1,6 +1,6 @@
 # Guard Server (Modality A)
 
-G1-Proxy exposes a **Model Context Protocol server** whose *tools are the GLAD detectors*. Any MCP-compliant host — Claude Desktop, an IDE, an agent runtime — connects and calls `glad.*` tools to vet an MCP interaction, getting back a **measurable verdict** (per-axis probability + energy, optional signed certificate) instead of an opinion.
+G1-Proxy exposes a **Model Context Protocol server** whose *tools are the detection axes*. Any MCP-compliant host — Claude Desktop, an IDE, an agent runtime — connects and calls `glad.*` tools to vet an MCP interaction, getting back a **measurable verdict** (per-axis probability + energy, optional signed certificate) instead of an opinion.
 
 The Guard Server starts automatically with G1-Proxy and listens on its own port (default **`8810`**).
 
@@ -72,7 +72,7 @@ Scans an untrusted **result** (a tool's output or a file/resource) for indirect 
 
 ### `glad.verify_tool_call`
 
-Vets a model-emitted tool call **before** it executes. Two layers: GLAD-BERT safety on the serialized arguments, plus a deterministic **intent policy** that blocks the OWASP exfiltration pattern — *the model read untrusted content this turn (`prior_untrusted`) ∧ the tool is an egress/sink ∧ the destination domain is not allow-listed*.
+Vets a model-emitted tool call **before** it executes. Two layers: G1-Hummingbird safety on the serialized arguments, plus a deterministic **intent policy** that blocks the OWASP exfiltration pattern — *the model read untrusted content this turn (`prior_untrusted`) ∧ the tool is an egress/sink ∧ the destination domain is not allow-listed*.
 
 ```jsonc
 { "name": "glad.verify_tool_call",

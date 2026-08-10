@@ -78,7 +78,7 @@ Attribution never opens the upstream model. Geodesia perturbs the input, re-scor
 flowchart LR
     A[Prompt · Context · Answer] --> B[Split into content units<br/>words / clauses]
     B --> C{{Intervene: do remove u}}
-    C -->|leave-one-out<br/>necessity| D[GLAD-Hummingbird<br/>re-scores]
+    C -->|leave-one-out<br/>necessity| D[G1-Hummingbird<br/>re-scores]
     C -->|keep-only<br/>sufficiency| D
     D --> E[Verify: minimal set that<br/>reproduces AND is needed]
     E --> F[Certified responsible tokens<br/>+ effect · sufficiency · responsibility]
@@ -238,6 +238,88 @@ MuPAX LLM sees what leave-one-out cannot: **interactions**. When two words only 
 
 <div class="endpoint"><span class="method method-post">POST</span><span class="path">/v1/glad/causal-explainability/analyze</span></div>
 
+**What it does.** Takes a prompt, an answer and (optionally) the grounding context you served them with, and returns the tokens that *caused* the detector's verdict — with a certificate saying how strongly. It is a measurement over a deterministic function: no gradients, no sampling, no upstream-model internals, and no LLM writing an explanation. Run it twice and you get the same answer.
+
+It also **scores text you supply** rather than generating anything, which makes it the endpoint to use when you want to evaluate stored traffic or another system's output.
+
+### Call it
+
+=== "curl"
+
+    ```bash
+    curl -s -X POST http://localhost:8080/gw/v1/glad/causal-explainability/analyze \
+      -H "Content-Type: application/json" \
+      -d '{
+        "prompt":   "According to the document, when was the Eiffel Tower built?",
+        "context":  "The Eiffel Tower was constructed between 1887 and 1889.",
+        "response": "The Eiffel Tower was built in 1885.",
+        "method":   "dca",
+        "axis":     "halluc_context"
+      }' | jq '{
+        axis: .detection_type,
+        base: .base_score,
+        mode: .xai.gradient_causal.attribution_mode,
+        necessary: [.xai.gradient_causal.top_tokens[] | select(.status=="necessary") | .token]
+      }'
+    ```
+
+=== "Python"
+
+    ```python
+    import httpx
+
+    r = httpx.post(
+        "http://localhost:8080/gw/v1/glad/causal-explainability/analyze",
+        json={
+            "prompt":   "According to the document, when was the Eiffel Tower built?",
+            "context":  "The Eiffel Tower was constructed between 1887 and 1889.",
+            "response": "The Eiffel Tower was built in 1885.",
+            "method":   "dca",          # deterministic; "mupax_causal" is the slow, thorough one
+            "axis":     "halluc_context",
+        },
+        timeout=360,                    # MuPAX can take minutes; DCA is seconds
+    )
+    r.raise_for_status()                # 422 when prompt/context or response is missing
+    body = r.json()
+
+    dca = body["xai"]["gradient_causal"]
+    print(dca["attribution_mode"], "base", dca["base_score"], "bar", dca["sufficiency_bar"])
+    for tok in dca["top_tokens"]:
+        print(f"  {tok['token']!r:14s} {tok['status']:10s} effect={tok['effect']:.2f}")
+    ```
+
+=== "TypeScript"
+
+    ```ts
+    const res = await fetch(
+      "http://localhost:8080/gw/v1/glad/causal-explainability/analyze",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: "According to the document, when was the Eiffel Tower built?",
+          context: "The Eiffel Tower was constructed between 1887 and 1889.",
+          response: "The Eiffel Tower was built in 1885.",
+          method: "dca",
+          axis: "halluc_context",
+        }),
+      },
+    )
+    if (!res.ok) throw new Error(await res.text())
+    const body = await res.json()
+
+    const dca = body.xai.gradient_causal
+    const necessary = dca.top_tokens.filter((t: any) => t.status === "necessary")
+    console.log(dca.attribution_mode, necessary.map((t: any) => t.token))
+    ```
+
+The date *"1885"* comes back as the certified necessary token: removing it alone drops the faithfulness score below the flag. Run it twice, on two machines, a month apart — same answer.
+
+!!! warning "Pick the method deliberately"
+    `dca` and `dca_dual` are deterministic and finish in seconds. `mupax_causal` is Monte-Carlo and can take **minutes** at the default sample count — set a generous client timeout, or use the [async job endpoint](../studio/api-reference.md#explainability) on Studio and poll it.
+
+`422` is returned when neither `prompt` nor `context` is supplied, or when `response` is missing for any method other than `dca_dual` (whose prompt surface is, by design, a block that happened before generation).
+
 ### Request Body
 
 | Field | Type | Required | Description |
@@ -334,25 +416,7 @@ Each token carries `start` / `end` character offsets into the returned `text`, s
 | `tokens` / `top_tokens` | Per-unit rows: `effect`, `sufficiency`, `importance`, `responsibility`, `status` (`necessary` / `relevant` / `irrelevant`), `start` / `end` |
 | `necessary_tokens` | The certified minimal responsible set, in rank order |
 | `causal_edges` | Prompt→answer token links, when a token matrix was requested |
-| `detector` | `glad_bert` — which detector backed the attribution |
-
----
-
-## Usage Example
-
-```bash
-curl -s -X POST http://localhost:8800/v1/glad/causal-explainability/analyze \
-  -H "Content-Type: application/json" \
-  -d '{
-    "prompt": "According to the document, when was the Eiffel Tower built?",
-    "context": "The Eiffel Tower was constructed between 1887 and 1889.",
-    "response": "The Eiffel Tower was built in 1885.",
-    "method": "dca",
-    "axis": "halluc_context"
-  }'
-```
-
-The date *"1885"* comes back as the certified necessary token: removing it alone drops the faithfulness score below the flag. Run it twice, on two machines, a month apart — same answer.
+| `detector` | Internal identifier of the detector build that backed the attribution. Record it alongside the result: an attribution is only reproducible against the same build. |
 
 ---
 

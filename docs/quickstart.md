@@ -37,7 +37,7 @@ Use this when deploying to a new customer or a new model:
 docker compose -f deploy/docker-compose.gateway.yml --profile customer up
 ```
 
-The closed-book fabrication detector is **cross-model** and works out of the box — there is no per-model setup step. On first boot the gateway probes the upstream for log-probability support and enables the closed-book axis automatically (5-axis mode); if the upstream has no log-probabilities it runs in 4-axis mode. Either way the gateway is ready immediately.
+The closed-book fabrication detector is **cross-model** and works out of the box — there is no per-model setup step. On first boot the proxy probes the upstream for log-probability support and enables the closed-book axis automatically; if the upstream has no log-probabilities, that one axis reports `available: false` and the rest keep working. Either way the proxy is ready immediately.
 
 ---
 
@@ -77,7 +77,7 @@ The fastest path on a connected GPU host is to pull the **prebuilt, signed** Geo
 
 | Image | Role | Default tag |
 |---|---|---|
-| `g1-proxy` | The gateway (GLAD-Hummingbird detector + optional GLAD-H second opinion via [Thinking Levels](g1-proxy/thinking-levels.md)). **Needs the GPU.** | `cuda` |
+| `g1-proxy` | The gateway (G1-Hummingbird detector, plus the optional extended-thinking capacity behind [Thinking Levels](g1-proxy/thinking-levels.md)). **Needs the GPU.** | `cuda` |
 | `g1-studio` | The G-1 Studio web UI / control plane. CPU-only. | `wolfi` |
 
 ### 1. Host prerequisites (amd64 + NVIDIA)
@@ -144,10 +144,11 @@ This pulls `${REG}/g1-proxy:cuda` and `${REG}/g1-studio:wolfi`, then starts:
 
 ### 4. Enable Thinking Levels on the proxy (optional)
 
-To make `thinking_level` 1/2 available (GLAD-H as a second opinion, requested per chat), point `GW_GLADH_CKPT` at a GLAD-H checkpoint on the `g1-proxy` service:
+[Thinking levels](g1-proxy/thinking-levels.md) above `0` need their capability packs present on the `g1-proxy` service — `GW_GLADH_CKPT` unlocks levels 1–2, `GW_GLADA_CKPT` unlocks level 3 (MAX):
 
 ```bash
 GW_GLADH_CKPT=/app/runs/glad_bert/glad_bert_gladh_v1_psjbasft_live.pt \
+GW_GLADA_CKPT=/app/runs/glad_bert/glad_a_agentdog_v1.pt \
   docker compose -f docker-compose.customer-registry.yml up -d
 ```
 
