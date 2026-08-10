@@ -117,6 +117,14 @@ extra:
 extra_css:
   - stylesheets/extra.css
 
+# Mermaid served from the site itself, not from unpkg. Material only fetches the
+# CDN copy when `window.mermaid` is still undefined, so shipping it here stops
+# that request. It matters because this same build is bundled inside the product
+# (web-ui/public/docs-site): on an air-gapped install the CDN never answers and
+# every diagram degrades to its raw source text.
+extra_javascript:
+  - javascripts/mermaid.min.js
+
 nav:
   - Home: index.md
   - Getting Started:
