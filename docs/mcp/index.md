@@ -9,6 +9,42 @@ Geodesia G-1 fills exactly that gap. Starting G1-Proxy starts an **MCP security 
 
 ---
 
+## Check it is running
+
+Starting G1-Proxy starts the MCP layer. One call tells you which surfaces are guarded, what the actions
+are, and which interceptors are listening.
+
+=== "curl"
+
+    ```bash
+    curl -s http://localhost:8080/gw/v1/glad/mcp/status | jq
+    ```
+
+=== "Python"
+
+    ```python
+    import httpx
+
+    st = httpx.get("http://localhost:8080/gw/v1/glad/mcp/status").json()
+    print("enabled:", st["enabled"], "· chat-aware:", st["chat_aware"])
+    print("actions:", st["actions"])
+    for i in st["interceptors"]:
+        print(f"  {i['name']}: :{i['listen_port']} → {i['upstream_url']}")
+    ```
+
+=== "TypeScript"
+
+    ```ts
+    const st = await fetch("http://localhost:8080/gw/v1/glad/mcp/status").then(r => r.json())
+    console.log(st.enabled, st.actions, st.interceptors)
+    ```
+
+**What comes back** — `{enabled, chat_aware, servers, guard, actions, domain_allowlist, egress_tools,
+interceptors}`. `actions` carries the per-surface enforcement in force (`tool_description`,
+`tool_result`, `tool_args`); `interceptors` lists each proxy hop with its listen port and upstream.
+
+Per-Application and per-tool overrides: **[Policy](policy.md)**.
+
 ## The threats it stops
 
 | MCP threat | What it is | Geodesia control |

@@ -7,6 +7,67 @@
 
 ---
 
+## Call it
+
+Create an Application, give it a key, and it is live on the data plane — three calls.
+
+=== "curl"
+
+    ```bash
+    APP=$(curl -s http://localhost:8080/v1/glad/apps -H "Content-Type: application/json" \
+      -d '{"name":"Support Bot","config":{"binding":{"upstream_type":"ollama",
+           "base_url":"http://localhost:11434","model":"llama3.1:8b"}}}' | jq -r .app_id)
+
+    KEY=$(curl -s http://localhost:8080/v1/glad/apps/$APP/keys \
+      -H "Content-Type: application/json" -d '{"role":"invoke"}' | jq -r .api_key)
+
+    curl -s http://localhost:8080/gw/v1/chat/completions \
+      -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+      -d '{"model":"llama3.1:8b","stream":false,"messages":[{"role":"user","content":"Hi"}]}'
+    ```
+
+=== "Python"
+
+    ```python
+    import httpx
+
+    st = httpx.Client(base_url="http://localhost:8080", timeout=60)
+
+    app = st.post("/v1/glad/apps", json={
+        "name": "Support Bot",
+        "config": {"binding": {"upstream_type": "ollama",
+                               "base_url": "http://localhost:11434",
+                               "model": "llama3.1:8b"}},
+    }).json()
+
+    key = st.post(f"/v1/glad/apps/{app['app_id']}/keys", json={"role": "invoke"}).json()["api_key"]
+
+    r = st.post("/gw/v1/chat/completions",
+                headers={"Authorization": f"Bearer {key}"},
+                json={"model": "llama3.1:8b", "stream": False,
+                      "messages": [{"role": "user", "content": "Hi"}]}).json()
+    print(r["glad_decision"])
+    ```
+
+=== "TypeScript"
+
+    ```ts
+    const H = { "Content-Type": "application/json" }
+    const app = await fetch("http://localhost:8080/v1/glad/apps", {
+      method: "POST", headers: H,
+      body: JSON.stringify({ name: "Support Bot",
+        config: { binding: { upstream_type: "ollama", base_url: "http://localhost:11434",
+                             model: "llama3.1:8b" } } }),
+    }).then(r => r.json())
+
+    const { api_key } = await fetch(`http://localhost:8080/v1/glad/apps/${app.app_id}/keys`, {
+      method: "POST", headers: H, body: JSON.stringify({ role: "invoke" }),
+    }).then(r => r.json())
+    ```
+
+The key is shown **once**. Full walkthrough: **[Control Plane API](control-plane-api.md)**.
+Every route: **[Complete API Map](api-reference.md)**.
+
 ## What is an Application?
 
 An **Application** is **1 LLM + G1-Hummingbird in the middle**, owning everything that makes that LLM safe, compliant, and accountable:

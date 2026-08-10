@@ -1,11 +1,132 @@
 # Cost & FinOps
 
-Every call that Geodesia G-1 logs also lands a **cost row**. The platform meters tokens into money at call time, rolls them up per day, tracks them against a monthly budget, and projects where you'll end the month — all per Application, with a consolidated view per organization.
+Every logged call also lands a **cost row**: tokens metered into money at call time, rolled up per day,
+tracked against a monthly budget, and projected to month-end. Per Application, per organisation. When a
+budget is crossed the platform either warns you or stops the traffic — that is a setting, not a hope.
 
-This page explains how metering works, the three tables behind it, how budgets and alerts behave, the forecasting methods, the Cost API, and the **Cost & FinOps** UI.
+---
 
-!!! info "Where cost configuration lives"
-    Rates, currency, budget and the over-budget policy are fields of an Application's `cost` config block. See [Applications → cost config fields](applications.md) for how to set them, and the [Control-Plane API](control-plane-api.md) for the full surface.
+## Cost API
+
+All cost routes are mounted under `/v1/glad` (next to the rest of the control plane). Reads are open; writes go through RBAC when `GEODESIA_ADMIN_TOKEN` is set. See the [Control-Plane API](control-plane-api.md) for auth details.
+
+### Per-Application
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/apps/{id}/cost` | Read the cost config block |
+| `PUT` | `/apps/{id}/cost` | Merge-update the cost config (rates, budget, alerts, policy) |
+| `GET` | `/apps/{id}/cost/summary` | Current-period totals (override with `?period=YYYY-MM`) |
+| `GET` | `/apps/{id}/cost/daily` | Daily roll-up series (`?since=` / `?until=`) |
+| `GET` | `/apps/{id}/cost/forecast` | Month-end projection (`?method=` / `?today=`) |
+
+#### Read & update the cost config
+
+```bash
+curl -s http://localhost:8080/v1/glad/apps/app_billing_copilot/cost
+```
+
+```json
+{
+  "cost": {
+    "currency": "EUR",
+    "input_per_mtok": 0.15,
+    "output_per_mtok": 0.60,
+    "glad_compute_per_mtok": 0.0,
+    "budget_month": 500.0,
+    "alert_pct": [0.8, 1.0],
+    "on_budget_exceeded": "alert",
+    "alert_recipients": ["finops@acme.example"]
+  }
+}
+```
+
+```bash
+curl -s -X PUT http://localhost:8080/v1/glad/apps/app_billing_copilot/cost \
+  -H 'Content-Type: application/json' \
+  -H 'X-Geodesia-Admin-Key: $GEODESIA_ADMIN_TOKEN' \
+  -d '{"cost": {"budget_month": 750.0, "on_budget_exceeded": "block"}}'
+```
+
+The body is **merged** into the existing cost block, so you can patch a single field. The response echoes the merged `cost` and the new `config_version`.
+
+#### Summary
+
+```bash
+curl -s "http://localhost:8080/v1/glad/apps/app_billing_copilot/cost/summary?period=2026-06"
+```
+
+```json
+{
+  "application_id": "app_billing_copilot",
+  "period": "2026-06",
+  "calls": 1842,
+  "blocked": 37,
+  "tokens_in": 4120000,
+  "tokens_out": 980000,
+  "tokens_glad": 5100000,
+  "cost_input": 0.618,
+  "cost_output": 0.588,
+  "cost_glad": 0.0,
+  "cost_total": 1.206,
+  "avg_cost_per_call": 0.000655,
+  "currency": "EUR"
+}
+```
+
+#### Daily series
+
+```bash
+curl -s "http://localhost:8080/v1/glad/apps/app_billing_copilot/cost/daily?since=2026-06-01&until=2026-06-30"
+```
+
+```json
+{
+  "series": [
+    {"application_id": "app_billing_copilot", "day": "2026-06-16", "currency": "EUR",
+     "calls": 121, "blocked": 2, "tokens_in": 280000, "tokens_out": 64000,
+     "tokens_glad": 344000, "cost_total": 0.0804},
+    {"application_id": "app_billing_copilot", "day": "2026-06-17", "currency": "EUR",
+     "calls": 143, "blocked": 1, "tokens_in": 331000, "tokens_out": 71000,
+     "tokens_glad": 402000, "cost_total": 0.0923}
+  ]
+}
+```
+
+#### Forecast
+
+The budget and currency for the projection are read from the Application's cost config automatically.
+
+```bash
+curl -s "http://localhost:8080/v1/glad/apps/app_billing_copilot/cost/forecast?method=linreg_dow"
+```
+
+(Response: the forecast object shown in [Forecasting](#forecasting) above. Pass `&today=YYYY-MM-DD` to reproduce a projection for a fixed day.)
+
+### Per-organization
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/orgs/{id}/cost/summary` | Consolidated spend across all Applications in the org |
+| `GET` | `/orgs/{id}/cost/forecast` | Consolidated month-end projection (`?method=`) |
+
+```bash
+curl -s http://localhost:8080/v1/glad/orgs/default/cost/summary
+```
+
+```json
+{
+  "period": "2026-06",
+  "total": 3.41,
+  "by_app": [
+    {"application_id": "app_billing_copilot", "cost_total": 1.21, "calls": 1842, "blocked": 37},
+    {"application_id": "app_support_rag",     "cost_total": 1.40, "calls": 2210, "blocked": 12},
+    {"application_id": "default",             "cost_total": 0.80, "calls":  640, "blocked":  4}
+  ]
+}
+```
+
+The org forecast sums each Application's projection (using each app's own budget/currency) and returns per-app detail plus org-wide `spent_mtd` and `projected_month`.
 
 ---
 
@@ -282,130 +403,6 @@ Pick a method with `?method=` (default `run_rate`):
 - **`spent_mtd`** — money-to-date this period (sum of the daily series).
 - **`projected_month`** — `spent_mtd` plus the projected spend for the remaining days.
 - **`projected_pct`** / **`over_budget`** — projection as a fraction of `budget_month`, and whether that fraction exceeds `1.0`.
-
----
-
-## Cost API
-
-All cost routes are mounted under `/v1/glad` (next to the rest of the control plane). Reads are open; writes go through RBAC when `GEODESIA_ADMIN_TOKEN` is set. See the [Control-Plane API](control-plane-api.md) for auth details.
-
-### Per-Application
-
-| Method | Path | Purpose |
-|---|---|---|
-| `GET` | `/apps/{id}/cost` | Read the cost config block |
-| `PUT` | `/apps/{id}/cost` | Merge-update the cost config (rates, budget, alerts, policy) |
-| `GET` | `/apps/{id}/cost/summary` | Current-period totals (override with `?period=YYYY-MM`) |
-| `GET` | `/apps/{id}/cost/daily` | Daily roll-up series (`?since=` / `?until=`) |
-| `GET` | `/apps/{id}/cost/forecast` | Month-end projection (`?method=` / `?today=`) |
-
-#### Read & update the cost config
-
-```bash
-curl -s http://localhost:8080/v1/glad/apps/app_billing_copilot/cost
-```
-
-```json
-{
-  "cost": {
-    "currency": "EUR",
-    "input_per_mtok": 0.15,
-    "output_per_mtok": 0.60,
-    "glad_compute_per_mtok": 0.0,
-    "budget_month": 500.0,
-    "alert_pct": [0.8, 1.0],
-    "on_budget_exceeded": "alert",
-    "alert_recipients": ["finops@acme.example"]
-  }
-}
-```
-
-```bash
-curl -s -X PUT http://localhost:8080/v1/glad/apps/app_billing_copilot/cost \
-  -H 'Content-Type: application/json' \
-  -H 'X-Geodesia-Admin-Key: $GEODESIA_ADMIN_TOKEN' \
-  -d '{"cost": {"budget_month": 750.0, "on_budget_exceeded": "block"}}'
-```
-
-The body is **merged** into the existing cost block, so you can patch a single field. The response echoes the merged `cost` and the new `config_version`.
-
-#### Summary
-
-```bash
-curl -s "http://localhost:8080/v1/glad/apps/app_billing_copilot/cost/summary?period=2026-06"
-```
-
-```json
-{
-  "application_id": "app_billing_copilot",
-  "period": "2026-06",
-  "calls": 1842,
-  "blocked": 37,
-  "tokens_in": 4120000,
-  "tokens_out": 980000,
-  "tokens_glad": 5100000,
-  "cost_input": 0.618,
-  "cost_output": 0.588,
-  "cost_glad": 0.0,
-  "cost_total": 1.206,
-  "avg_cost_per_call": 0.000655,
-  "currency": "EUR"
-}
-```
-
-#### Daily series
-
-```bash
-curl -s "http://localhost:8080/v1/glad/apps/app_billing_copilot/cost/daily?since=2026-06-01&until=2026-06-30"
-```
-
-```json
-{
-  "series": [
-    {"application_id": "app_billing_copilot", "day": "2026-06-16", "currency": "EUR",
-     "calls": 121, "blocked": 2, "tokens_in": 280000, "tokens_out": 64000,
-     "tokens_glad": 344000, "cost_total": 0.0804},
-    {"application_id": "app_billing_copilot", "day": "2026-06-17", "currency": "EUR",
-     "calls": 143, "blocked": 1, "tokens_in": 331000, "tokens_out": 71000,
-     "tokens_glad": 402000, "cost_total": 0.0923}
-  ]
-}
-```
-
-#### Forecast
-
-The budget and currency for the projection are read from the Application's cost config automatically.
-
-```bash
-curl -s "http://localhost:8080/v1/glad/apps/app_billing_copilot/cost/forecast?method=linreg_dow"
-```
-
-(Response: the forecast object shown in [Forecasting](#forecasting) above. Pass `&today=YYYY-MM-DD` to reproduce a projection for a fixed day.)
-
-### Per-organization
-
-| Method | Path | Purpose |
-|---|---|---|
-| `GET` | `/orgs/{id}/cost/summary` | Consolidated spend across all Applications in the org |
-| `GET` | `/orgs/{id}/cost/forecast` | Consolidated month-end projection (`?method=`) |
-
-```bash
-curl -s http://localhost:8080/v1/glad/orgs/default/cost/summary
-```
-
-```json
-{
-  "period": "2026-06",
-  "total": 3.41,
-  "by_app": [
-    {"application_id": "app_billing_copilot", "cost_total": 1.21, "calls": 1842, "blocked": 37},
-    {"application_id": "app_support_rag",     "cost_total": 1.40, "calls": 2210, "blocked": 12},
-    {"application_id": "default",             "cost_total": 0.80, "calls":  640, "blocked":  4}
-  ]
-}
-```
-
-The org forecast sums each Application's projection (using each app's own budget/currency) and returns per-app detail plus org-wide `spent_mtd` and `projected_month`.
 
 ---
 

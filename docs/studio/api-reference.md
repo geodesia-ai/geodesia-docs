@@ -27,6 +27,16 @@ Every HTTP surface **G-1 Studio** exposes. Studio is the **control plane**: Appl
 
 ---
 
+## One call, to check you are pointed at the right service
+
+```bash
+curl -s http://localhost:8080/v1/glad/health | jq
+# {"status": "ok", "version": "…"}
+```
+
+If that answers, everything below is reachable. If you were expecting chat or detection, you want the
+other service — see the [G1-Proxy API map](../g1-proxy/api-reference.md).
+
 ## Applications & organisations
 
 An **Application** is the unit of management: one upstream LLM with G1-Hummingbird in the middle, owning its own policy, thresholds, RAG collection, cost centre and compliance posture. Full guide: [Managing Applications](applications.md).

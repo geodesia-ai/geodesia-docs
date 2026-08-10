@@ -1,23 +1,8 @@
 # Threshold Tuning Guide
 
-Geodesia G-1 uses **probability thresholds** to decide when a detection score is high enough to trigger a block, a flag, or a routing decision. Where you set them is one of the most consequential operational decisions you will make — too low and you block legitimate traffic, too high and problems get through.
-
-This guide explains what each threshold controls and how to set it **empirically, on your own traffic**, rather than by copying a number.
-
----
-
-## The detection decision
-
-For each axis, the decision is:
-
-```
-score >= threshold  →  flagged
-score <  threshold  →  pass
-```
-
-Scores are always in the range [0, 1]: **0** = the detector is confident the content is safe/grounded/in-scope; **1** = confident it is not.
-
-A flag is not automatically a block. What a flag *does* depends on the axis's **enforcement mode** — `block`, `annotate`, or `off` — configured per Application. See [Detection Axes](../g1-proxy/detection-axes.md#guardrails-vs-operational-axes).
+A threshold turns a probability into a decision, which makes it the single most consequential number in
+the deployment — and the one most often set by intuition. This page says where each threshold lives, what
+the calibrated defaults are and what they were measured against, and how to move one without guessing.
 
 ---
 
@@ -92,6 +77,21 @@ Set the threshold at the percentile of **benign** scores matching the false-posi
 ### 3. Passthrough observation
 
 Set enforcement to `annotate` (or run the request with `mode: "passthrough"`), let 1 000+ calls accumulate, export from the dashboard, and repeat step 2. Nothing is blocked while you measure.
+
+---
+
+## The detection decision
+
+For each axis, the decision is:
+
+```
+score >= threshold  →  flagged
+score <  threshold  →  pass
+```
+
+Scores are always in the range [0, 1]: **0** = the detector is confident the content is safe/grounded/in-scope; **1** = confident it is not.
+
+A flag is not automatically a block. What a flag *does* depends on the axis's **enforcement mode** — `block`, `annotate`, or `off` — configured per Application. See [Detection Axes](../g1-proxy/detection-axes.md#guardrails-vs-operational-axes).
 
 ---
 

@@ -17,6 +17,17 @@ Every HTTP surface **G1-Proxy** exposes, in one table. G1-Proxy is the **data pl
 
 ---
 
+## One call, to check you are pointed at the right service
+
+```bash
+curl -s http://localhost:8080/gw/health | jq
+# {"ok": true, "upstream_type": "ollama", "upstream": "http://localhost:11434",
+#  "logprobs": true, "axes": 5, "calibration": {"model": "…", "status": "calibrated"}}
+```
+
+If that answers, everything below is reachable. If it 404s you are talking to Studio — drop the `/gw`
+and see the [Studio API map](../studio/api-reference.md) instead.
+
 ## Inference
 
 | Method | Path | What it does | Docs |

@@ -1,8 +1,31 @@
 # Interceptor (Modality B)
 
-The **Interceptor** is the *enforcing* modality. G1-Proxy sits as a trusted man-in-the-middle between an MCP host and a downstream MCP server. Every JSON-RPC message is scanned **before** its content can re-enter the model's context — so indirect injection and tool poisoning are stopped at the source, not merely reported.
+The enforcing modality. G1-Proxy sits as a trusted man-in-the-middle between an MCP host and a downstream
+MCP server, scanning every JSON-RPC message in both directions — tool descriptions on the way in,
+arguments on the way out, results on the way back. Nothing reaches the agent unscreened, and the host
+needs no changes beyond a URL.
 
-![Diagram](../assets/diagrams/mcp-interceptor.svg){: .diagram }
+---
+
+## Configuring an interceptor
+
+Interceptors are configured via **env/CLI only** — never the remote config API — because a downstream spec may carry a stdio spawn command (a subprocess is an RCE vector). Each entry brokers one downstream server on its own listen port:
+
+```jsonc
+// mcp_interceptors (in the gateway config / env)
+[
+  { "name": "github-broker",
+    "listen_port": 8901,
+    "upstream_url": "http://127.0.0.1:8950/mcp",
+    "transport": "http",
+    "application_id": "support-bot",          // optional: apply this app's policy
+    "actions": { "tool_description": "block", // optional per-surface overrides
+                 "tool_result": "annotate",
+                 "tool_args": "policy" } }
+]
+```
+
+Point your host at the interceptor (`http://localhost:8901/mcp`) instead of the real server. Studio → Settings → MCP lists every active interceptor (read-only).
 
 ---
 
@@ -30,28 +53,6 @@ Annotated (non-blocked) messages carry a `_meta.glad` block so a host can still 
 
 !!! note "Session taint"
     The Interceptor tracks taint and approved tool hashes **per MCP session** (`Mcp-Session-Id`). Reading one poisoned result this session is what arms the exfiltration block on a *later* tool call — the temporal correlation a prompt-only filter cannot see.
-
----
-
-## Configuring an interceptor
-
-Interceptors are configured via **env/CLI only** — never the remote config API — because a downstream spec may carry a stdio spawn command (a subprocess is an RCE vector). Each entry brokers one downstream server on its own listen port:
-
-```jsonc
-// mcp_interceptors (in the gateway config / env)
-[
-  { "name": "github-broker",
-    "listen_port": 8901,
-    "upstream_url": "http://127.0.0.1:8950/mcp",
-    "transport": "http",
-    "application_id": "support-bot",          // optional: apply this app's policy
-    "actions": { "tool_description": "block", // optional per-surface overrides
-                 "tool_result": "annotate",
-                 "tool_args": "policy" } }
-]
-```
-
-Point your host at the interceptor (`http://localhost:8901/mcp`) instead of the real server. Studio → Settings → MCP lists every active interceptor (read-only).
 
 ---
 

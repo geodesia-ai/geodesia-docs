@@ -1,14 +1,9 @@
 # Token & Cost Control
 
-Two of the nine [detection axes](detection-axes.md) are not guardrails. They exist to answer a commercial question rather than a safety one:
-
-- **`out_of_scope`** — *should we answer this at all?* An off-topic request refused at the gate costs **zero upstream tokens**, because the upstream model is never called.
-- **`prompt_complexity`** — *how expensive does this answer need to be?* A trivial prompt is routed to a cheap model, a hard one to a capable model, at **no extra latency and no extra model call**.
-
-Both scores come out of the **same detector forward pass** that already produces the safety axes. There is no second model to run, no classification LLM to pay for, and no extra round-trip: by the time the gateway has decided whether a request is safe, it has already decided whether it is in scope and how hard it is.
-
-![Diagram](../assets/diagrams/gateway-cost-control.svg){: .diagram }
-<p class="diagram-caption">One detector pass produces the safety verdict, the scope verdict and the complexity verdict together. Off-topic traffic never reaches an LLM; simple traffic reaches the cheap one.</p>
+Two of the nine [detection axes](detection-axes.md) answer a commercial question rather than a safety
+one. **`out_of_scope`** refuses off-topic traffic *before* the upstream call, so those tokens are never
+billed. **`prompt_complexity`** routes easy prompts to a cheap model and hard ones to a capable one.
+Both come from the pass you are already paying for — no extra latency, no extra model call.
 
 ---
 

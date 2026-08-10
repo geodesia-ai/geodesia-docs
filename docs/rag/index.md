@@ -1,30 +1,10 @@
 # Knowledge Base (RAG)
 
-Geodesia G-1 includes a built-in **Retrieval-Augmented Generation (RAG)** system that lets you upload documents and have the LLM answer questions grounded in those documents. Every retrieved chunk is passed to the faithfulness detection axis, and the claims in the answer are verified citation-by-citation against the source material.
+Upload your documents, and the LLM answers from them instead of from memory. Retrieved passages become
+the grounding context the faithfulness axis scores against, and the answer's claims are verified
+citation by citation — so "the model made it up" becomes a measurable event rather than a suspicion.
 
-**Supported document formats:** PDF, Word (.docx), PowerPoint (.pptx), Markdown (.md), HTML, Excel (.xlsx), CSV, plain text (.txt)
-
----
-
-## How It Works
-
-```
-1. You upload a document → Docling parses it → chunked into ~480 tokens with 64-token overlap
-2. Each chunk is embedded with BGE-M3 (multilingual) → stored in LanceDB
-3. On a RAG-enabled chat request:
-   a. Retrieve top-K chunks most relevant to the user's question (dense retrieval + reranking)
-   b. Inject the retrieved context into the upstream LLM's prompt
-   c. The LLM answers using the context
-   d. Geodesia verifies each claim in the answer against the retrieved chunks
-   e. If all claims are verified with citations → halluc_context flag suppressed
-   f. If any claim is ungrounded → halluc_context flags normally
-```
-
----
-
-## Collections
-
-Documents are organised into **collections**. A collection is a named group of documents that shares an embedding index. You can have multiple collections for different topics or customers.
+**Formats:** PDF, Word, PowerPoint, Markdown, HTML, Excel, CSV, plain text.
 
 ---
 
@@ -309,6 +289,28 @@ When RAG is active, the `geodesia.rag` field in the response contains retrieval 
 | `verification.n_grounded` | Claims supported by the retrieved chunks |
 | `verification.ungrounded` | `false` when all claims are grounded — triggers hallucination suppression |
 | `verification.claims` | Per-claim grounding status and the matching citation |
+
+---
+
+## How It Works
+
+```
+1. You upload a document → Docling parses it → chunked into ~480 tokens with 64-token overlap
+2. Each chunk is embedded with BGE-M3 (multilingual) → stored in LanceDB
+3. On a RAG-enabled chat request:
+   a. Retrieve top-K chunks most relevant to the user's question (dense retrieval + reranking)
+   b. Inject the retrieved context into the upstream LLM's prompt
+   c. The LLM answers using the context
+   d. Geodesia verifies each claim in the answer against the retrieved chunks
+   e. If all claims are verified with citations → halluc_context flag suppressed
+   f. If any claim is ungrounded → halluc_context flags normally
+```
+
+---
+
+## Collections
+
+Documents are organised into **collections**. A collection is a named group of documents that shares an embedding index. You can have multiple collections for different topics or customers.
 
 ---
 

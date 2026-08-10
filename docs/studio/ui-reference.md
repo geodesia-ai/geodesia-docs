@@ -17,6 +17,20 @@ Every screen and control in the G-1 Studio UI, and the exact API call behind it.
 
 ---
 
+## Reproducing any control from code
+
+Every row below is a real HTTP call. Take the path, prefix the host, and send it — the UI has no private
+API.
+
+```bash
+# what the Application picker reads
+curl -s http://localhost:8080/v1/glad/apps | jq '[.apps[].app_id]'
+
+# what a per-Application panel sends (note the header)
+curl -s http://localhost:8080/gw/v1/glad/rag/collections \
+  -H "X-Geodesia-App: support_bot" | jq
+```
+
 ## Chrome — always on screen
 
 | Component | What it is | Calls |

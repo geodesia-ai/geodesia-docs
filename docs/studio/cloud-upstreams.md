@@ -1,8 +1,9 @@
 # Cloud Upstreams & Scale-Out
 
-Geodesia G-1 Studio runs unchanged from a developer laptop to a multi-replica cloud deployment. The same artifact talks to **managed cloud LLMs** (AWS Bedrock, Google Vertex, Azure OpenAI), resolves provider credentials through a **pluggable secret provider**, stores its control-plane and cost state on **SQLite or Postgres**, offloads G1-Hummingbird detection to a **remote scoring pool**, and ingests RAG documents through an **exactly-once claim queue** that is safe across replicas.
-
-This page documents each of those scale-out surfaces. For a full step-by-step walkthrough of taking a PC deployment to AWS, see the section ["PC → AWS deployment guide"](#pc-aws-deployment-guide) at the bottom.
+The same artifact runs on a laptop and across a multi-replica cloud deployment. It talks to managed
+cloud LLMs (Bedrock, Vertex, Azure OpenAI) through their own SDKs, reads secrets from a manager instead
+of a database, stores state in Postgres or SQLite, and can push detection compute out to a separate
+scoring pool.
 
 ---
 

@@ -1,13 +1,78 @@
 # Detection Axes
 
-Geodesia G-1 scores every request across **nine independent detection axes**. Each axis is scored separately, has its own calibrated threshold, and can be individually configured per Application. Understanding what each axis detects helps you tune thresholds appropriately for your use case.
+Every request is scored on **nine independent axes** in a single forward pass, each with its own
+calibrated threshold and its own enforcement mode. Six are guardrails — they decide whether a request or
+an answer is allowed. Three answer operational questions instead: *is this offensive?*, *is this even our
+job?*, *is this hard enough to need the expensive model?*
 
-Six axes are **guardrails** (they decide whether a request or an answer is allowed). Three are newer axes that answer operational questions instead — *is this offensive?*, *is this even our job?*, *is this hard enough to need the expensive model?* — and two of those three are what turn the gateway into a [token- and cost-control layer](cost-control.md).
+---
 
-!!! note "G1-Hummingbird"
-    These axes are produced by **G1-Hummingbird** — Geodesia's fast, model-agnostic companion detector that runs *outside* the served LLM. It is a geometric MoE model: low latency, runs on a small GPU, and scores all nine axes in the **same forward pass**, so adding an axis costs no extra latency.
+## Which axes does my deployment have?
 
-    For high-stakes deployments the same nine axes can be scored with extra depth, per request, via [Thinking Levels](thinking-levels.md) — up to `thinking_level: 3` (MAX).
+The served checkpoint decides. Ask the control plane rather than assuming:
+
+```bash
+curl -s http://localhost:8080/v1/glad/apps/meta | jq '{axes, extra_axes, supports_axis}'
+```
+
+```json
+{
+  "axes": ["prompt_safety", "jailbreak", "rag_jailbreak",
+           "halluc_context", "halluc_closedbook", "answer_safety",
+           "profanity", "out_of_scope", "prompt_complexity"],
+  "extra_axes": ["profanity", "out_of_scope", "prompt_complexity"],
+  "supports_axis": { "prompt_complexity": true }
+}
+```
+
+The same vocabulary is served to the feedback UI at `GET /v1/glad/feedback/schema`, so a front-end never hard-codes an axis list. On a checkpoint without the extra axes, `supports_axis.prompt_complexity` is `false`, the Studio hides the routing controls, and complexity routing silently falls back to Model A instead of failing requests.
+
+---
+
+## Reading Axis Results
+
+Each axis produces a per-axis object in the `geodesia.axis_energy` response field:
+
+```json
+{
+  "halluc_context": {
+    "p_detector": 0.72,
+    "flag": true,
+    "threshold": 0.6475,
+    "available": true,
+    "suppressed_by": null,
+    "p_detector_raw": null
+  },
+  "out_of_scope": {
+    "p_detector": 0.998,
+    "flag": true,
+    "threshold": 0.90,
+    "available": true
+  },
+  "prompt_complexity": {
+    "p_detector": 0.81,
+    "flag": true,
+    "threshold": 0.50,
+    "available": true
+  }
+}
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `p_detector` | `float` [0, 1] | Detection probability. Higher means more likely to be the kind of content this axis detects. |
+| `flag` | `bool` | `true` if the score crossed this axis's threshold. Whether a flag *does* anything depends on the axis's enforcement mode. |
+| `threshold` | `float` | The threshold used for this request (may be overridden by the Application policy or `threshold_overrides`). |
+| `available` | `bool` | `false` if the axis cannot run (e.g. `halluc_closedbook` when the upstream has no logprobs, or an axis the served checkpoint does not have). A `false` axis never flags. |
+| `fact_seeking` | `bool` | (closed-book only) Whether the question was classified as fact-seeking. Only fact-seeking questions can flag. |
+| `suppressed_by` | `string` \| `null` | Reason why the axis was suppressed despite the score. Example: `"rag_claim_verification"` when all RAG claims are verified. |
+| `p_detector_raw` | `float` \| `null` | The original score before suppression, for audit purposes. |
+| `exemplar_match` | `object` \| `null` | Present when the [feedback exemplar bank](self-evolving.md#3-the-fast-loop-episodic-memory) moved this score, with the matched verdict and similarity. |
+
+The `geodesia.brake` field is `true` if any **answer-region** axis (`halluc_context`, `halluc_closedbook`, `answer_safety`) has `flag: true`. Input-region axes affect the input phase separately.
+
+!!! tip "A flag is not a block"
+    `flag: true` on `profanity` or `out_of_scope` means *the axis fired*, not *the request was refused*. Read `glad_decision` / `flagged_axis` for what the gateway actually did.
 
 ---
 
@@ -265,53 +330,6 @@ The empirical way to set a threshold for *your* traffic is [Policy Lens](../stud
 
 ---
 
-## Reading Axis Results
-
-Each axis produces a per-axis object in the `geodesia.axis_energy` response field:
-
-```json
-{
-  "halluc_context": {
-    "p_detector": 0.72,
-    "flag": true,
-    "threshold": 0.6475,
-    "available": true,
-    "suppressed_by": null,
-    "p_detector_raw": null
-  },
-  "out_of_scope": {
-    "p_detector": 0.998,
-    "flag": true,
-    "threshold": 0.90,
-    "available": true
-  },
-  "prompt_complexity": {
-    "p_detector": 0.81,
-    "flag": true,
-    "threshold": 0.50,
-    "available": true
-  }
-}
-```
-
-| Field | Type | Description |
-|---|---|---|
-| `p_detector` | `float` [0, 1] | Detection probability. Higher means more likely to be the kind of content this axis detects. |
-| `flag` | `bool` | `true` if the score crossed this axis's threshold. Whether a flag *does* anything depends on the axis's enforcement mode. |
-| `threshold` | `float` | The threshold used for this request (may be overridden by the Application policy or `threshold_overrides`). |
-| `available` | `bool` | `false` if the axis cannot run (e.g. `halluc_closedbook` when the upstream has no logprobs, or an axis the served checkpoint does not have). A `false` axis never flags. |
-| `fact_seeking` | `bool` | (closed-book only) Whether the question was classified as fact-seeking. Only fact-seeking questions can flag. |
-| `suppressed_by` | `string` \| `null` | Reason why the axis was suppressed despite the score. Example: `"rag_claim_verification"` when all RAG claims are verified. |
-| `p_detector_raw` | `float` \| `null` | The original score before suppression, for audit purposes. |
-| `exemplar_match` | `object` \| `null` | Present when the [feedback exemplar bank](self-evolving.md#3-the-fast-loop-episodic-memory) moved this score, with the matched verdict and similarity. |
-
-The `geodesia.brake` field is `true` if any **answer-region** axis (`halluc_context`, `halluc_closedbook`, `answer_safety`) has `flag: true`. Input-region axes affect the input phase separately.
-
-!!! tip "A flag is not a block"
-    `flag: true` on `profanity` or `out_of_scope` means *the axis fired*, not *the request was refused*. Read `glad_decision` / `flagged_axis` for what the gateway actually did.
-
----
-
 ## Axis Grouping
 
 | Phase | Axes | Timing |
@@ -339,25 +357,3 @@ This grouping matters for enforcement: `block_input` only applies to the input p
 | `profanity` | No | No | No |
 | `out_of_scope` | No | No | **Yes** — silent without one |
 | `prompt_complexity` | No | No | No |
-
----
-
-## Which axes does my deployment have?
-
-The served checkpoint decides. Ask the control plane rather than assuming:
-
-```bash
-curl -s http://localhost:8080/v1/glad/apps/meta | jq '{axes, extra_axes, supports_axis}'
-```
-
-```json
-{
-  "axes": ["prompt_safety", "jailbreak", "rag_jailbreak",
-           "halluc_context", "halluc_closedbook", "answer_safety",
-           "profanity", "out_of_scope", "prompt_complexity"],
-  "extra_axes": ["profanity", "out_of_scope", "prompt_complexity"],
-  "supports_axis": { "prompt_complexity": true }
-}
-```
-
-The same vocabulary is served to the feedback UI at `GET /v1/glad/feedback/schema`, so a front-end never hard-codes an axis list. On a checkpoint without the extra axes, `supports_axis.prompt_complexity` is `false`, the Studio hides the routing controls, and complexity routing silently falls back to Model A instead of failing requests.

@@ -1,22 +1,8 @@
 # Upstream Backends
 
-Geodesia G-1 is model-agnostic. It can sit in front of any LLM backend that speaks the OpenAI or Ollama API. The upstream backend is configured once (via the UI's **Settings → Service Connection** page or via the API) and the gateway automatically adapts its detection strategy to what the backend can provide.
-
----
-
-## Supported Backend Types
-
-| Type key | Description | Logprobs | Closed-book axis |
-|---|---|---|---|
-| `vllm` | vLLM serving engine | ✅ Full support | ✅ 5 axes |
-| `sglang` | SGLang serving framework | ✅ Full support | ✅ 5 axes |
-| `trtllm` / `tensorrt-llm` | NVIDIA TensorRT-LLM | ✅ Full support | ✅ 5 axes |
-| `openai` | OpenAI API or any OpenAI-compatible endpoint | ✅ When `logprobs=true` | ✅ 5 axes |
-| `ollama` | Ollama (local models) | ✅ Native (≥ 0.12) | ✅ 5 axes (older < 0.12: 4, or sidecar) |
-| `internal` | vLLM managed and lifecycle-controlled by the gateway itself | ✅ Full support | ✅ 5 axes |
-
-!!! info "4 vs 5 axes"
-    The **closed-book fabrication** axis requires per-token log-probability values from the upstream. Log-probabilities are a measure of how "certain" the model is about each word it generates. When they are unavailable, this axis is automatically disabled and the gateway operates with 4 axes — no configuration change is needed. The `/health` endpoint tells you which mode is active.
+G1-Proxy is model-agnostic: it sits in front of anything that speaks the OpenAI or Ollama API — vLLM,
+SGLang, TensorRT-LLM, Ollama, OpenAI, Bedrock, Vertex, Azure. You configure the upstream once and every
+Application inherits it, or binds its own.
 
 ---
 
@@ -50,6 +36,67 @@ curl -s -X POST http://localhost:8800/v1/glad/gateway/config \
 ```
 
 Any field in `GatewayConfig` can be updated. Changes take effect immediately on the next request.
+
+---
+
+## Testing a Connection
+
+The `/upstream/test` endpoint performs a full connection probe and returns a diagnostic summary. It is called automatically when you click **Test connection** in the UI.
+
+```bash
+curl -s -X POST http://localhost:8800/upstream/test \
+  -H "Content-Type: application/json" \
+  -d '{
+    "url": "http://localhost:8000",
+    "type": "vllm",
+    "api_key": "",
+    "model": "my-model"
+  }'
+```
+
+**Response:**
+
+```json
+{
+  "reachable": true,
+  "models": ["my-model"],
+  "has_logprobs": true,
+  "sample_reply": "OK",
+  "latency_ms": 117,
+  "error": null,
+  "type": "vllm",
+  "model": "my-model",
+  "closed_book_available": true,
+  "axes": 5
+}
+```
+
+| Field | Description |
+|---|---|
+| `reachable` | `true` if the server responded with an HTTP status below 500 |
+| `models` | List of model IDs available on the upstream |
+| `has_logprobs` | `true` if the upstream returns per-token log-probabilities |
+| `sample_reply` | The model's reply to "Reply with the single word OK" (up to 120 characters) |
+| `latency_ms` | Round-trip latency in milliseconds |
+| `error` | Error message if the connection failed, otherwise `null` |
+| `closed_book_available` | Same as `has_logprobs` — whether the 5th detection axis is available |
+| `axes` | `5` with logprobs, `4` without |
+
+---
+
+## Supported Backend Types
+
+| Type key | Description | Logprobs | Closed-book axis |
+|---|---|---|---|
+| `vllm` | vLLM serving engine | ✅ Full support | ✅ 5 axes |
+| `sglang` | SGLang serving framework | ✅ Full support | ✅ 5 axes |
+| `trtllm` / `tensorrt-llm` | NVIDIA TensorRT-LLM | ✅ Full support | ✅ 5 axes |
+| `openai` | OpenAI API or any OpenAI-compatible endpoint | ✅ When `logprobs=true` | ✅ 5 axes |
+| `ollama` | Ollama (local models) | ✅ Native (≥ 0.12) | ✅ 5 axes (older < 0.12: 4, or sidecar) |
+| `internal` | vLLM managed and lifecycle-controlled by the gateway itself | ✅ Full support | ✅ 5 axes |
+
+!!! info "4 vs 5 axes"
+    The **closed-book fabrication** axis requires per-token log-probability values from the upstream. Log-probabilities are a measure of how "certain" the model is about each word it generates. When they are unavailable, this axis is automatically disabled and the gateway operates with 4 axes — no configuration change is needed. The `/health` endpoint tells you which mode is active.
 
 ---
 
@@ -104,6 +151,8 @@ curl -X POST http://localhost:8800/v1/glad/gateway/config \
 
 !!! warning "Log-probability access"
     Log-probabilities are available from the OpenAI API when you set `logprobs: true` in the request. The gateway does this automatically. Some models or pricing tiers may not support them — the gateway detects this on the first request and falls back to 4-axis mode.
+
+---
 
 ## Cloud upstreams (Bedrock / Vertex / Azure)
 
@@ -174,51 +223,6 @@ curl -X POST http://localhost:8800/v1/glad/gateway/config \
 |---|---|
 | `internal_vllm_cmd` | Full shell command to start vLLM. The gateway runs it as a subprocess. |
 | `internal_vllm_url` | Base URL where the internal vLLM is accessible after startup. |
-
----
-
-## Testing a Connection
-
-The `/upstream/test` endpoint performs a full connection probe and returns a diagnostic summary. It is called automatically when you click **Test connection** in the UI.
-
-```bash
-curl -s -X POST http://localhost:8800/upstream/test \
-  -H "Content-Type: application/json" \
-  -d '{
-    "url": "http://localhost:8000",
-    "type": "vllm",
-    "api_key": "",
-    "model": "my-model"
-  }'
-```
-
-**Response:**
-
-```json
-{
-  "reachable": true,
-  "models": ["my-model"],
-  "has_logprobs": true,
-  "sample_reply": "OK",
-  "latency_ms": 117,
-  "error": null,
-  "type": "vllm",
-  "model": "my-model",
-  "closed_book_available": true,
-  "axes": 5
-}
-```
-
-| Field | Description |
-|---|---|
-| `reachable` | `true` if the server responded with an HTTP status below 500 |
-| `models` | List of model IDs available on the upstream |
-| `has_logprobs` | `true` if the upstream returns per-token log-probabilities |
-| `sample_reply` | The model's reply to "Reply with the single word OK" (up to 120 characters) |
-| `latency_ms` | Round-trip latency in milliseconds |
-| `error` | Error message if the connection failed, otherwise `null` |
-| `closed_book_available` | Same as `has_logprobs` — whether the 5th detection axis is available |
-| `axes` | `5` with logprobs, `4` without |
 
 ---
 

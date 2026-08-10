@@ -1,18 +1,79 @@
 # Settings
 
-The **Settings** page in G-1 Studio configures the **platform-wide** gateway (the Geodesia G1-Proxy
-service): upstream binding, Constitutional Intelligence, the numeric solver, your licence and
-the database. Everything that is **per-Application** — model binding, detection policy, thresholds,
-closed-book calibration, RAG, cost and governance — lives under **Applications → pick an app → Edit**, not
-here.
+The Settings page configures the **platform-wide** proxy: upstream binding, Constitutional Intelligence,
+the numeric solver, licence, database. Everything **per-Application** — model binding, detection policy,
+thresholds, calibration, RAG, cost, governance — lives under **Applications → pick an app → Edit**, not
+here. Every control on the page is one field on one API object.
 
-!!! info "What Save does — and what it doesn't"
-    Clicking **Save configuration** writes the config to the gateway (`POST /v1/glad/gateway/config`) and
-    **hot-reloads** the detector and numeric solver on the next request — no restart
-    needed. The **one exception is the bind host/port**: the gateway picks its listening port at process
-    start from `GW_PORT` (the container launch), so a new bind takes effect only after you **recreate the
-    container** (see [Changing the bind port](#changing-the-bind-port)). The Save status line tells you
-    which case you are in.
+---
+
+## Do it from the API
+
+**What it does.** Everything on this page is one object on the gateway. `GET` it to read the live
+configuration, `POST` a partial patch to change it — applied immediately and persisted to
+`GW_CONFIG_FILE`, no restart.
+
+=== "curl"
+
+    ```bash
+    # read (the upstream key comes back masked as "***", never in clear)
+    curl -s http://localhost:8080/gw/v1/glad/gateway/config | jq
+
+    # patch — send only what changes
+    curl -s -X POST http://localhost:8080/gw/v1/glad/gateway/config \
+      -H "Content-Type: application/json" \
+      -d '{"upstream_type":"ollama","upstream_base_url":"http://localhost:11434",
+           "upstream_model":"llama3.1:8b","inject_system_prompt":false}' | jq '.ok'
+    ```
+
+=== "Python"
+
+    ```python
+    import httpx
+
+    c = httpx.Client(base_url="http://localhost:8080/gw", timeout=60)
+
+    cfg = c.get("/v1/glad/gateway/config").json()
+    print(cfg["upstream_type"], cfg["upstream_model"])
+
+    r = c.post("/v1/glad/gateway/config", json={
+        "upstream_model": "llama3.1:8b",
+        "inject_system_prompt": False,
+        # leave "***" (or omit the key) to keep the stored upstream credential
+        "upstream_api_key": "***",
+    }).json()
+    print(r["ok"], r["config"]["upstream_model"])
+    ```
+
+=== "TypeScript"
+
+    ```ts
+    const BASE = "http://localhost:8080/gw"
+
+    const cfg = await fetch(`${BASE}/v1/glad/gateway/config`).then(r => r.json())
+
+    const r = await fetch(`${BASE}/v1/glad/gateway/config`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ upstream_model: "llama3.1:8b", inject_system_prompt: false }),
+    }).then(r => r.json())
+    console.log(r.ok)
+    ```
+
+**What comes back** — `{"ok": true, "config": { … }}` with the full configuration after the merge, minus
+the upstream key.
+
+!!! info "Save applies live — with one exception"
+    The detector and the numeric solver hot-reload on the next request. The **bind host/port** does not:
+    the gateway reads its listening port from `GW_PORT` at process start, so a new bind is persisted but
+    only takes effect after you recreate the container — see [Changing the bind port](#changing-the-bind-port).
+
+!!! danger "Three keys the endpoint refuses"
+    `system_prompt`, `internal_vllm_cmd` and `internal_vllm_url` are silently dropped, and
+    `upstream_type: "internal"` is rejected with a `400`. They feed a subprocess launch and the
+    constitutional prompt; they are settable by env/CLI only, so a remote caller cannot reach them.
+
+    When `GW_API_TOKEN` is set, this endpoint requires `Authorization: Bearer <token>`.
 
 ---
 
@@ -83,6 +144,8 @@ docker compose up -d --force-recreate g1-proxy
 The `GATEWAY_PORT` in `.env` drives the gateway's `--port` (and, with `network_mode: host`, the port
 clients connect to). After the recreate, update the **Gateway URL** field only if the console is on a
 different host.
+
+---
 
 ## Restarting to apply other changes
 

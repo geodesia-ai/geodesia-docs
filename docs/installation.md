@@ -1,23 +1,23 @@
 # Installation & Configuration
 
-One guide, all the commands: from `install.sh` to a working, configured stack, to calling an LLM with an API
-key and reading the safety verdicts.
+One guide, all the commands: from `install.sh` to a working, configured stack, to calling an LLM with an
+API key and reading the safety verdicts.
 
-**Contents**
-1. [What you're installing](#1-what-youre-installing)
-2. [Prerequisites](#2-prerequisites)
-3. [Install with `install.sh`](#3-install-with-installsh)
-4. [What the installer created](#4-what-the-installer-created)
-5. [Configure the upstream LLM](#5-configure-the-upstream-llm)
-6. [Licensing & tiers](#6-licensing-tiers)
-7. [Dilution guard (adaptive-attack defense)](#7-dilution-guard-adaptive-attack-defense)
-8. [Runtime gateway config](#8-runtime-gateway-config)
-9. [Create an Application + API key](#9-create-an-application-api-key)
-10. [Call the LLM with the key](#10-call-the-llm-with-the-key)
-11. [Interpret the response](#11-interpret-the-response)
-12. [Operations (logs, update, stop, health, metrics)](#12-operations)
-13. [Troubleshooting](#13-troubleshooting)
-14. [Full environment-variable reference](#14-full-environment-variable-reference)
+??? abstract "Contents"
+    1. [What you're installing](#1-what-youre-installing)
+    2. [Prerequisites](#2-prerequisites)
+    3. [Install with `install.sh`](#3-install-with-installsh)
+    4. [What the installer created](#4-what-the-installer-created)
+    5. [Configure the upstream LLM](#5-configure-the-upstream-llm)
+    6. [Licensing & tiers](#6-licensing-tiers)
+    7. [Dilution guard (adaptive-attack defense)](#7-dilution-guard-adaptive-attack-defense)
+    8. [Runtime gateway config](#8-runtime-gateway-config)
+    9. [Create an Application + API key](#9-create-an-application-api-key)
+    10. [Call the LLM with the key](#10-call-the-llm-with-the-key)
+    11. [Interpret the response](#11-interpret-the-response)
+    12. [Operations (logs, update, stop, health, metrics)](#12-operations)
+    13. [Troubleshooting](#13-troubleshooting)
+    14. [Full environment-variable reference](#14-full-environment-variable-reference)
 
 ---
 

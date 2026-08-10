@@ -1,23 +1,9 @@
 # Human Oversight
 
-The Human Oversight module implements **EU AI Act Article 14** — the requirement that high-risk AI systems include mechanisms allowing human operators to monitor, understand, override, and intervene in the system's operation.
-
-When a detection score exceeds the configured oversight threshold, the call is queued for human review. A human reviewer can approve or reject the system's decision, and the decision is permanently recorded in the audit trail.
-
----
-
-## How Oversight Works
-
-![Diagram](../assets/diagrams/compliance-oversight.svg){: .diagram }
-<p class="diagram-caption">Calls that exceed the oversight threshold are queued for a human, who confirms, overrides, or escalates — every decision is recorded in the audit chain.</p>
-
-The oversight threshold is independent from the blocking threshold. You can configure the system to:
-
-- **Block** calls above the blocking threshold AND queue for review
-- **Pass through** borderline calls but still flag them for review
-- **Review only** without any blocking (supervisory mode)
-
-Oversight configuration is set in [config.yaml](../configuration/index.md#human-oversight) under `human_oversight`.
+EU AI Act Article 14 requires that a human can monitor, override and intervene. When a call's risk
+crosses the oversight threshold it is queued as a **review**, keyed by `review_id`; a human closes it
+with a decision that is recorded permanently. Four endpoints: read the queue, read the counters, open a
+review by hand, close one.
 
 ---
 
@@ -269,6 +255,21 @@ A review is identified by its **`review_id`** (`REV-…`), not by the call it is
 | `rejected` | The human overrules the system. Review closes as `completed`; pair it with `override_justification`. |
 | `modified` | The outcome was changed by hand. Review closes as `completed`. |
 | `escalated` | Review closes as `escalated` **and a new review is opened one level up** (no new review past level 3). |
+
+---
+
+## How Oversight Works
+
+![Diagram](../assets/diagrams/compliance-oversight.svg){: .diagram }
+<p class="diagram-caption">Calls that exceed the oversight threshold are queued for a human, who confirms, overrides, or escalates — every decision is recorded in the audit chain.</p>
+
+The oversight threshold is independent from the blocking threshold. You can configure the system to:
+
+- **Block** calls above the blocking threshold AND queue for review
+- **Pass through** borderline calls but still flag them for review
+- **Review only** without any blocking (supervisory mode)
+
+Oversight configuration is set in [config.yaml](../configuration/index.md#human-oversight) under `human_oversight`.
 
 ---
 

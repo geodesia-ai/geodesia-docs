@@ -1,6 +1,9 @@
 # Reports & Deployer Manual
 
-Geodesia G-1 can generate legally-formatted compliance reports as PDF or DOCX files, suitable for submission to regulatory authorities, internal auditors, or enterprise compliance teams. It also generates a **Deployer Transparency Manual** — an EU AI Act Article 13-compliant instructions-for-use document.
+Two documents a regulator or an auditor will ask for, generated from what the deployment actually
+recorded: a **compliance report** covering a period (statistics, oversight, chain state, per-framework
+mapping) and a **deployer transparency manual** describing the current system in plain language, as
+Article 13 requires. Both come as structured data or as a rendered PDF.
 
 ---
 

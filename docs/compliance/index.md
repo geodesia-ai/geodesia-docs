@@ -4,6 +4,40 @@ The Geodesia G-1 Compliance Platform provides the complete toolchain to operate,
 
 ---
 
+## Call it
+
+The one call that tells you whether the deployment is defensible right now.
+
+=== "curl"
+
+    ```bash
+    curl -s http://localhost:8080/v1/glad/dashboard | jq '{overall_health, issues, warnings}'
+    curl -s http://localhost:8080/v1/glad/scorecard | jq '.scorecard'
+    ```
+
+=== "Python"
+
+    ```python
+    import httpx
+
+    dash = httpx.get("http://localhost:8080/v1/glad/dashboard", timeout=60).json()
+    print("overall:", dash["overall_health"])
+    for name, sub in dash["systems"].items():
+        print(f"  {name:20s} {sub['health']}")
+    for i in dash["issues"]:
+        print("  ISSUE:", i)
+    ```
+
+=== "TypeScript"
+
+    ```ts
+    const dash = await fetch("http://localhost:8080/v1/glad/dashboard").then(r => r.json())
+    console.log(dash.overall_health, dash.issues)
+    ```
+
+`overall_health` is `green` / `yellow` / `red`, and `issues` / `warnings` are already written for a human
+to read. Details: **[Dashboard](dashboard.md)**.
+
 ## Platform Components
 
 | Component | API prefix | Description |

@@ -4,11 +4,95 @@ icon: material/server-network
 
 # Framework Compatibility & DevOps Guide
 
-Geodesia G-1 is **model-agnostic and framework-agnostic**. It sits in front of your inference server as a thin, stateless validation layer and inspects every request and response — it does not care *how* the tokens are produced, only that the server speaks a protocol it understands.
+G1-Proxy sits in front of your inference server as a thin, stateless HTTP hop — it never loads your
+weights and never replaces your serving stack. Any framework that speaks the OpenAI or Ollama wire
+format works. The one thing that varies between them is whether they expose per-token
+log-probabilities, which decides whether the closed-book axis can run.
 
-> **The golden rule:** if your serving stack exposes an OpenAI-compatible `/v1/chat/completions` endpoint (or the Ollama API), Geodesia G-1 drops in front of it with zero changes to your application — you only change the `base_url` your client points at.
+---
 
-This page is the operator's reference: the **compatibility matrix**, **per-framework setup**, and the **production deployment, scaling, observability, security, and troubleshooting** playbook.
+## Configure It — Three Equivalent Ways
+
+Every framework below is configured identically; only the values change.
+
+=== "Gateway API (runtime, hot-reload)"
+
+    ```bash
+    curl -X POST http://localhost:8800/v1/glad/gateway/config \
+      -H "Content-Type: application/json" \
+      -d '{
+        "upstream_type": "vllm",
+        "upstream_base_url": "http://generator:8000",
+        "upstream_model": "meta-llama/Llama-3-8B-Instruct",
+        "upstream_api_key": ""
+      }'
+    ```
+    Changes take effect on the next request — no restart.
+
+=== "Environment variables (declarative)"
+
+    ```bash
+    GW_UPSTREAM_TYPE=vllm
+    GW_UPSTREAM_URL=http://generator:8000
+    GW_UPSTREAM_MODEL=meta-llama/Llama-3-8B-Instruct
+    GW_API_KEY=                 # only for hosted services
+    GW_BLOCK_INPUT=1            # enforce on input
+    GW_BLOCK_OUTPUT=1           # enforce on output
+    ```
+    The canonical way for Docker / Kubernetes — config is reproducible from your manifests.
+
+=== "Web UI"
+
+    **Settings → Service Connection** → choose type, enter URL (and API key if hosted), **Test connection**, pick the model, **Save**.
+
+| Config field | Env var | Meaning |
+|---|---|---|
+| `upstream_type` | `GW_UPSTREAM_TYPE` | `vllm` · `sglang` · `trtllm` · `openai` · `ollama` · `internal` |
+| `upstream_base_url` | `GW_UPSTREAM_URL` | Base URL of the server (no trailing `/v1`) |
+| `upstream_model` | `GW_UPSTREAM_MODEL` | Model name as the upstream knows it |
+| `upstream_api_key` | `GW_API_KEY` | Bearer token; empty for local servers |
+| — | `GW_MAXLEN` | Max tokens the detector reads (latency vs recall) |
+| — | `GW_BLOCK_INPUT` / `GW_BLOCK_OUTPUT` | `1` = block flagged content, `0` = annotate only |
+
+!!! info "Always verify after configuring"
+    Run `POST /upstream/test` (or the **Test connection** button) — it reports reachability, latency, the model list, and whether log-probabilities are available. See [Upstream Backends](backends.md#testing-a-connection).
+
+---
+
+## Health, Readiness & Probes
+
+The gateway's `/health` is designed to be both a **liveness** and a **readiness** signal.
+
+```bash
+curl http://localhost:8800/health
+```
+
+```json
+{
+  "ok": true,
+  "upstream_type": "vllm",
+  "upstream": "http://localhost:8000",
+  "internal_vllm": "stopped",
+  "logprobs": true,
+  "axes": 5
+}
+```
+
+| Field | Use it for |
+|---|---|
+| `ok` | Liveness — process is up and serving |
+| `upstream` / `upstream_type` | Confirm the configured backend |
+| `logprobs` | Readiness for full validation — `false` means 4-axis mode |
+| `axes` | Capability gauge — alert on an unexpected `5 → 4` drop |
+| `internal_vllm` | Lifecycle state when `type: internal` (`running` / `stopped`) |
+
+The product backend exposes its own lightweight check at `GET /v1/glad/health` for the compliance plane.
+
+| Probe | Endpoint | Recommended timing |
+|---|---|---|
+| Readiness | `GET :8800/health` | `initialDelay 10s · period 10s` |
+| Liveness | `GET :8800/health` | `initialDelay 30s · period 20s` |
+| Compliance plane | `GET :8199/v1/glad/health` | `period 30s` |
 
 ---
 
@@ -95,54 +179,6 @@ No setting toggles this — the gateway probes it on the first request and `/hea
 
 ![Diagram](../assets/diagrams/gateway-compatibility-2.svg){: .diagram }
 <p class="diagram-caption">Anything OpenAI-compatible that is not vLLM / SGLang / TensorRT-LLM uses <code>type: openai</code>.</p>
-
----
-
-## Configure It — Three Equivalent Ways
-
-Every framework below is configured identically; only the values change.
-
-=== "Gateway API (runtime, hot-reload)"
-
-    ```bash
-    curl -X POST http://localhost:8800/v1/glad/gateway/config \
-      -H "Content-Type: application/json" \
-      -d '{
-        "upstream_type": "vllm",
-        "upstream_base_url": "http://generator:8000",
-        "upstream_model": "meta-llama/Llama-3-8B-Instruct",
-        "upstream_api_key": ""
-      }'
-    ```
-    Changes take effect on the next request — no restart.
-
-=== "Environment variables (declarative)"
-
-    ```bash
-    GW_UPSTREAM_TYPE=vllm
-    GW_UPSTREAM_URL=http://generator:8000
-    GW_UPSTREAM_MODEL=meta-llama/Llama-3-8B-Instruct
-    GW_API_KEY=                 # only for hosted services
-    GW_BLOCK_INPUT=1            # enforce on input
-    GW_BLOCK_OUTPUT=1           # enforce on output
-    ```
-    The canonical way for Docker / Kubernetes — config is reproducible from your manifests.
-
-=== "Web UI"
-
-    **Settings → Service Connection** → choose type, enter URL (and API key if hosted), **Test connection**, pick the model, **Save**.
-
-| Config field | Env var | Meaning |
-|---|---|---|
-| `upstream_type` | `GW_UPSTREAM_TYPE` | `vllm` · `sglang` · `trtllm` · `openai` · `ollama` · `internal` |
-| `upstream_base_url` | `GW_UPSTREAM_URL` | Base URL of the server (no trailing `/v1`) |
-| `upstream_model` | `GW_UPSTREAM_MODEL` | Model name as the upstream knows it |
-| `upstream_api_key` | `GW_API_KEY` | Bearer token; empty for local servers |
-| — | `GW_MAXLEN` | Max tokens the detector reads (latency vs recall) |
-| — | `GW_BLOCK_INPUT` / `GW_BLOCK_OUTPUT` | `1` = block flagged content, `0` = annotate only |
-
-!!! info "Always verify after configuring"
-    Run `POST /upstream/test` (or the **Test connection** button) — it reports reachability, latency, the model list, and whether log-probabilities are available. See [Upstream Backends](backends.md#testing-a-connection).
 
 ---
 
@@ -379,14 +415,18 @@ spec:
             httpGet: { path: /health, port: 8800 }
             initialDelaySeconds: 30
             periodSeconds: 20
+
 ---
+
 apiVersion: v1
 kind: Service
 metadata: { name: geodesia-gw }
 spec:
   selector: { app: geodesia-gateway }
   ports: [{ port: 8800, targetPort: 8800 }]
+
 ---
+
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata: { name: geodesia-gateway }
@@ -428,43 +468,6 @@ WantedBy=multi-user.target
 systemctl enable --now geodesia-gateway
 systemctl status geodesia-gateway
 ```
-
----
-
-## Health, Readiness & Probes
-
-The gateway's `/health` is designed to be both a **liveness** and a **readiness** signal.
-
-```bash
-curl http://localhost:8800/health
-```
-
-```json
-{
-  "ok": true,
-  "upstream_type": "vllm",
-  "upstream": "http://localhost:8000",
-  "internal_vllm": "stopped",
-  "logprobs": true,
-  "axes": 5
-}
-```
-
-| Field | Use it for |
-|---|---|
-| `ok` | Liveness — process is up and serving |
-| `upstream` / `upstream_type` | Confirm the configured backend |
-| `logprobs` | Readiness for full validation — `false` means 4-axis mode |
-| `axes` | Capability gauge — alert on an unexpected `5 → 4` drop |
-| `internal_vllm` | Lifecycle state when `type: internal` (`running` / `stopped`) |
-
-The product backend exposes its own lightweight check at `GET /v1/glad/health` for the compliance plane.
-
-| Probe | Endpoint | Recommended timing |
-|---|---|---|
-| Readiness | `GET :8800/health` | `initialDelay 10s · period 10s` |
-| Liveness | `GET :8800/health` | `initialDelay 30s · period 20s` |
-| Compliance plane | `GET :8199/v1/glad/health` | `period 30s` |
 
 ---
 

@@ -1,12 +1,57 @@
 # Agent Flow API
 
-The Agent Flow API provides a structured multi-agent debugging and demonstration interface. It exposes pre-built pipeline types that show how Geodesia G-1 integrates into agentic AI workflows — and allows you to trace, replay, and compute explainability for each step.
+A structured harness for multi-agent pipelines: run a pre-built pipeline, get back a full trace of every
+agent hop with the detection verdict at each one, and measure how stable the whole thing is under
+resampling. It exists so you can see where a guardrail fires inside an agentic flow, not just at its
+edges.
 
-This API is primarily intended for:
+---
 
-- **Integration demonstrations** — showing how Geodesia works in a multi-agent pipeline
-- **Developer debugging** — tracing what happened in a complex multi-step pipeline
-- **Research and evaluation** — computing PSS attribution across a full agent run
+## Call it
+
+**What it does.** List the pipelines, run one, read its trace. Every hop in the trace carries the
+detection verdict that step was served with, so a guardrail firing three agents deep is visible instead
+of inferred.
+
+=== "curl"
+
+    ```bash
+    BASE=http://localhost:8080/v1/agent-flow
+
+    curl -s $BASE/demos | jq '[.demos[].type]'
+    curl -s -X POST $BASE/run/rag_qa | jq '.steps[] | {step, decision}'
+    curl -s "$BASE/compute_pss/rag_qa?n_samples=8&temperature=0.7" | jq
+    ```
+
+=== "Python"
+
+    ```python
+    import httpx
+
+    c = httpx.Client(base_url="http://localhost:8080/v1/agent-flow", timeout=300)
+
+    print([d["type"] for d in c.get("/demos").json()["demos"]])
+
+    run = c.post("/run/rag_qa").json()
+    for step in run["steps"]:
+        print(f"  {step['step']:20s} {step.get('decision', '-')}")
+
+    pss = c.post("/compute_pss/rag_qa", params={"n_samples": 8, "temperature": 0.7}).json()
+    print("stability:", pss)
+    ```
+
+=== "TypeScript"
+
+    ```ts
+    const BASE = "http://localhost:8080/v1/agent-flow"
+
+    const demos = await fetch(`${BASE}/demos`).then(r => r.json())
+    const run = await fetch(`${BASE}/run/rag_qa`, { method: "POST" }).then(r => r.json())
+    run.steps.forEach((s: any) => console.log(s.step, s.decision))
+    ```
+
+**What comes back** — the trace: one entry per pipeline step, each with what it produced and what the
+detector said about it. `compute_pss` returns the positional-stability measurement over resamples.
 
 ---
 

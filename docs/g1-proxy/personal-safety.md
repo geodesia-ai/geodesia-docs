@@ -1,5 +1,68 @@
 # Personal Safety
 
+## Turn it on
+
+Off by default. Two switches: the automatic reviewer that proposes corrections, and — separately —
+whether it is allowed to write them or only to queue them.
+
+=== "curl"
+
+    ```bash
+    # is it installed, and is it running?
+    curl -s http://localhost:8080/gw/v1/glad/feedback/auto/status | jq \
+      '{installed, enabled, judge_state, queue}'
+
+    # read the exact prompt it will use, before enabling it
+    curl -s "http://localhost:8080/gw/v1/glad/feedback/auto/prompt-preview?axis=prompt_safety" | jq -r .system
+
+    # enable, and require a human to approve everything it proposes
+    curl -s -X PUT http://localhost:8080/gw/v1/glad/feedback/auto/config \
+      -H "Content-Type: application/json" \
+      -d '{"enabled": true, "autoapprove": false}' | jq '.config'
+    ```
+
+=== "Python"
+
+    ```python
+    import httpx
+
+    c = httpx.Client(base_url="http://localhost:8080/gw", timeout=30)
+
+    st = c.get("/v1/glad/feedback/auto/status").json()
+    if not st["installed"]:
+        raise SystemExit("the reviewer is not present in this image")
+
+    # Read what it will be asked, before letting it ask anything.
+    print(c.get("/v1/glad/feedback/auto/prompt-preview",
+                params={"axis": "prompt_safety"}).json()["system"])
+
+    c.put("/v1/glad/feedback/auto/config", json={"enabled": True, "autoapprove": False})
+
+    # What it has proposed so far.
+    for item in c.get("/v1/glad/feedback/auto/items", params={"limit": 20}).json()["items"]:
+        print(item)
+    ```
+
+=== "TypeScript"
+
+    ```ts
+    const BASE = "http://localhost:8080/gw"
+
+    const st = await fetch(`${BASE}/v1/glad/feedback/auto/status`).then(r => r.json())
+    console.log(st.installed, st.enabled, st.queue)
+
+    await fetch(`${BASE}/v1/glad/feedback/auto/config`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ enabled: true, autoapprove: false }),
+    })
+    ```
+
+**What comes back** — `auto/status` reports `{installed, enabled, judge_state, judged_total, idle_seconds,
+queue: {pending, judging, scored, disagreements, promoted, …}}`. Everything the reviewer writes is stamped
+as machine-made, so you can audit — or revoke — every automatic entry in one action without touching a
+single human decision.
+
 ## Safety is personal, in the same sense a computer is personal
 
 A pharmaceutical company doing mRNA research needs its assistant to discuss CRISPR in operational

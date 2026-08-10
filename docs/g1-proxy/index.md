@@ -5,6 +5,51 @@
 
 **G1-Proxy** is an OpenAI-compatible HTTP proxy that adds real-time AI validation to any LLM backend. It listens for chat requests, screens them, forwards them to the configured upstream model, validates the response, and returns the result — with a `geodesia` field attached containing the full detection payload.
 
+## Call it
+
+Point any OpenAI client at the proxy. Nothing else in your code changes — the answer comes back in the
+shape you already handle, with the verdict attached.
+
+=== "curl"
+
+    ```bash
+    curl -s http://localhost:8080/gw/v1/chat/completions \
+      -H "Content-Type: application/json" \
+      -d '{"model":"my-model","stream":false,
+           "messages":[{"role":"user","content":"What is the capital of France?"}]}' \
+      | jq '{answer: .choices[0].message.content, decision: .glad_decision}'
+    ```
+
+=== "Python"
+
+    ```python
+    from openai import OpenAI
+
+    client = OpenAI(base_url="http://localhost:8080/gw/v1", api_key="not-needed-locally")
+    r = client.chat.completions.create(
+        model="my-model",
+        messages=[{"role": "user", "content": "What is the capital of France?"}],
+    )
+    print(r.choices[0].message.content)
+    print(r.model_extra["glad_decision"], r.model_extra["geodesia"]["dominant_axis"])
+    ```
+
+=== "TypeScript"
+
+    ```ts
+    import OpenAI from "openai"
+
+    const client = new OpenAI({ baseURL: "http://localhost:8080/gw/v1", apiKey: "not-needed-locally" })
+    const r = (await client.chat.completions.create({
+      model: "my-model",
+      messages: [{ role: "user", content: "What is the capital of France?" }],
+    })) as any
+
+    console.log(r.choices[0].message.content, r.glad_decision)
+    ```
+
+Full request/response contract: **[Chat API](chat-api.md)**. Every route: **[Complete API Map](api-reference.md)**.
+
 ## Key Capabilities
 
 | Capability | Description |

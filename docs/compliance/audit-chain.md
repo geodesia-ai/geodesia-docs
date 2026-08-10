@@ -1,54 +1,9 @@
 # Audit Chain
 
-The Audit Chain is a **tamper-evident, append-only log** that records every significant event in the Geodesia G-1 system. Each log entry is cryptographically linked to the previous one via HMAC-SHA256, making any retroactive modification detectable.
-
----
-
-## Design
-
-The audit chain is inspired by blockchain-style ledger design, but implemented as a simple hash-linked list stored in the SQLite database:
-
-![Diagram](../assets/diagrams/compliance-audit-chain.svg){: .diagram }
-
-Each `entry_hash` is computed over: `prev_hash + timestamp + event_type + payload`. If any past entry is modified, the hash chain breaks, and `GET /v1/glad/chain/verify` reports the tampered entry.
-
----
-
-## Two kinds of tamper evidence
-
-The hash chain proves that a record **was not altered after the fact**. It cannot, on its own, prove that the record was *right* — a perfectly intact chain of unexplainable decisions is still unexplainable.
-
-Geodesia pairs it with a second, independent property: the decision's explanation is **deterministic and recomputable**. [Causal explainability](../g1-proxy/causal-xai.md) is a measurement over a deterministic detector — no gradients, no sampling, no LLM in the loop — so the same request, against the same detector build, yields the same responsible tokens for anyone who runs it, including an auditor who does not trust you.
-
-| Question an auditor asks | Answered by |
-|---|---|
-| *"Has this record been changed since it was written?"* | The hash chain — `GET /v1/glad/chain/verify` |
-| *"Why was this specific request blocked?"* | The certified responsible tokens stored with the decision |
-| *"Can I check that answer myself?"* | Re-running the attribution and getting the same tokens |
-
-This is a property an LLM provider structurally cannot offer. An explanation *generated* by a language model is another sample — temperature-dependent, unverifiable, different tomorrow. An explanation *computed* by intervening on a deterministic function is arithmetic, and arithmetic can be repeated.
-
----
-
-## What Gets Logged
-
-Every entry in the chain has an `event_type`. The following events are automatically recorded:
-
-| Event Type | When Recorded |
-|---|---|
-| `inference_call` | Every call through the evaluate endpoint or gateway |
-| `prompt_blocked` | When a prompt is blocked by the safety or jailbreak detector |
-| `answer_blocked` | When an answer is withheld by the safety or hallucination detector |
-| `kill_switch_activated` | When the kill switch is engaged |
-| `kill_switch_deactivated` | When the kill switch is disengaged |
-| `oversight_review` | When a human reviewer records a decision |
-| `oversight_escalation` | When a pending review is escalated |
-| `fria_created` | When a FRIA dossier is created |
-| `fria_approved` | When a FRIA dossier is approved |
-| `model_switched` | When the active model checkpoint is changed |
-| `threshold_changed` | When detection thresholds are updated |
-| `watermark_verified` | When a watermark is verified |
-| `config_changed` | When the gateway configuration is modified |
+Every significant event — each inference call, each block, each human decision, each configuration
+change — is written to a **tamper-evident, append-only ledger**. Entries are chained with HMAC-SHA256,
+so any retroactive edit breaks verification and is reported with the index where it broke. Two endpoints:
+one for the snapshot, one for the full cryptographic re-check.
 
 ---
 
@@ -179,15 +134,59 @@ Both endpoints live on **G-1 Studio** (`/v1/glad/...`). They take no parameters 
 
 ---
 
-## Exporting the chain
+## Design
 
-There is **no** query/pagination endpoint on the ledger — `chain/status` returns the newest 20 entries and nothing else. To get a full, filtered export, use one of:
+The audit chain is inspired by blockchain-style ledger design, but implemented as a simple hash-linked list stored in the SQLite database:
 
-| You want | Use |
+![Diagram](../assets/diagrams/compliance-audit-chain.svg){: .diagram }
+
+Each `entry_hash` is computed over: `prev_hash + timestamp + event_type + payload`. If any past entry is modified, the hash chain breaks, and `GET /v1/glad/chain/verify` reports the tampered entry.
+
+---
+
+## Two kinds of tamper evidence
+
+The hash chain proves that a record **was not altered after the fact**. It cannot, on its own, prove that the record was *right* — a perfectly intact chain of unexplainable decisions is still unexplainable.
+
+Geodesia pairs it with a second, independent property: the decision's explanation is **deterministic and recomputable**. [Causal explainability](../g1-proxy/causal-xai.md) is a measurement over a deterministic detector — no gradients, no sampling, no LLM in the loop — so the same request, against the same detector build, yields the same responsible tokens for anyone who runs it, including an auditor who does not trust you.
+
+| Question an auditor asks | Answered by |
 |---|---|
-| Everything one Application ever saw, as a database file | `GET /v1/glad/apps/{app_id}/export?fmt=sqlite` (also `csv`, `jsonl`) — see [Managing Applications](../studio/applications.md) |
-| A regulator-ready dossier with the chain snapshot, FRIA and call statistics | `POST /v1/glad/report` — see [Reports & Manuals](reports.md) |
-| A per-call decision record | `GET /v1/glad/apps/{app_id}/messages` |
+| *"Has this record been changed since it was written?"* | The hash chain — `GET /v1/glad/chain/verify` |
+| *"Why was this specific request blocked?"* | The certified responsible tokens stored with the decision |
+| *"Can I check that answer myself?"* | Re-running the attribution and getting the same tokens |
+
+This is a property an LLM provider structurally cannot offer. An explanation *generated* by a language model is another sample — temperature-dependent, unverifiable, different tomorrow. An explanation *computed* by intervening on a deterministic function is arithmetic, and arithmetic can be repeated.
+
+---
+
+## What Gets Logged
+
+Every entry in the chain has an `event_type`. The following events are automatically recorded:
+
+| Event Type | When Recorded |
+|---|---|
+| `inference_call` | Every call through the evaluate endpoint or gateway |
+| `prompt_blocked` | When a prompt is blocked by the safety or jailbreak detector |
+| `answer_blocked` | When an answer is withheld by the safety or hallucination detector |
+| `kill_switch_activated` | When the kill switch is engaged |
+| `kill_switch_deactivated` | When the kill switch is disengaged |
+| `oversight_review` | When a human reviewer records a decision |
+| `oversight_escalation` | When a pending review is escalated |
+| `fria_created` | When a FRIA dossier is created |
+| `fria_approved` | When a FRIA dossier is approved |
+| `model_switched` | When the active model checkpoint is changed |
+| `threshold_changed` | When detection thresholds are updated |
+| `watermark_verified` | When a watermark is verified |
+| `config_changed` | When the gateway configuration is modified |
+
+---
+
+## For regulatory submission
+
+For a complete audit bundle including FRIA, chain snapshot and call statistics, use
+[`POST /v1/glad/report`](reports.md). For the raw per-call records of one Application,
+`GET /v1/glad/apps/{app_id}/export?fmt=sqlite`.
 
 ---
 
@@ -204,8 +203,12 @@ There is **no** query/pagination endpoint on the ledger — `chain/status` retur
 
 ---
 
-## For regulatory submission
+## Exporting the chain
 
-For a complete audit bundle including FRIA, chain snapshot and call statistics, use
-[`POST /v1/glad/report`](reports.md). For the raw per-call records of one Application,
-`GET /v1/glad/apps/{app_id}/export?fmt=sqlite`.
+There is **no** query/pagination endpoint on the ledger — `chain/status` returns the newest 20 entries and nothing else. To get a full, filtered export, use one of:
+
+| You want | Use |
+|---|---|
+| Everything one Application ever saw, as a database file | `GET /v1/glad/apps/{app_id}/export?fmt=sqlite` (also `csv`, `jsonl`) — see [Managing Applications](../studio/applications.md) |
+| A regulator-ready dossier with the chain snapshot, FRIA and call statistics | `POST /v1/glad/report` — see [Reports & Manuals](reports.md) |
+| A per-call decision record | `GET /v1/glad/apps/{app_id}/messages` |

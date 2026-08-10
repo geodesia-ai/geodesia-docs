@@ -8,6 +8,76 @@ Because policy is per Application, scoring uses that Application's **bound model
 
 ---
 
+## Set it
+
+MCP enforcement is part of the Application config, under `mcp`. Read it, patch it, and it applies to every
+tool surface that Application sees.
+
+=== "curl"
+
+    ```bash
+    curl -s -X PUT http://localhost:8080/v1/glad/apps/support_bot \
+      -H "Content-Type: application/json" \
+      -d '{"config":{"mcp":{
+            "enabled": true,
+            "action_tool_description": "block",
+            "action_tool_args": "policy",
+            "action_tool_result": "annotate",
+            "domain_allowlist": ["intranet.acme.com"],
+            "tools": {
+              "read_file":  {"trusted": true},
+              "send_email": {"egress": true, "action": "block"}
+            }}}}' | jq '.config_version'
+    ```
+
+=== "Python"
+
+    ```python
+    import httpx
+
+    c = httpx.Client(base_url="http://localhost:8080", timeout=30)
+
+    app = c.get("/v1/glad/apps/support_bot").json()
+    mcp = app["config"].get("mcp", {})
+    mcp |= {
+        "enabled": True,
+        "action_tool_description": "block",     # block | annotate | off
+        "action_tool_args": "policy",           # + "policy" (the deterministic intent policy)
+        "action_tool_result": "annotate",
+        "axis_actions": {"jailbreak": "block"}, # per-axis override of the surface action
+        "domain_allowlist": ["intranet.acme.com"],
+        "tools": {
+            "read_file":  {"trusted": True},                      # skip scanning
+            "send_email": {"egress": True, "action": "block"},    # treat as a data sink
+        },
+    }
+    c.put("/v1/glad/apps/support_bot", json={"config": {"mcp": mcp}})
+    ```
+
+=== "TypeScript"
+
+    ```ts
+    await fetch("http://localhost:8080/v1/glad/apps/support_bot", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ config: { mcp: {
+        enabled: true,
+        action_tool_description: "block",
+        action_tool_args: "policy",
+        action_tool_result: "annotate",
+        domain_allowlist: ["intranet.acme.com"],
+        tools: { read_file: { trusted: true }, send_email: { egress: true, action: "block" } },
+      } } }),
+    })
+    ```
+
+Per-surface actions are **flat fields** (`action_tool_description`, `action_tool_result`,
+`action_tool_args`), not a nested object. `action_tool_args` additionally accepts `policy` — the
+deterministic intent policy — alongside `block` / `annotate` / `off`.
+
+Read the live layer state — which servers and interceptors are listening, and the actions in force —
+with `GET /gw/v1/glad/mcp/status`.
+
 ## 1 · Per Application
 
 | Setting | Meaning |

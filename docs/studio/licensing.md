@@ -1,9 +1,69 @@
 # Licensing & Entitlements
 
-Geodesia G-1 ships with everything unlocked enough to evaluate end-to-end, and gates the rest behind a **vendor-signed license**. There is no license server to call and no phone-home: a license is a small signed file that the companion verifies **offline** against an Ed25519 public key baked into the build. This page describes the tiers, what is metered, the license file format, and how you apply, clear, and inspect a license.
+Everything is unlocked enough to evaluate end to end; the rest sits behind a **vendor-signed licence**.
+There is no licence server to call and nothing phones home — the Ed25519 signature on the licence *is*
+the authorization, verified locally. Two endpoints apply and clear it; one reports the plan and today's
+usage.
 
-!!! note "Enforced locally, verified offline"
-    The entitlement module runs inside the gateway and is **AES-protected in distribution**, so the limits cannot be trivially patched out. Verification uses a baked-in Ed25519 **public** key — no network, no license server. This is **air-gap friendly**: an installation that never touches the internet still enforces (and can be upgraded by dropping in a new license file).
+---
+
+## Applying and clearing a license
+
+You can apply a license either from the UI or directly against the gateway API. Either way the license string may be the **raw JSON document** shown above, or its **base64 encoding** (the convenient paste-able "license key").
+
+### From the UI
+
+Open **Settings → Plan & License**, paste the license key, and apply. The page then reflects the new tier and limits.
+
+### From the API
+
+Apply a license:
+
+=== "curl"
+
+    ```bash
+    curl -s -X POST http://localhost:8080/gw/v1/glad/gateway/license \
+      -H "Content-Type: application/json" \
+      -d '{"license": "<raw-json-or-base64>"}' | jq
+    ```
+
+=== "Python"
+
+    ```python
+    import httpx
+
+    r = httpx.post("http://localhost:8080/gw/v1/glad/gateway/license",
+                   json={"license": open("license.b64").read().strip()}, timeout=30)
+    if r.status_code == 400:
+        raise SystemExit(f"rejected: {r.json()['detail']}")
+    plan = r.json()
+    print("now on:", plan["tier"], "until", plan["expires"])
+    ```
+
+=== "TypeScript"
+
+    ```ts
+    const res = await fetch("http://localhost:8080/gw/v1/glad/gateway/license", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ license: licenseKey }),
+    })
+    if (res.status === 400) throw new Error((await res.json()).detail)
+    const plan = await res.json()
+    ```
+
+The request body accepts the license under any of the keys `license`, `token`, or `key`. On success the endpoint returns the new `status()` plan; an invalid or expired signature returns **HTTP 400** with the reason in `detail`.
+
+!!! note "The signature is the authorization"
+    The license endpoints require no admin token — the **Ed25519 signature is the authorization**. An unsigned or tampered license is rejected outright, so there is nothing to gain by POSTing one. Only a license signed with the vendor's private key validates.
+
+Clear the installed license (return to FREE):
+
+```bash
+curl -s -X DELETE http://localhost:8080/gw/v1/glad/gateway/license
+```
+
+This removes `license.json` and returns the (now free-tier) plan.
 
 ---
 
@@ -139,66 +199,6 @@ A license is a JSON document with a `payload` and an Ed25519 `sig` over the cano
 | `license_id` | Stable identifier for this license. |
 
 The companion stores the installed license at `license.json` next to the install root (override the path with `GLAD_LICENSE_FILE`). On every refresh it re-reads the file, re-verifies the signature against the baked-in public key, and checks `expires`. **Any** failure — missing file, malformed JSON, bad signature, past expiry — falls back to FREE.
-
----
-
-## Applying and clearing a license
-
-You can apply a license either from the UI or directly against the gateway API. Either way the license string may be the **raw JSON document** shown above, or its **base64 encoding** (the convenient paste-able "license key").
-
-### From the UI
-
-Open **Settings → Plan & License**, paste the license key, and apply. The page then reflects the new tier and limits.
-
-### From the API
-
-Apply a license:
-
-=== "curl"
-
-    ```bash
-    curl -s -X POST http://localhost:8080/gw/v1/glad/gateway/license \
-      -H "Content-Type: application/json" \
-      -d '{"license": "<raw-json-or-base64>"}' | jq
-    ```
-
-=== "Python"
-
-    ```python
-    import httpx
-
-    r = httpx.post("http://localhost:8080/gw/v1/glad/gateway/license",
-                   json={"license": open("license.b64").read().strip()}, timeout=30)
-    if r.status_code == 400:
-        raise SystemExit(f"rejected: {r.json()['detail']}")
-    plan = r.json()
-    print("now on:", plan["tier"], "until", plan["expires"])
-    ```
-
-=== "TypeScript"
-
-    ```ts
-    const res = await fetch("http://localhost:8080/gw/v1/glad/gateway/license", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ license: licenseKey }),
-    })
-    if (res.status === 400) throw new Error((await res.json()).detail)
-    const plan = await res.json()
-    ```
-
-The request body accepts the license under any of the keys `license`, `token`, or `key`. On success the endpoint returns the new `status()` plan; an invalid or expired signature returns **HTTP 400** with the reason in `detail`.
-
-!!! note "The signature is the authorization"
-    The license endpoints require no admin token — the **Ed25519 signature is the authorization**. An unsigned or tampered license is rejected outright, so there is nothing to gain by POSTing one. Only a license signed with the vendor's private key validates.
-
-Clear the installed license (return to FREE):
-
-```bash
-curl -s -X DELETE http://localhost:8080/gw/v1/glad/gateway/license
-```
-
-This removes `license.json` and returns the (now free-tier) plan.
 
 ---
 

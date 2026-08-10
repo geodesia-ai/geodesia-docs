@@ -1,9 +1,53 @@
 # Enforcement Modes
 
-Geodesia G-1 can operate in two enforcement modes that control what happens when a detection axis flags content. The mode can be set globally (in the gateway configuration) and overridden on a per-request basis.
+A flagged axis has to *do* something. **Blocking** withholds the content; **passthrough** returns it with
+the verdict attached. The choice is a deployment default, overridable per Application and per request —
+and it is what separates a guardrail from a monitor.
 
-![Diagram](../assets/diagrams/gateway-enforcement-modes.svg){: .diagram }
-<p class="diagram-caption">Both modes record the verdict — they differ only in whether the flagged content reaches the user.</p>
+---
+
+## Setting the Mode
+
+### Globally (gateway configuration)
+
+```bash
+# Enable blocking for both input and output (recommended for production)
+curl -X POST http://localhost:8800/v1/glad/gateway/config \
+  -d '{"block_input": true, "block_output": true}'
+
+# Enable passthrough for monitoring/audit only
+curl -X POST http://localhost:8800/v1/glad/gateway/config \
+  -d '{"block_input": false, "block_output": false}'
+```
+
+Environment variables:
+
+| Variable | Default | Effect |
+|---|---|---|
+| `GW_BLOCK_INPUT` | `0` | Set to `1` to enable input blocking globally |
+| (no env var for output) | `true` | Output blocking is enabled by default |
+
+### Per-request override
+
+Use the `mode` (or `glad_mode`) field to override the global setting for one request:
+
+```bash
+# Force passthrough for this request (review mode)
+curl -X POST http://localhost:8800/v1/chat/completions \
+  -d '{"model":"my-model","messages":[...],"mode":"passthrough","stream":false}'
+
+# Force blocking for this request
+curl -X POST http://localhost:8800/v1/chat/completions \
+  -d '{"model":"my-model","messages":[...],"mode":"block","stream":false}'
+```
+
+**Accepted values for `mode` / `glad_mode`:**
+
+| Value | Effect |
+|---|---|
+| `"block"`, `"blocking"`, `"enforce"` | Block flagged content (withhold) |
+| `"passthrough"`, `"monitor"`, `"annotate"`, `"observe"`, `"score"` | Return answer but annotate |
+| (omitted) | Fall back to the gateway's global `block_input`/`block_output` settings |
 
 ---
 
@@ -70,51 +114,6 @@ Passthrough is useful when:
 ```
 
 Key distinction: `glad_decision` is `"blocked"` (the axis fired), but `glad_mode` is `"passthrough"` (no content was withheld). Your application can inspect `glad_decision` to decide whether to show the answer.
-
----
-
-## Setting the Mode
-
-### Globally (gateway configuration)
-
-```bash
-# Enable blocking for both input and output (recommended for production)
-curl -X POST http://localhost:8800/v1/glad/gateway/config \
-  -d '{"block_input": true, "block_output": true}'
-
-# Enable passthrough for monitoring/audit only
-curl -X POST http://localhost:8800/v1/glad/gateway/config \
-  -d '{"block_input": false, "block_output": false}'
-```
-
-Environment variables:
-
-| Variable | Default | Effect |
-|---|---|---|
-| `GW_BLOCK_INPUT` | `0` | Set to `1` to enable input blocking globally |
-| (no env var for output) | `true` | Output blocking is enabled by default |
-
-### Per-request override
-
-Use the `mode` (or `glad_mode`) field to override the global setting for one request:
-
-```bash
-# Force passthrough for this request (review mode)
-curl -X POST http://localhost:8800/v1/chat/completions \
-  -d '{"model":"my-model","messages":[...],"mode":"passthrough","stream":false}'
-
-# Force blocking for this request
-curl -X POST http://localhost:8800/v1/chat/completions \
-  -d '{"model":"my-model","messages":[...],"mode":"block","stream":false}'
-```
-
-**Accepted values for `mode` / `glad_mode`:**
-
-| Value | Effect |
-|---|---|
-| `"block"`, `"blocking"`, `"enforce"` | Block flagged content (withhold) |
-| `"passthrough"`, `"monitor"`, `"annotate"`, `"observe"`, `"score"` | Return answer but annotate |
-| (omitted) | Fall back to the gateway's global `block_input`/`block_output` settings |
 
 ---
 

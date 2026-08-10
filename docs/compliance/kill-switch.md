@@ -1,23 +1,9 @@
 # Kill Switch
 
-The Kill Switch provides an **immediate, system-wide suspension** mechanism for the Geodesia G-1 service. When activated, all inference calls are rejected with a clear compliance message. It is designed to satisfy the "stop button" requirements in EU AI Act Article 14 and the 72-hour compliance deactivation window in California SB 942.
-
----
-
-## What Happens When the Kill Switch Is Active
-
-When the kill switch is engaged:
-
-1. The gateway immediately rejects all new inference requests with HTTP `503` and a compliance message
-2. All queued calls are drained without processing
-3. The kill switch activation event is written to the HMAC audit chain
-4. A kill switch notification is sent to the configured contact email (if enabled)
-5. All existing sessions are invalidated
-
-The kill switch does **not** affect:
-- Compliance API endpoints (oversight, FRIA, reports, audit chain)
-- Health check endpoints
-- Admin endpoints for deactivating the kill switch
+One call suspends the whole deployment: inference stops, the event is written to the ledger, and the
+status endpoint reports whether you are still inside the 72-hour window California SB 942 allows. It is
+the "stop button" of EU AI Act Article 14. Activation is permanent until something deactivates it —
+there is no timer.
 
 ---
 
@@ -203,6 +189,23 @@ Three routes on **G-1 Studio**. All of them are scoped by `deployer_id`, which d
 
 !!! info "`activated_by`, not `deactivated_by`"
     Both endpoints share one request model. The field is `activated_by` on deactivation too — the event's `event_type` is what distinguishes the two.
+
+---
+
+## What Happens When the Kill Switch Is Active
+
+When the kill switch is engaged:
+
+1. The gateway immediately rejects all new inference requests with HTTP `503` and a compliance message
+2. All queued calls are drained without processing
+3. The kill switch activation event is written to the HMAC audit chain
+4. A kill switch notification is sent to the configured contact email (if enabled)
+5. All existing sessions are invalidated
+
+The kill switch does **not** affect:
+- Compliance API endpoints (oversight, FRIA, reports, audit chain)
+- Health check endpoints
+- Admin endpoints for deactivating the kill switch
 
 ---
 

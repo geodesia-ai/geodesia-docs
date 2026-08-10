@@ -15,6 +15,53 @@ If you are wiring an application to Geodesia, you are almost always talking to *
 
 ---
 
+## Hello world
+
+=== "curl"
+
+    ```bash
+    # data plane — a guarded completion
+    curl -s http://localhost:8080/gw/v1/chat/completions \
+      -H "Content-Type: application/json" \
+      -d '{"model":"my-model","stream":false,"messages":[{"role":"user","content":"Hello"}]}' \
+      | jq '{answer: .choices[0].message.content, decision: .glad_decision}'
+
+    # control plane — what this deployment is configured to detect
+    curl -s http://localhost:8080/v1/glad/apps/meta | jq '.axes'
+    ```
+
+=== "Python"
+
+    ```python
+    import httpx
+
+    gw = httpx.Client(base_url="http://localhost:8080/gw", timeout=120)
+    st = httpx.Client(base_url="http://localhost:8080", timeout=30)
+
+    r = gw.post("/v1/chat/completions", json={
+        "model": "my-model", "stream": False,
+        "messages": [{"role": "user", "content": "Hello"}],
+    }).json()
+    print(r["glad_decision"], r["choices"][0]["message"]["content"])
+
+    print(st.get("/v1/glad/apps/meta").json()["axes"])
+    ```
+
+=== "TypeScript"
+
+    ```ts
+    const r = await fetch("http://localhost:8080/gw/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model: "my-model", stream: false,
+                             messages: [{ role: "user", content: "Hello" }] }),
+    }).then(r => r.json())
+    console.log(r.glad_decision, r.choices[0].message.content)
+
+    const meta = await fetch("http://localhost:8080/v1/glad/apps/meta").then(r => r.json())
+    console.log(meta.axes)
+    ```
+
 ## Base URLs
 
 The packaged installer serves both behind **one** port:

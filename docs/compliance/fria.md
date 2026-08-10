@@ -1,23 +1,9 @@
 # FRIA — Fundamental Rights Impact Assessment
 
-The Fundamental Rights Impact Assessment (FRIA) is mandated by **EU AI Act Article 27** for deployers of high-risk AI systems. Geodesia G-1 provides a full dossier management API: create, edit, review, approve, archive, and export FRIA documents as legally-ready PDF or DOCX bundles.
-
----
-
-## What Is a FRIA?
-
-A FRIA is a structured document that assesses the impact of deploying an AI system on the fundamental rights of individuals affected by it. It must be completed **before deployment** of high-risk AI systems and kept current throughout the system's operational life.
-
-The FRIA dossier in Geodesia G-1 covers:
-
-- The AI system being deployed and its purpose
-- Categories of individuals affected
-- Fundamental rights that could be impacted
-- Probability and severity of each impact
-- Mitigating measures taken
-- Residual risk assessment
-- Human oversight procedures
-- Responsible persons and sign-off
+EU AI Act Article 27 requires deployers of high-risk systems to assess the impact on fundamental rights
+**before** going live. The API creates a dossier pre-filled from a deployment-context template, lets you
+correct it section by section, attaches **measured** evidence from real traffic, and exports it as
+PDF/DOCX/JSON for submission.
 
 ---
 
@@ -264,6 +250,23 @@ Two ways to get the document out. Prefer the async one for anything real.
 The `token` is required on both follow-up calls. On failure, the job's `error` carries the real reason — read it rather than reporting a generic failure.
 
 The generated PDF/DOCX contains the cover page and system identity, every Article 27 section, the risk and mitigation matrices, the approval block when approved, the runtime evidence, and the regulatory mapping appendix.
+
+---
+
+## What Is a FRIA?
+
+A FRIA is a structured document that assesses the impact of deploying an AI system on the fundamental rights of individuals affected by it. It must be completed **before deployment** of high-risk AI systems and kept current throughout the system's operational life.
+
+The FRIA dossier in Geodesia G-1 covers:
+
+- The AI system being deployed and its purpose
+- Categories of individuals affected
+- Fundamental rights that could be impacted
+- Probability and severity of each impact
+- Mitigating measures taken
+- Residual risk assessment
+- Human oversight procedures
+- Responsible persons and sign-off
 
 ---
 

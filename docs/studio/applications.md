@@ -1,30 +1,164 @@
 # Managing Applications
 
-In Geodesia G-1 **Studio**, an **Application** is the unit you manage: one upstream LLM with G1-Hummingbird in the middle, owning its own **policy** (9-axis thresholds + enforcement, plus its declared scope), **threshold profile**, **RAG knowledge base**, **cost center**, and **governance** record. You select the active Application from the topbar App switcher, and every other surface — Dashboard, Oversight, FRIA, Reports, Knowledge Base, Cost — scopes to it.
-
-Studio is a backward-compatible evolution of the single-upstream gateway: an existing deployment surfaces as a single Application named `default`, with zero behaviour change.
-
-!!! info "Two planes, one engine"
-    Applications live on the **control plane** (`/v1/glad/apps/*` — Applications, orgs, keys, policy, cost, metrics). The **data plane** is chat: resolve the Application, score the 9 axes, route to the Application's LLM (optionally to a second, cheaper or stronger model), then log and cost the call. See the [Control Plane API](control-plane-api.md) for the underlying routes.
+An **Application** is the unit you manage: one upstream LLM with G1-Hummingbird in the middle, owning its
+own policy (nine thresholds + enforcement modes), knowledge base, cost centre, compliance posture and API
+keys. One deployment serves many, isolated from each other, on shared hardware.
 
 ---
 
-## Lifecycle states
+## Call it
 
-Every Application is in exactly one of three states, stored in the `status` column:
+**What it does.** Creates the Application, writes its policy, and mints the key it will authenticate
+with. Read `/apps/meta` first — it reports the axes the **served** detector actually has, and a policy
+naming any other axis is rejected with a `400`.
 
-| State | Meaning | Effect on traffic |
-|---|---|---|
-| `active` | Normal operation. | Requests are scored and routed to the upstream. |
-| `paused` | Temporarily halted. | Use to suspend an Application without losing its configuration, keys, or history. |
-| `killed` | Hard-stopped (kill-switch). | The Application is retained for audit but treated as stopped. |
+=== "curl"
 
-![Diagram](../assets/diagrams/studio-applications.svg){: .diagram }
+    ```bash
+    BASE=http://localhost:8080; J='-H Content-Type:application/json'
 
-State transitions go through `set_status`, which only accepts `active`, `paused`, or `killed`. Pausing and resuming are the same operation with a different target state.
+    curl -s $BASE/v1/glad/apps/meta | jq '.axes'
 
-!!! warning "The `default` Application"
-    The `default` Application is synthesised on first boot from your existing `runs/gateway_config.json` so a pre-existing single-upstream deployment keeps working unchanged. Treat it as your fallback Application — do **not** delete it. Deleting an Application also deletes all of its API keys.
+    APP=$(curl -s $BASE/v1/glad/apps $J -d '{
+      "name":"Support Bot",
+      "config":{"binding":{"upstream_type":"ollama",
+                           "base_url":"http://localhost:11434","model":"llama3.1:8b"}}
+    }' | jq -r .app_id)
+
+    curl -s -X PUT $BASE/v1/glad/apps/$APP/policy $J -d '{
+      "policy":{"thresholds":{"prompt_safety":0.80},
+                "enforcement":{"answer_safety":"block"},
+                "scope":"Answers questions about our travel booking service."}
+    }' | jq '.config_version'
+
+    curl -s $BASE/v1/glad/apps/$APP/keys $J -d '{"role":"invoke"}' | jq -r .api_key
+    ```
+
+=== "Python"
+
+    ```python
+    import httpx
+
+    c = httpx.Client(base_url="http://localhost:8080", timeout=60)
+    # If a platform token is configured:
+    # c.headers["X-Geodesia-Admin-Key"] = os.environ["GEODESIA_ADMIN_TOKEN"]
+
+    meta = c.get("/v1/glad/apps/meta").json()
+    print("axes on this deployment:", meta["axes"])
+
+    app = c.post("/v1/glad/apps", json={
+        "name": "Support Bot",
+        "config": {"binding": {"upstream_type": "ollama",
+                               "base_url": "http://localhost:11434",
+                               "model": "llama3.1:8b"}},
+    }).json()
+    app_id = app["app_id"]
+
+    c.put(f"/v1/glad/apps/{app_id}/policy", json={"policy": {
+        "thresholds": {"prompt_safety": 0.80},
+        "enforcement": {"answer_safety": "block"},
+        # out_of_scope stays silent until something declares the scope
+        "scope": "Answers questions about our travel booking service.",
+    }})
+
+    key = c.post(f"/v1/glad/apps/{app_id}/keys", json={"role": "invoke"}).json()
+    print(key["api_key"])        # returned ONCE
+    ```
+
+=== "TypeScript"
+
+    ```ts
+    const BASE = "http://localhost:8080"
+    const H = { "Content-Type": "application/json" }
+
+    const meta = await fetch(`${BASE}/v1/glad/apps/meta`).then(r => r.json())
+
+    const app = await fetch(`${BASE}/v1/glad/apps`, {
+      method: "POST", headers: H,
+      body: JSON.stringify({ name: "Support Bot",
+        config: { binding: { upstream_type: "ollama",
+                             base_url: "http://localhost:11434", model: "llama3.1:8b" } } }),
+    }).then(r => r.json())
+
+    await fetch(`${BASE}/v1/glad/apps/${app.app_id}/policy`, {
+      method: "PUT", headers: H,
+      body: JSON.stringify({ policy: { thresholds: { prompt_safety: 0.80 },
+                                       scope: "Answers questions about our travel booking service." } }),
+    })
+
+    const key = await fetch(`${BASE}/v1/glad/apps/${app.app_id}/keys`, {
+      method: "POST", headers: H, body: JSON.stringify({ role: "invoke" }),
+    }).then(r => r.json())
+    ```
+
+**What comes back** — `{app_id, config_version, status, app: {…}}` from the create, the merged policy plus
+a bumped `config_version` from the `PUT`, and from the key call an `api_key` **shown only once**: only its
+hash is stored.
+
+Field-by-field request/response reference: **[Control Plane API](control-plane-api.md)**.
+
+## Creating an Application from the UI
+
+Open **Applications** (`ApplicationsView`) and click **New Application** to open the creation modal. The modal performs **live model discovery** against the upstream you choose, so you pick a real model instead of typing one:
+
+| Upstream | Discovery source |
+|---|---|
+| Ollama | `GET /api/tags` |
+| vLLM / OpenAI (and OpenAI-compatible) | `GET /v1/models` |
+| Bedrock | Curated AWS Bedrock model catalog |
+| Vertex | Curated Google Vertex model catalog |
+
+Discovery is served by the control-plane endpoint **`POST /v1/glad/apps/upstream/models`**, which returns the model list and its `source` (or an `error` you can act on).
+
+In the same modal you set the **cost** for the Application — `€/Mtok` for input and output tokens — so the cost center is configured from the start.
+
+Once created, the Application opens to its detail view, organised into tabs:
+
+| Tab | What you configure |
+|---|---|
+| **Model** | Upstream type, base URL, model, region, `logprobs`, and credential reference — with **live model discovery** and a **Test connection** probe (see below). |
+| **Policy** | The six-axis threshold sliders plus per-axis enforcement (`block` / `annotate` / `off`), `block_input`, CI injection, and the streaming brake. |
+| **Cost & Budget** | Per-Mtok rates, monthly budget, alert percentages, and the budget-exceeded action. See [Cost & Budget](cost.md). |
+| **Governance** | Applicable laws, risk classification, retention, FRIA link, and human-oversight thresholds. |
+| **API Keys** | Create, list, and revoke the Application's `g1k_live_…` keys. |
+
+Saving any tab validates the full `AppConfig`, bumps `config_version`, and takes effect on the next request.
+
+### Read-only Overview, then edit with auto-save
+
+The detail view opens on a **read-only Overview tab** — a safe summary of the Application's binding, policy, cost, and governance that you can't change by accident. To make changes, click **Modifica**, which switches to the editable settings tabs: **Model**, **Policy**, **Cost & Budget**, **Governance**, and **API Keys**.
+
+There is **no "Save" button**. Every change in those tabs is **saved automatically**, debounced shortly after you stop editing — adjust a threshold slider, change the budget, edit `alert_recipients`, and it persists on its own. An inline status indicator shows where each edit stands: **"Saving…"** while the debounced write is in flight, then **"Saved ✓"** once it lands (and the underlying `config_version` bumps). Because saving is automatic, dependent UI — such as the Cost & Budget projection chart — redraws immediately against the new values.
+
+### The Model tab: discover and test
+
+The editable **Model** tab (under **Modifica**) does more than hold the binding fields — it lets you bind to a real upstream model with confidence:
+
+- **Live model discovery.** The **Model** field is an input backed by a `datalist`, so you can **pick a discovered model or type your own**. Models are discovered from the chosen upstream — Ollama (`/api/tags`), vLLM / OpenAI-compatible (`/v1/models`), or the curated Bedrock / Vertex catalogs — via `POST /v1/glad/apps/upstream/models`. Discovery runs **automatically and debounced** whenever you change the upstream type or the base URL (so a URL typed character-by-character only fires one query when you pause), and a **↻ discover** button re-runs it on demand. An inline hint shows how many models were found, the source, or an actionable error if the upstream couldn't be listed.
+
+- **Test connection.** A **Test connection** button probes the bound upstream for **reachability** (with a latency reading) and runs a **logprob probe** that reports whether the **closed-book** axis is *available* or *unavailable* for that model — since `halluc_closedbook` depends on per-token log-probabilities. A reachable upstream also refreshes the discovered-model list.
+
+!!! note "The closed-book axis needs no per-model setup"
+    The closed-book fabrication detector is **cross-model** — it works on any bound upstream out of the box, with no calibration or training step. Binding to a new model is just *discover → test → save*.
+
+!!! note "These controls are now per-Application"
+    Test connection and model discovery used to live in the **global** Settings → Gateway card. In Studio they are **per-Application**, on the Model tab, so each Application is discovered and tested against its own bound upstream.
+
+### Where each setting lives: Applications vs. Settings
+
+Studio splits configuration cleanly between the **per-Application** detail view and the **platform-wide** Settings page:
+
+| Configured **per-Application** (Applications → **Modifica**, auto-saved) | Configured **platform-wide** (the **Settings** page) |
+|---|---|
+| Model binding (upstream, base URL, model, region, `logprobs`, credential ref) | Plan & license |
+| Detection policy & per-axis thresholds, enforcement, `block_input`, CI injection, streaming brake | The platform **Gateway card** — the exposed API bind (host / port) and the numeric solver |
+| RAG knowledge base | Appearance (theme) |
+| Cost rates, budget & governance | Provider identity |
+| | System (server health / version) |
+| | Demo reset |
+
+!!! info "Settings is platform-only"
+    Anything specific to one Application — model, detection policy & thresholds, RAG, cost & governance — is set on that Application (and saved automatically). The global **Settings** page now keeps only **platform-wide** settings: plan & license, the platform gateway card (exposed API bind + numeric solver), appearance, provider identity, system, and demo reset.
 
 ---
 
@@ -148,6 +282,25 @@ The `human_oversight` object controls when a call is auto-escalated for human re
 
 ---
 
+## Lifecycle states
+
+Every Application is in exactly one of three states, stored in the `status` column:
+
+| State | Meaning | Effect on traffic |
+|---|---|---|
+| `active` | Normal operation. | Requests are scored and routed to the upstream. |
+| `paused` | Temporarily halted. | Use to suspend an Application without losing its configuration, keys, or history. |
+| `killed` | Hard-stopped (kill-switch). | The Application is retained for audit but treated as stopped. |
+
+![Diagram](../assets/diagrams/studio-applications.svg){: .diagram }
+
+State transitions go through `set_status`, which only accepts `active`, `paused`, or `killed`. Pausing and resuming are the same operation with a different target state.
+
+!!! warning "The `default` Application"
+    The `default` Application is synthesised on first boot from your existing `runs/gateway_config.json` so a pre-existing single-upstream deployment keeps working unchanged. Treat it as your fallback Application — do **not** delete it. Deleting an Application also deletes all of its API keys.
+
+---
+
 ## API keys
 
 Each Application has its own API keys. A key is the Application's **runtime identity on the data plane**: an `invoke` key sent as `Authorization: Bearer g1k_live_…` on a chat or RAG request now **routes that request to its Application and scopes** the request's policy, cost, quota, and compliance to it — even when no `X-Geodesia-App` header or `application_id` is supplied. (Previously an `invoke` key was control-plane-only — a read-only credential; it is now also the data-plane routing identity.) An explicit `application_id` / `X-Geodesia-App` still wins over the key. See [Data-plane routing](control-plane-api.md#data-plane-routing-header).
@@ -171,71 +324,6 @@ Each Application has its own API keys. A key is the Application's **runtime iden
 - **Revoke** — sets `active = 0`. Revoked and expired keys fail verification immediately.
 
 A request authenticates by presenting the plaintext key; verification hashes it, looks up the active, unexpired record, touches `last_used_at`, and resolves it to `{app_id, role}`. The full create/list/revoke routes are documented in the [Control Plane API](control-plane-api.md).
-
----
-
-## Creating an Application from the UI
-
-Open **Applications** (`ApplicationsView`) and click **New Application** to open the creation modal. The modal performs **live model discovery** against the upstream you choose, so you pick a real model instead of typing one:
-
-| Upstream | Discovery source |
-|---|---|
-| Ollama | `GET /api/tags` |
-| vLLM / OpenAI (and OpenAI-compatible) | `GET /v1/models` |
-| Bedrock | Curated AWS Bedrock model catalog |
-| Vertex | Curated Google Vertex model catalog |
-
-Discovery is served by the control-plane endpoint **`POST /v1/glad/apps/upstream/models`**, which returns the model list and its `source` (or an `error` you can act on).
-
-In the same modal you set the **cost** for the Application — `€/Mtok` for input and output tokens — so the cost center is configured from the start.
-
-Once created, the Application opens to its detail view, organised into tabs:
-
-| Tab | What you configure |
-|---|---|
-| **Model** | Upstream type, base URL, model, region, `logprobs`, and credential reference — with **live model discovery** and a **Test connection** probe (see below). |
-| **Policy** | The six-axis threshold sliders plus per-axis enforcement (`block` / `annotate` / `off`), `block_input`, CI injection, and the streaming brake. |
-| **Cost & Budget** | Per-Mtok rates, monthly budget, alert percentages, and the budget-exceeded action. See [Cost & Budget](cost.md). |
-| **Governance** | Applicable laws, risk classification, retention, FRIA link, and human-oversight thresholds. |
-| **API Keys** | Create, list, and revoke the Application's `g1k_live_…` keys. |
-
-Saving any tab validates the full `AppConfig`, bumps `config_version`, and takes effect on the next request.
-
-### Read-only Overview, then edit with auto-save
-
-The detail view opens on a **read-only Overview tab** — a safe summary of the Application's binding, policy, cost, and governance that you can't change by accident. To make changes, click **Modifica**, which switches to the editable settings tabs: **Model**, **Policy**, **Cost & Budget**, **Governance**, and **API Keys**.
-
-There is **no "Save" button**. Every change in those tabs is **saved automatically**, debounced shortly after you stop editing — adjust a threshold slider, change the budget, edit `alert_recipients`, and it persists on its own. An inline status indicator shows where each edit stands: **"Saving…"** while the debounced write is in flight, then **"Saved ✓"** once it lands (and the underlying `config_version` bumps). Because saving is automatic, dependent UI — such as the Cost & Budget projection chart — redraws immediately against the new values.
-
-### The Model tab: discover and test
-
-The editable **Model** tab (under **Modifica**) does more than hold the binding fields — it lets you bind to a real upstream model with confidence:
-
-- **Live model discovery.** The **Model** field is an input backed by a `datalist`, so you can **pick a discovered model or type your own**. Models are discovered from the chosen upstream — Ollama (`/api/tags`), vLLM / OpenAI-compatible (`/v1/models`), or the curated Bedrock / Vertex catalogs — via `POST /v1/glad/apps/upstream/models`. Discovery runs **automatically and debounced** whenever you change the upstream type or the base URL (so a URL typed character-by-character only fires one query when you pause), and a **↻ discover** button re-runs it on demand. An inline hint shows how many models were found, the source, or an actionable error if the upstream couldn't be listed.
-
-- **Test connection.** A **Test connection** button probes the bound upstream for **reachability** (with a latency reading) and runs a **logprob probe** that reports whether the **closed-book** axis is *available* or *unavailable* for that model — since `halluc_closedbook` depends on per-token log-probabilities. A reachable upstream also refreshes the discovered-model list.
-
-!!! note "The closed-book axis needs no per-model setup"
-    The closed-book fabrication detector is **cross-model** — it works on any bound upstream out of the box, with no calibration or training step. Binding to a new model is just *discover → test → save*.
-
-!!! note "These controls are now per-Application"
-    Test connection and model discovery used to live in the **global** Settings → Gateway card. In Studio they are **per-Application**, on the Model tab, so each Application is discovered and tested against its own bound upstream.
-
-### Where each setting lives: Applications vs. Settings
-
-Studio splits configuration cleanly between the **per-Application** detail view and the **platform-wide** Settings page:
-
-| Configured **per-Application** (Applications → **Modifica**, auto-saved) | Configured **platform-wide** (the **Settings** page) |
-|---|---|
-| Model binding (upstream, base URL, model, region, `logprobs`, credential ref) | Plan & license |
-| Detection policy & per-axis thresholds, enforcement, `block_input`, CI injection, streaming brake | The platform **Gateway card** — the exposed API bind (host / port) and the numeric solver |
-| RAG knowledge base | Appearance (theme) |
-| Cost rates, budget & governance | Provider identity |
-| | System (server health / version) |
-| | Demo reset |
-
-!!! info "Settings is platform-only"
-    Anything specific to one Application — model, detection policy & thresholds, RAG, cost & governance — is set on that Application (and saved automatically). The global **Settings** page now keeps only **platform-wide** settings: plan & license, the platform gateway card (exposed API bind + numeric solver), appearance, provider identity, system, and demo reset.
 
 ---
 
