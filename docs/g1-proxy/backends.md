@@ -150,7 +150,7 @@ curl -X POST http://localhost:8800/v1/glad/gateway/config \
 ```
 
 !!! warning "Log-probability access"
-    Log-probabilities are available from the OpenAI API when you set `logprobs: true` in the request. The gateway does this automatically. Some models or pricing tiers may not support them — the gateway detects this on the first request and falls back to 4-axis mode.
+    Log-probabilities are available from the OpenAI API when you set `logprobs: true` in the request. The gateway does this automatically. Some models or pricing tiers may not support them — the proxy detects this on the first request and gates the closed-book axis; nothing else changes.
 
 ---
 
@@ -182,7 +182,7 @@ curl -X POST http://localhost:8800/v1/glad/gateway/config \
 ```
 
 !!! success "Ollama ≥ 0.12 — logprobs just work"
-    On any current Ollama the closed-book (5th) axis is **on automatically**: Ollama returns per-token log-probabilities on `/v1/chat/completions`, the gateway probes them on the first request, and `GET /health` reports `axes: 5`. No sidecar, no flag, no extra server. The sidecar below is **only** for legacy Ollama **< 0.12**.
+    On any current Ollama the closed-book axis is **on automatically**: Ollama returns per-token log-probabilities on `/v1/chat/completions`, the proxy probes them on the first request, and `GET /health` reports `logprobs: true` with an empty `axes_gated`. No sidecar, no flag, no extra server. The sidecar below is **only** for legacy Ollama **< 0.12**.
 
 #### Legacy only (Ollama < 0.12) — recover the 5th axis with a logprob sidecar
 
@@ -228,4 +228,4 @@ curl -X POST http://localhost:8800/v1/glad/gateway/config \
 
 ## Closed-Book Fabrication — no per-model setup
 
-The closed-book fabrication detector is **cross-model**: it ships ready to use and runs on any upstream out of the box, with no per-model calibration or training step. When you switch to a different base model, nothing to do — point the gateway at the new upstream and the closed-book axis works immediately (provided the upstream returns per-token log-probabilities; otherwise the gateway simply runs in 4-axis mode).
+The closed-book fabrication detector is **cross-model**: it ships ready to use and runs on any upstream out of the box, with no per-model calibration or training step. When you switch to a different base model, nothing to do — point the gateway at the new upstream and the closed-book axis works immediately (provided the upstream returns per-token log-probabilities; otherwise that one axis is gated and the rest run unchanged).

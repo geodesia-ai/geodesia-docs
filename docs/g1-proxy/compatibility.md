@@ -82,7 +82,7 @@ curl http://localhost:8800/health
 |---|---|
 | `ok` | Liveness — process is up and serving |
 | `upstream` / `upstream_type` | Confirm the configured backend |
-| `logprobs` | Readiness for full validation — `false` means 4-axis mode |
+| `logprobs` | Readiness for full validation — `false` means the closed-book axis is gated (it appears in `axes_gated`) |
 | `axes` | Capability gauge — alert on an unexpected `5 → 4` drop |
 | `internal_vllm` | Lifecycle state when `type: internal` (`running` / `stopped`) |
 
@@ -144,7 +144,7 @@ Log-probabilities express how confident the model was when it chose each word. G
 No setting toggles this — the gateway probes it on the first request and `/health` reports the result. You can recover the 5th axis later with a [log-prob sidecar](#ollama).
 
 !!! tip "Make `axes` an alerting signal"
-    Treat an unexpected drop from `axes: 5` to `axes: 4` in `/health` as a **degradation alert** — it means your upstream stopped returning log-probabilities (model change, tier change, flag dropped).
+    Treat `halluc_closedbook` appearing in `/health`'s `axes_gated` as a **degradation alert** — it means your upstream stopped returning log-probabilities (model change, tier change, flag dropped). Alert on `axes_gated` being non-empty, not on the `axes` count: `axes` is a property of the checkpoint and does not move when the upstream does.
 
 ---
 
@@ -234,7 +234,7 @@ curl -X POST http://localhost:8800/v1/glad/gateway/config \
 ```
 
 !!! warning "Build with log-probs enabled"
-    Ensure the engine is built so the serving frontend can request `logprobs`. If absent, the gateway runs in 4-axis mode.
+    Ensure the engine is built so the serving frontend can request `logprobs`. If absent, every other axis still runs and only `halluc_closedbook` is gated.
 
 ### llama.cpp
 
@@ -263,11 +263,11 @@ curl -X POST http://localhost:8800/v1/glad/gateway/config \
 ```
 
 !!! tip "Check the probe result"
-    `GET /health` reports `axes: 5` once the log-prob probe succeeds. If you see `axes: 4` on a recent Ollama, make sure you're on **0.12 or newer** (older builds did not expose log-probs).
+    `GET /health` reports `logprobs: true` and an empty `axes_gated` once the log-prob probe succeeds. If `axes_gated` still lists `halluc_closedbook` on a recent Ollama, make sure you're on **0.12 or newer** (older builds did not expose log-probs).
 
 #### Older Ollama — recover the closed-book axis with a log-prob sidecar
 
-On **Ollama < 0.12** (no native log-probs) you stay in 4-axis mode. You can recover the closed-book axis by running a **second server for the same model that does expose log-probabilities** — typically `llama.cpp` on the same GGUF. The gateway re-derives the answer through the sidecar to recover the signal (only used when native log-probs are absent).
+On **Ollama < 0.12** (no native log-probs) the closed-book axis is gated and every other axis runs normally. You can recover it by running a **second server for the same model that does expose log-probabilities** — typically `llama.cpp` on the same GGUF. The gateway re-derives the answer through the sidecar to recover the signal (only used when native log-probs are absent).
 
 ![Diagram](../assets/diagrams/gateway-compatibility-3.svg){: .diagram }
 
@@ -512,7 +512,7 @@ Every response carries a `geodesia{}` block — your richest telemetry source. S
 | **Gateway replicas** | Throughput, HA | Stateless — add replicas freely behind a load balancer |
 | **`GW_MAXLEN`** | Detector latency vs recall | `2048` for long-context RAG faithfulness; drop to `512` to cut latency on short prompts |
 | **Blocking vs streaming** | Time-to-first-token | Streaming with the mid-stream brake adds minimal overhead; the brake halts at token-cadence boundaries |
-| **Log-prob sidecar (older Ollama < 0.12)** | +1 axis, +1 re-derivation | Only needed pre-0.12 (≥ 0.12 has native log-probs). Costs one extra generation per call — size the sidecar accordingly or accept 4-axis mode |
+| **Log-prob sidecar (older Ollama < 0.12)** | +1 axis, +1 re-derivation | Only needed pre-0.12 (≥ 0.12 has native log-probs). Costs one extra generation per call — size the sidecar accordingly, or accept that `halluc_closedbook` stays gated |
 | **GPU placement** | Cost | Gateway on CPU nodes, model on GPU nodes — scale independently |
 | **Shared audit DB** | Consistency | All replicas point at one database (managed Postgres-class store or shared volume) so the dashboard and chain stay coherent |
 
@@ -539,9 +539,9 @@ In Kubernetes, prefer a rolling update of the `Deployment` with the new env vars
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | `/health` `ok=false` | Upstream unreachable | Check `upstream_base_url`, network policy, and that the model server is up |
-| `axes: 4` when you expected 5 | Upstream returns no log-probs | Upgrade to **Ollama ≥ 0.12** (native log-probs), use a model/tier that supports `logprobs`, or add a [log-prob sidecar](#ollama) for older Ollama |
+| `axes_gated` contains `halluc_closedbook` | Upstream returns no log-probs | Upgrade to **Ollama ≥ 0.12** (native log-probs), use a model/tier that supports `logprobs`, or add a [log-prob sidecar](#ollama) for older Ollama |
 | `connection refused` on switch | Wrong port or `/v1` appended | Use the **base** URL (no trailing `/v1`); the gateway adds the path |
-| Hosted API → 4 axes | Provider/model omits log-probs | Try another model on the provider, or accept 4-axis mode |
+| Hosted API gates closed-book | Provider/model omits log-probs | Try another model on the provider, or accept that `halluc_closedbook` stays gated |
 | First request very slow | Model cold-loading on first boot | Expected once per boot — the gateway warms the upstream proactively; subsequent requests are fast |
 | `internal_vllm: stopped` with `type: internal` | Subprocess failed to start | Check `internal_vllm_cmd` and GPU availability in container logs |
 | 5xx from the gateway under load | Upstream saturated | Scale the **model server**; the gateway itself is rarely the limit |

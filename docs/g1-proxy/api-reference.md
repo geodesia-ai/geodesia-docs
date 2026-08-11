@@ -22,7 +22,10 @@ Every HTTP surface **G1-Proxy** exposes, in one table. G1-Proxy is the **data pl
 ```bash
 curl -s http://localhost:8080/gw/health | jq
 # {"ok": true, "upstream_type": "ollama", "upstream": "http://localhost:11434",
-#  "logprobs": true, "axes": 5, "calibration": {"model": "…", "status": "calibrated"}}
+#  "logprobs": true, "axes": 9,
+#  "axes_available": ["halluc_context","halluc_closedbook","prompt_safety","answer_safety",
+#                     "jailbreak","rag_jailbreak","profanity","out_of_scope","prompt_complexity"],
+#  "axes_gated": [], "calibration": {"model": "…", "status": "calibrated"}}
 ```
 
 If that answers, everything below is reachable. If it 404s you are talking to Studio — drop the `/gw`
@@ -45,7 +48,7 @@ All four accept the same [Geodesia extension fields](chat-api.md#geodesia-extens
 
 | Method | Path | Returns |
 |---|---|---|
-| `GET` | `/health` | `{ok, upstream_type, upstream, internal_vllm, logprobs, axes, calibration}`. `axes` counts the **base** axes only: `5` when the upstream exposes token log-probabilities, `4` when it does not (the closed-book axis needs them). It is not the number of axes the detector scores — the served head ships nine. Use `logprobs` for the capability check. |
+| `GET` | `/health` | `{ok, upstream_type, upstream, internal_vllm, logprobs, axes, axes_available, axes_gated, calibration}`. `axes` is how many axes the **served checkpoint** actually scores (nine on the shipped head) and `axes_available` names them. `axes_gated` lists the ones that cannot be scored right now — `["halluc_closedbook"]` when the upstream exposes no token log-probabilities, `[]` otherwise. |
 | `GET` | `/version` | The proxy's component version, read hot from `G1_PROXY_VERSION.json`. |
 | `GET` | `/v1/glad/documentation` | `docs/USER_GUIDE.md` as `text/markdown`. `404` if the file is not in the image. Backs the in-product Documentation page on a proxy-only deployment. |
 | `GET` | `/v1/glad/mcp/status` | MCP layer state: `{enabled, chat_aware, servers, guard, actions, domain_allowlist, egress_tools, interceptors}`. |
@@ -60,7 +63,7 @@ All four accept the same [Geodesia extension fields](chat-api.md#geodesia-extens
 |---|---|---|---|
 | `GET` | `/v1/glad/gateway/config` | | The live gateway config. `upstream_api_key` is returned as `***`, never in clear. |
 | `POST` | `/v1/glad/gateway/config` | 🔒 | Patch the live config; applies immediately and is persisted to `GW_CONFIG_FILE`. Sending `"***"` as the API key leaves the stored one untouched. |
-| `POST` | `/upstream/test` | | Connect to a candidate backend, list its models, probe log-probability support, and return a sample reply with latency. Body: `{url, type, api_key?, model?}`. This is the **Test connection** button. |
+| `POST` | `/upstream/test` | | Connect to a candidate backend, list its models, probe log-probability support, and return a sample reply with latency. Body: `{url, type, api_key?, model?}`. Also returns `closed_book_available` and the same `axes` / `axes_available` / `axes_gated` block as `/health`. This is the **Test connection** button. |
 | `POST` | `/test-capabilities` | 🔒 | Run the detector on built-in safe/unsafe sample pairs, one per axis, and report which axes actually separate. **No upstream call** — it tests the detector, not the LLM. |
 
 !!! danger "Keys the config endpoint refuses"

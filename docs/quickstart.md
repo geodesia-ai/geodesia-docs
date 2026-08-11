@@ -238,7 +238,7 @@ curl http://localhost:8800/health
 | Field | Meaning |
 |---|---|
 | `logprobs` | Whether the upstream returns per-token log-probabilities. Required for the closed-book fabrication axis. |
-| `axes` | `5` when logprobs are available (all five detection axes active); `4` when logprobs are unavailable (closed-book axis disabled automatically). |
+| `axes` | How many axes the served checkpoint scores — **nine** on the shipped head. `axes_available` names them; `axes_gated` lists the ones that cannot run right now (`halluc_closedbook` when the upstream returns no logprobs). |
 
 ---
 
