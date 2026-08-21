@@ -81,7 +81,7 @@ Health check. Returns upstream type, logprob capability, and active axis count (
 
 <div class="endpoint"><span class="method method-get">GET</span><span class="path">/v1/models</span></div>
 
-Proxy to the upstream's `/v1/models`. Returns available model IDs.
+Returns Geodesia's own model descriptor — id, `capabilities` (e.g. `hallucination_detection`, `tool_calling`), and the detected upstream base model — so an OpenAI-compatible client can discover what the deployment supports without a separate probe. See [Tool calling](chat-api.md#tool-calling-tools-tool_choice).
 
 <div class="endpoint"><span class="method method-get">GET</span><span class="path">/v1/glad/gateway/config</span></div>
 

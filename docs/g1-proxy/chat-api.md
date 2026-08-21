@@ -261,6 +261,114 @@ With `stream: true` the response is SSE (OpenAI format) or NDJSON (Ollama format
 
 ---
 
+## Tool calling — `tools` / `tool_choice`
+
+`tools` and `tool_choice` are forwarded to the upstream unchanged (see [Request reference](#standard-openai-fields) above) — the proxy does not rewrite your tool schemas. What it *does* do is translate whatever the upstream's serving stack returns for a tool call back into standard OpenAI shape: an accumulating `delta.tool_calls` on each streaming chunk, `message.tool_calls` on the non-streaming response, and `finish_reason: "tool_calls"`. Any provider-native tool-call syntax the underlying model would otherwise leak into plain text (e.g. a bracketed marker or an XML-ish block, depending on the serving stack) never reaches the client as content.
+
+This requires the upstream's own serving stack to have tool-call parsing turned on — for example vLLM's `--enable-auto-tool-choice --tool-call-parser <family>` (the parser family must match the model's chat template). Check `GET /v1/models` — a `"tool_calling"` entry in `capabilities` confirms the deployment is configured for it; if it's absent, `tools` is still forwarded but the model's raw tool-call output may come back as plain `content` instead of `tool_calls`.
+
+=== "curl"
+
+    ```bash
+    curl -N -s http://localhost:8080/gw/v1/chat/completions \
+      -H "Content-Type: application/json" \
+      -d '{
+        "model": "my-model",
+        "stream": false,
+        "tool_choice": "auto",
+        "tools": [{
+          "type": "function",
+          "function": {
+            "name": "web_search",
+            "description": "Search the web and return ranked results with URLs.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "query": { "type": "string" },
+                "max_results": { "type": "integer" }
+              },
+              "required": ["query"]
+            }
+          }
+        }],
+        "messages": [{"role": "user", "content": "Search the web for the current prime minister of Italy."}]
+      }'
+    ```
+
+=== "Python"
+
+    ```python
+    from openai import OpenAI
+
+    client = OpenAI(base_url="http://localhost:8080/gw/v1", api_key="not-needed-locally")
+
+    r = client.chat.completions.create(
+        model="my-model",
+        tool_choice="auto",
+        tools=[{
+            "type": "function",
+            "function": {
+                "name": "web_search",
+                "description": "Search the web and return ranked results with URLs.",
+                "parameters": {
+                    "type": "object",
+                    "properties": {"query": {"type": "string"}, "max_results": {"type": "integer"}},
+                    "required": ["query"],
+                },
+            },
+        }],
+        messages=[{"role": "user", "content": "Search the web for the current prime minister of Italy."}],
+    )
+    call = r.choices[0].message.tool_calls[0]
+    print(call.function.name, call.function.arguments)   # web_search {"query": "...", "max_results": ...}
+    ```
+
+**What comes back** (non-streaming):
+
+```json
+{
+  "choices": [{
+    "index": 0,
+    "message": {
+      "role": "assistant",
+      "content": null,
+      "tool_calls": [{
+        "id": "call_abc123",
+        "type": "function",
+        "function": { "name": "web_search", "arguments": "{\"query\": \"...\", \"max_results\": 5}" }
+      }]
+    },
+    "finish_reason": "tool_calls"
+  }]
+}
+```
+
+Streaming carries the same call as incremental `delta.tool_calls` fragments — `id`/`type`/`function.name` on the first fragment for a given `index`, `function.arguments` concatenated across the rest — exactly the shape any OpenAI-compatible SDK already knows how to accumulate. **Parallel tool calls** (the model requesting more than one function in the same turn) come back as separate entries keyed by `index`, each with its own `id`.
+
+### Completing the round trip
+
+After you execute the tool, send the conversation back with the assistant's `tool_calls` from the previous turn and one `role: "tool"` result message per call — the proxy forwards both unchanged to the upstream, same as any OpenAI-compatible endpoint:
+
+```json
+{
+  "model": "my-model",
+  "tools": [ /* same schema as before */ ],
+  "messages": [
+    {"role": "user", "content": "Search the web for the current prime minister of Italy."},
+    {"role": "assistant", "content": null, "tool_calls": [
+      {"id": "call_abc123", "type": "function",
+       "function": {"name": "web_search", "arguments": "{\"query\": \"prime minister of Italy\"}"}}
+    ]},
+    {"role": "tool", "tool_call_id": "call_abc123", "content": "Giorgia Meloni is the Prime Minister of Italy."}
+  ]
+}
+```
+
+!!! info "Tool-result messages count as grounding context"
+    A `role: "tool"` message is treated the same way as `context` for the `halluc_context` axis — the final answer is scored for faithfulness against what the tool actually returned, not just against the user's original question.
+
+---
+
 ## Ollama format — `POST /api/chat`
 
 The same pipeline in Ollama's wire format. Every Geodesia extension field above works identically.
