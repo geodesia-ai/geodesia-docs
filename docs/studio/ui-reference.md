@@ -272,19 +272,6 @@ Route `/calibration`.
 
 ---
 
-## Agent Flow
-
-Route `/agent-flow`. See [Agent Flow](../agent-flow/index.md).
-
-| Control | Calls |
-|---|---|
-| Demo picker | `GET /v1/agent-flow/demos` |
-| Graph / trace | `GET /v1/agent-flow/trace/{demo_type}` |
-| **Run** | `POST /v1/agent-flow/run/{demo_type}` |
-| **Compute stability** | `POST /v1/agent-flow/compute_pss/{demo_type}` |
-
----
-
 ## Settings
 
 Route `/settings`. See [Settings](settings.md).

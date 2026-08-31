@@ -186,8 +186,6 @@ nav:
     - Supported Laws: regulatory/index.md
     - EU AI Act: regulatory/eu-ai-act.md
     - Global Laws: regulatory/global-laws.md
-  - Agent Flow:
-    - Multi-Agent Pipeline: agent-flow/index.md
   - Configuration:
     - config.yaml Reference: configuration/index.md
     - Environment Variables: configuration/env-vars.md

@@ -103,7 +103,7 @@ Computes black-box token-level causal attribution (occlusion or MuPAX LLM) for a
 
 Serves the built-in user guide as Markdown.
 
-Plus the [Knowledge Base](../rag/index.md) (`/v1/glad/rag/*`) and [Agent Flow](../agent-flow/index.md) (`/v1/agent-flow/*`) sub-routers.
+Plus the [Knowledge Base](../rag/index.md) (`/v1/glad/rag/*`) sub-router.
 
 ## Request & Response Extension
 

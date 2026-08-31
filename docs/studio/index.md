@@ -193,7 +193,7 @@ The following areas are **global and not app-scoped**:
 | **Legal Frameworks** | Shows the **full catalog of all frameworks** regardless of the selected Application |
 | **API Docs** | Reference material, not per-app data |
 | **Documentation** | This site — not per-app data |
-| **Causal / AgentFlow** | Operate on an **explicitly-selected call**, not per-app aggregates — so no misleading "scoped" banner is shown |
+| **Causal** | Operates on an **explicitly-selected call**, not per-app aggregates — so no misleading "scoped" banner is shown |
 
 ---
 

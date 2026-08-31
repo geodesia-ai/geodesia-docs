@@ -342,7 +342,6 @@ For production scoring use `POST /v1/glad/evaluate` on **G1-Proxy** instead — 
 | `GET` | `/v1/glad/version` | Studio's component version. The proxy reports its own at `/gw/version`. |
 | `GET` | `/v1/glad/documentation` | `docs/USER_GUIDE.md` as `text/markdown`. |
 | `POST` | `/v1/glad/admin/reset-demo` | **Destructive.** Wipes chat history, calls, audit chain, FRIA records, kill-switch log, watermarks, retention events, reviews and notifications. Query: `keep_threshold_prefs` (default `true`). Returns the per-table delete counts. |
-| `GET` `POST` | `/v1/agent-flow/…` | Agent-flow diagnostics — same routes as on the proxy, see [that map](../g1-proxy/api-reference.md#agent-flow-diagnostics). |
 
 !!! danger "`admin/reset-demo` is not reversible"
     It exists so a prototype can be handed to a fresh audience. There is no confirmation step and no undo. Do not expose it on a deployment that holds real traffic.

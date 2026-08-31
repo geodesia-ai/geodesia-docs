@@ -187,19 +187,6 @@ Off until switched on. While the box is idle, a CPU judge re-scores served traff
 
 ---
 
-## Agent flow (diagnostics)
-
-Prefix `/v1/agent-flow`. A demonstration harness for multi-agent pipelines — see [Agent Flow](../agent-flow/index.md). Mounted on **both** services.
-
-| Method | Path | What it does |
-|---|---|---|
-| `GET` | `/demos` | The available demo pipelines. |
-| `GET` | `/trace/{demo_type}` | The last recorded trace. |
-| `POST` | `/run/{demo_type}` | Run the pipeline and record a trace. |
-| `POST` | `/compute_pss/{demo_type}` | Compute positional stability over the trace. Query: `n_samples`, `temperature`, `match_mode`, `save`. |
-
----
-
 ## Not on G1-Proxy
 
 Frequently looked for here, actually on [G-1 Studio](../studio/api-reference.md):
