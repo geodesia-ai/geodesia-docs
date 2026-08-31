@@ -130,7 +130,8 @@ block with the per-axis detector output.
   "glad_decision": "passed",        // "passed" | "blocked"  ← the headline verdict
 
   "geodesia": {
-    "axis_energy": { …per-axis… },  // the 6 risk axes (below)
+    "axis_energy": { …per-axis… },     // the 6 PRIMARY axes (below)
+    "additional_axes": { …per-axis… }, // profanity / out-of-scope / prompt-complexity — annotate only
     "brake": false,                 // true = the gateway decided to block
     "dominant_axis": "halluc_context",
     "energy_unit": "J",
@@ -139,7 +140,7 @@ block with the per-axis detector output.
 }
 ```
 
-### The 9 axes (`geodesia.axis_energy`)
+### The 9 axes (`geodesia.axis_energy` + `geodesia.additional_axes`)
 
 Each axis is an **independent** risk signal with its **own** calibrated threshold — read each on its own, it is
 not one blended score.
@@ -156,9 +157,16 @@ not one blended score.
 | `out_of_scope` | the prompt is off-topic for the Application's declared scope (silent without one) | input |
 | `prompt_complexity` | the prompt is "complex" — a routing signal, never a guardrail | input |
 
-The last three ship **annotate-only**: they appear in `axis_energy` and in the audit record but do not
-withhold anything until an operator promotes them. See
-[Detection Axes](g1-proxy/detection-axes.md#guardrails-vs-operational-axes) and
+The first six are **primary**: they travel in `axis_energy`, they are what the product commits to, and
+they are the ones benchmarked against out-of-distribution attack corpora.
+
+The last three are **additional**: they travel in a separate `additional_axes` object, they annotate and
+never withhold, and they **cannot be promoted to blocking by configuration** — `GW_PROMPT_BLOCK_AXES`
+ignores them. (Enabling off-topic refusal for one Application is still possible through that Application's
+own enforcement policy, which is an explicit per-customer choice rather than a global switch.)
+
+Every axis in both blocks carries `tier` (`primary` | `additional`), so a client can tell them apart without
+knowing the names. See [Detection Axes](g1-proxy/detection-axes.md#primary-axes-vs-additional-axes) and
 [Token & Cost Control](g1-proxy/cost-control.md).
 
 ### Per-axis fields

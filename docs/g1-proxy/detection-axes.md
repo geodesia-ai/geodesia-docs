@@ -149,26 +149,78 @@ The nine axes split by **where in the request lifecycle** they are evaluated: si
 
 ---
 
-## Guardrails vs. operational axes
+## Primary axes vs. additional axes
 
 Not every axis is a guardrail, and the distinction is enforced in the product, not just in the documentation.
 
-| Group | Axes | Default enforcement |
-|---|---|---|
-| **Guardrails** | `prompt_safety`, `jailbreak`, `rag_jailbreak`, `halluc_context`, `halluc_closedbook`, `answer_safety` | `block` on the input axes, `annotate` on the answer axes |
-| **Operational** | `profanity`, `out_of_scope` | `annotate` — visible in the UI, the certificate and the telemetry; promoted to `block` per deployment |
-| **Routing** | `prompt_complexity` | `off` — never an enforcement surface; consumed only by [complexity routing](cost-control.md#complexity-routing-model-a-model-b) |
+| Group | Axes | Travels in | Default enforcement |
+|---|---|---|---|
+| **Primary** | `prompt_safety`, `jailbreak`, `rag_jailbreak`, `halluc_context`, `halluc_closedbook`, `answer_safety` | `axis_energy` | `block` on the input axes, `annotate` on the answer axes |
+| **Additional** | `profanity`, `out_of_scope`, `prompt_complexity` | `additional_axes` | `annotate` (`off` for `prompt_complexity`) |
 
-A new axis therefore ships **display-only**: it appears in `axis_energy`, in the audit record and on the chat panel, and it cannot withhold a single request until an operator explicitly promotes it. The gateway's blocking set is `prompt_safety, jailbreak` by default and is widened with `GW_PROMPT_BLOCK_AXES`:
+**Primary axes are what the product commits to.** They are the ones benchmarked against out-of-distribution
+attack corpora, the ones whose thresholds are conformally calibrated, and the ones whose numbers we publish.
 
-```bash
-# make off-topic prompts an actual refusal (and save the upstream call)
-GW_PROMPT_BLOCK_AXES="prompt_safety,jailbreak,out_of_scope" \
-  python -m glad_minimal.gateway.geodesia_gateway --host 0.0.0.0 --port 8800 ...
+**Additional axes annotate.** They are useful signals that travel with the verdict — an off-topic prompt, a
+vulgar one, a complex one — but they are held to a different standard, and the product does not make a
+detection claim about them. `prompt_complexity` is not a detector at all: it is the Model A / Model B routing
+boundary.
+
+Since v0.3 they ship in a **separate payload field**, so a consumer never has to know the axis names to tell
+the two apart:
+
+```json
+{
+  "geodesia": {
+    "axis_energy":      { "jailbreak": { "…": "…", "tier": "primary" } },
+    "additional_axes":  { "out_of_scope": { "…": "…", "tier": "additional" } }
+  }
+}
 ```
 
-!!! warning "`prompt_complexity` must never be promoted"
-    It is a routing boundary, not a risk score. Putting it in `GW_PROMPT_BLOCK_AXES` would refuse every hard question your users ask.
+Every axis also carries an explicit `tier` (`primary` | `additional`) in both blocks and in the signed
+certificate, which additionally lists them under a top-level `additional_axes` key. Nothing is hidden: an
+additional axis is fully scored, fully audited and fully certified — it is *labelled*, not removed.
+
+`/health` and `/upstream/test` report the split too:
+
+```json
+{ "axes": 9,
+  "axes_primary":    ["prompt_safety", "jailbreak", "rag_jailbreak", "halluc_context", "halluc_closedbook", "answer_safety"],
+  "axes_additional": ["profanity", "out_of_scope", "prompt_complexity"] }
+```
+
+### What "additional" guarantees
+
+An additional axis **cannot be promoted to a blocking axis by configuration**. Listing it in
+`GW_PROMPT_BLOCK_AXES` is ignored, with a line on stderr:
+
+```bash
+GW_PROMPT_BLOCK_AXES="prompt_safety,jailbreak,out_of_scope"
+# [gateway] GW_PROMPT_BLOCK_AXES: ignoro ['out_of_scope'] — sono assi classificatori o additional,
+#           non possono bloccare
+```
+
+This is deliberate. `GW_PROMPT_BLOCK_AXES` is a **global, silent** switch: one line in a deployment file
+would have given an annotate-grade detector the power to withhold every customer's traffic, and nobody
+reading that line would know they were doing it.
+
+The **per-Application enforcement policy is a different matter** and stays open: setting
+`enforcement: {"out_of_scope": "block"}` on one Application is an explicit, per-customer, UI-visible choice —
+and it is exactly how [off-topic cost control](cost-control.md) is meant to be switched on. Scope it to the
+Application that wants it, not to the whole gateway.
+
+!!! warning "`prompt_complexity` can never be promoted, on any path"
+    It is a routing boundary, not a risk score. Both paths refuse it — `GW_PROMPT_BLOCK_AXES` drops it, and an
+    Application policy that sets it to `block` is silently corrected to `off`. Enforcing it would refuse every
+    hard question your users ask.
+
+### Configuring the split
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `GW_ADDITIONAL_AXES` | `profanity,out_of_scope,prompt_complexity` | Which axes are additional. Set it to `""` to make every axis primary. |
+| `GW_ADDITIONAL_INLINE` | `0` | `1` also emits the additional axes inside `axis_energy`, for a client written before this field existed. |
 
 ---
 

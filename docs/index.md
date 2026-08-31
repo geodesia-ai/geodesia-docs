@@ -2,7 +2,7 @@
 <h1>Geodesia G-1</h1>
 <p class="subtitle">The AI Validation Gateway — hallucination detection, safety enforcement, and regulatory compliance in a single drop-in layer.</p>
 <div class="hero-badges">
-  <span class="hero-badge">🛡️ 9-Axis Detection</span>
+  <span class="hero-badge">🛡️ 6 Guardrail Axes</span>
   <span class="hero-badge">🎙️ Realtime Voice Guard</span>
   <span class="hero-badge">🔌 MCP Security Layer</span>
   <span class="hero-badge">🔍 Causal Explainability</span>
@@ -38,14 +38,14 @@ You do not need to retrain your model. You do not need to change your applicatio
 
 <div class="feature-card">
 <span class="feature-icon">🔬</span>
-<h3>9-Axis Detection</h3>
-<p><strong>G1-Hummingbird</strong> scores context faithfulness, closed-book fabrication, prompt safety, answer safety, jailbreak, <code>rag_jailbreak</code> (context-injection firewall), profanity, out-of-scope and prompt complexity — nine independent axes, calibrated thresholds, <strong>one forward pass</strong>.</p>
+<h3>6 Guardrail Axes + 3 Signals</h3>
+<p><strong>G1-Hummingbird</strong> scores six <strong>primary</strong> guardrail axes — context faithfulness, closed-book fabrication, prompt safety, answer safety, jailbreak and <code>rag_jailbreak</code> (context-injection firewall) — plus three <strong>additional</strong> signals that annotate but never block: profanity, out-of-scope and prompt complexity. Independent axes, calibrated thresholds, <strong>one forward pass</strong>.</p>
 </div>
 
 <div class="feature-card">
 <span class="feature-icon">💸</span>
 <h3>Token &amp; Cost Control</h3>
-<p>Two axes that pay for themselves: <a href="g1-proxy/cost-control/"><code>out_of_scope</code></a> refuses off-topic traffic <em>before</em> the upstream call (zero tokens billed), and <code>prompt_complexity</code> routes easy prompts to the cheap model and hard ones to the capable one — no extra latency, no extra model call.</p>
+<p>Two additional signals that pay for themselves: <a href="g1-proxy/cost-control/"><code>out_of_scope</code></a> can refuse off-topic traffic <em>before</em> the upstream call (zero tokens billed) once you enable it on an Application, and <code>prompt_complexity</code> routes easy prompts to the cheap model and hard ones to the capable one — no extra latency, no extra model call.</p>
 </div>
 
 <div class="feature-card">

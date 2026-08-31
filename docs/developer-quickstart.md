@@ -96,7 +96,11 @@ Two things matter: the **answer** and the **verdict**.
       "prompt_safety": { "p_detector": 0.03, "threshold": 0.69, "flag": false },
       "jailbreak":     { "p_detector": 0.01, "threshold": 0.90, "flag": false },
       "answer_safety": { "p_detector": 0.00, "threshold": 0.92, "flag": false }
-      // …9 axes total
+      // …6 primary axes
+    },
+    "additional_axes": {         // ← annotate only, never block
+      "out_of_scope":      { "p_detector": 0.11, "threshold": 0.95, "flag": false },
+      "prompt_complexity": { "p_detector": 0.22, "threshold": 0.50, "verdict": "simple" }
     }
   }
 }
@@ -107,13 +111,15 @@ Read it like this:
 - Each **axis** is one risk check. **`flag: true`** = that check tripped. `p_detector` vs `threshold` tells
   you how close it was.
 
-The 9 axes: `prompt_safety`, `jailbreak`, `rag_jailbreak`, `profanity`, `out_of_scope` and
-`prompt_complexity` (the user side) and `answer_safety`, `halluc_context`, `halluc_closedbook`
-(the answer side — unsafe content or made-up facts).
+**The 6 primary axes** (in `axis_energy`) are the guardrails: `prompt_safety`, `jailbreak`,
+`rag_jailbreak` on the user side; `answer_safety`, `halluc_context`, `halluc_closedbook` on the answer
+side (unsafe content or made-up facts). These are what the product commits to.
 
-The last three of the user-side axes are not guardrails: `profanity` moderates tone, `out_of_scope`
-refuses questions outside what the Application is for, and `prompt_complexity` picks which upstream
-model answers. See [Detection Axes](g1-proxy/detection-axes.md) and
+**The 3 additional axes** (in `additional_axes`) annotate and never block: `profanity` moderates tone,
+`out_of_scope` marks questions outside what the Application is for, and `prompt_complexity` picks which
+upstream model answers. They are fully scored and fully audited — they just do not carry a detection
+claim, and no environment variable can promote them to blocking. See
+[Detection Axes](g1-proxy/detection-axes.md#primary-axes-vs-additional-axes) and
 [Token & Cost Control](g1-proxy/cost-control.md).
 
 Quick check in one line:

@@ -91,7 +91,7 @@ score <  threshold  →  pass
 
 Scores are always in the range [0, 1]: **0** = the detector is confident the content is safe/grounded/in-scope; **1** = confident it is not.
 
-A flag is not automatically a block. What a flag *does* depends on the axis's **enforcement mode** — `block`, `annotate`, or `off` — configured per Application. See [Detection Axes](../g1-proxy/detection-axes.md#guardrails-vs-operational-axes).
+A flag is not automatically a block. What a flag *does* depends on the axis's **enforcement mode** — `block`, `annotate`, or `off` — configured per Application. See [Detection Axes](../g1-proxy/detection-axes.md#primary-axes-vs-additional-axes).
 
 ---
 

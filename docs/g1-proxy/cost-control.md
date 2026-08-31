@@ -42,12 +42,22 @@ A client that sends its own system message overrides it for that conversation. G
 
 ### Turning it into an actual block
 
-Extra axes ship **annotate-only**. To make an off-topic prompt a real refusal, add the axis to the gateway's blocking set:
+`out_of_scope` is an [additional axis](detection-axes.md#primary-axes-vs-additional-axes): it ships
+**annotate-only**, and the gateway-wide `GW_PROMPT_BLOCK_AXES` **will not** promote it — that switch is
+global and silent, and an annotate-grade signal should not gain the power to refuse every customer's
+traffic from one line in a deployment file.
+
+Enable it where the decision belongs: on the **Application** that wants it, through its enforcement policy.
 
 ```bash
-GW_PROMPT_BLOCK_AXES="prompt_safety,jailbreak,out_of_scope" \
-  python -m glad_minimal.gateway.geodesia_gateway --host 0.0.0.0 --port 8800 ...
+curl -X PATCH "$G1/v1/glad/apps/$APP_ID" \
+  -H "Authorization: Bearer $ADMIN_KEY" -H "Content-Type: application/json" \
+  -d '{"policy": {"enforcement": {"out_of_scope": "block"}}}'
 ```
+
+(The same control is a dropdown in g1-studio → **Applications → Policy → Enforcement**.) Scoping it to one
+Application is the point: an assistant with a tight declared scope wants the refusal, a general-purpose one
+does not, and the two can share a gateway.
 
 The refusal comes back in the shape the caller expects — an OpenAI `finish_reason: "content_filter"` response, an Ollama `done` message, or a stream frame for streaming clients — with the full verdict attached:
 
