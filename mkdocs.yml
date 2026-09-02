@@ -163,6 +163,8 @@ nav:
     - Human Feedback Loop: g1-proxy/feedback.md
     - Knowledge Base (RAG): rag/index.md
     - Causal Explainability: g1-proxy/causal-xai.md
+  - Agent Setup:
+    - Agent Skill (SKILL.md): agent-setup/SKILL.md
   - MCP Security:
     - Overview: mcp/index.md
     - Guard Server: mcp/guard-server.md
