@@ -202,7 +202,7 @@ All nine are produced by one forward pass. What differs is **which region of the
 | 2 | `jailbreak` | prompt region | Attempts to override the system policy — persona, roleplay, encoding, DAN-style | 0.9997 | 0.50 | enforce (input) |
 | 3 | `rag_jailbreak` | **context region** | **Indirect** prompt injection: instructions hidden inside retrieved or fetched content | 0.2501 | 0.50 | advisory in chat, primary in MCP |
 | 4 | `halluc_context` | answer vs context | Answer not grounded in the supplied evidence | 0.6475 | 0.60 | enforce (output brake) |
-| 5 | `halluc_closedbook` | answer + logprobs | Fabrication with no evidence supplied — parametric-knowledge error | conformal τ (see below) | 0.60 | advisory, hard-blocks above 0.995 |
+| 5 | `halluc_closedbook` | answer + **generator logprobs** | Fabrication with no evidence supplied — parametric-knowledge error | conformal τ per model **and per language**, carried in the SLEDGE artifact | n/a over MCP — no logprobs, axis reports `available: false` | advisory, hard-blocks above 0.995 |
 | 6 | `answer_safety` | answer region | Harmful, toxic, or unsafe generated content | 0.7295 | 0.50 | enforce (output brake) |
 | 7 | `profanity` | text | Obscene language | 0.90 | — | **additional**, annotate-only |
 | 8 | `out_of_scope` | text vs declared scope | Request outside the application's stated purpose | 0.90 | — | **additional**, annotate-only |
@@ -253,8 +253,14 @@ the one most often misreported:
   about the wrong tokens. Treat closed-book output from reasoning models as unreliable.
 * It is advisory, with one exception: above `GW_CB_BLOCK_P` (0.995) it holds content back and the axis
   carries `hard_block: true`. Anything building a verdict must read that field, not just the role table.
-* It is the weakest axis on the honest out-of-distribution bench (AUROC 0.6165). When a model is
-  *confident and wrong*, there is no uncertainty left to measure. Report it as a signal, not a proof.
+* Every feature it reads measures **uncertainty**. When a model is *confident and wrong*, there is
+  nothing left to measure and the axis stays quiet — that ceiling is the design, not a mis-calibration.
+  Report it as a signal, not a proof.
+* Over the MCP Guard Server there is no generation and therefore no logprobs, so the axis reports
+  `available: false` and never flags. That is the honest answer, not a passing score: **`p_detector: 0.0`
+  on an unavailable axis means "not measured", never "not hallucinating".** For real closed-book coverage
+  use the generation path — `POST /v1/glad/evaluate` or the gateway's `/v1/chat/completions` — where G-1
+  sees the model's own token distribution.
 
 In `glad.verify_answer` it is **scored and returned but does not drive the verdict** by default, precisely
 because tool-augmented answers are short and factual and the head is noisy there. An application that
@@ -487,8 +493,22 @@ Out-of-distribution AUROC, decontaminated bench, served checkpoint, endpoint rea
 | `answer_safety` | 0.9174 |
 | `halluc_context` | 0.8671 |
 | `jailbreak` | 0.8623 |
-| `halluc_closedbook` | 0.6165 |
-| **macro** | **0.8540** |
+| **macro (5 axes above)** | **0.8540** |
+
+`halluc_closedbook` is **not in that table**, and any number that puts it there is measuring the wrong
+thing. The bench above scores the *textual head alone*, with no generator logprobs — the configuration
+the detector explicitly refuses to serve, because out of distribution that head is **anti-predictive**
+(0.52 / 0.42 AUROC). The closed-book detector is **SLEDGE**, and it exists only when logprobs do:
+
+| SLEDGE (logprobs present) | AUROC |
+|---|---|
+| served generator, out-of-fold | **0.8437** (the GBM it replaced: 0.7765) |
+| cross-generator, qwen-7b | 0.8274 |
+| cross-generator, qwen-0.5b | 0.6381 |
+
+The spread between those rows *is* the finding: **SLEDGE is calibrated for a (generator, head) pair.**
+An artifact trained on one generator degrades on another, so a deployment that swaps its upstream model
+must recalibrate — the number does not travel with the code.
 
 Multilingual bench (`prompt_safety` + `jailbreak` labels only): `prompt_safety` 0.9892, `jailbreak` 0.8426,
 macro 0.9159. Decontamination is verified against the corpus manifest: **0 of 18** sources shared with the
@@ -503,9 +523,10 @@ a full gateway, budget more — measure it where it runs, not on the detector al
 
 * **A callable tool is advisory.** A compromised model can simply not call it. For a control that holds,
   use the Interceptor or a pre-execution hook.
-* **`halluc_closedbook` measures uncertainty.** A model that is confident and wrong leaves nothing to
-  measure. It is the weakest axis (0.6165 OOD) and it needs logprobs, a fact-seeking question, and a
-  non-reasoning generator to mean anything.
+* **`halluc_closedbook` needs logprobs, and the MCP guard has none** — it declares itself unavailable
+  there. Where it does run (SLEDGE, 0.8437 on the served generator) it measures *uncertainty*: a model
+  confident and wrong leaves nothing to measure. It also needs a fact-seeking question and a
+  non-reasoning generator, and its calibration is bound to the generator it was fitted on.
 * **`out_of_scope` needs a declared scope**; without one it is mute, not clean.
 * **`profanity` and `out_of_scope` are annotate-only** and cannot be promoted to blocking.
 * **`prompt_complexity` is a router**, not a risk axis. Never count it toward a block.
