@@ -165,7 +165,6 @@ nav:
     - Causal Explainability: g1-proxy/causal-xai.md
   - Agent Setup:
     - Agent Skill (SKILL.md): agent-setup/SKILL.md
-    - Explainability Skill (χ): agent-setup/xai/SKILL.md
   - MCP Security:
     - Overview: mcp/index.md
     - Guard Server: mcp/guard-server.md
