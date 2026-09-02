@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 430" width="100%" role="img" aria-label="One detector pass produces the safety verdict, the scope verdict and the complexity verdict together. Off-topic traffic is refused without calling any LLM; simple traffic is routed to the cheap model and complex traffic to the expensive one.">
+  <style>
+    .lbl   { font-family: Inter, "trebuchet ms", verdana, arial, sans-serif; fill: #1f2430; }
+    .h     { font-size: 15px; font-weight: 700; }
+    .axis  { font-size: 14px; font-family: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace; fill: #16204a; }
+    .note  { font-size: 12.5px; fill: #5a6377; }
+    .edge  { font-size: 12.5px; fill: #47506a; font-family: "JetBrains Mono", ui-monospace, monospace; }
+    .stage { font-size: 15px; font-weight: 700; fill: #ffffff; }
+    .big   { font-size: 13px; font-weight: 700; }
+  </style>
+  <defs>
+    <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#8892aa"/>
+    </marker>
+    <marker id="a2r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#e53935"/>
+    </marker>
+  </defs>
+
+  <!-- prompt -->
+  <rect x="20" y="186" width="116" height="46" rx="10" fill="#1a1f6e"/>
+  <text class="lbl stage" x="78" y="214" text-anchor="middle">Prompt</text>
+  <path d="M136 209 L 180 209" stroke="#8892aa" stroke-width="1.6" marker-end="url(#a2)" fill="none"/>
+
+  <!-- one detector pass -->
+  <rect x="180" y="96" width="250" height="228" rx="12" fill="#eef1fb" stroke="#3f51b5"/>
+  <text class="lbl h" x="305" y="124" text-anchor="middle" fill="#283593">One detector pass</text>
+  <text class="lbl note" x="305" y="143" text-anchor="middle">GLAD-Hummingbird · milliseconds</text>
+  <line x1="200" y1="156" x2="410" y2="156" stroke="#c3c9de"/>
+  <text class="axis" x="200" y="180">prompt_safety · jailbreak</text>
+  <text class="lbl note" x="200" y="198">→ is it safe?</text>
+  <text class="axis" x="200" y="228">out_of_scope</text>
+  <text class="lbl note" x="200" y="246">→ is it our job?</text>
+  <text class="axis" x="200" y="276">prompt_complexity</text>
+  <text class="lbl note" x="200" y="294">→ how hard is it?</text>
+  <text class="lbl note" x="305" y="316" text-anchor="middle" font-style="italic">no second model · no extra call</text>
+
+  <!-- refusal branch -->
+  <path d="M430 150 L 468 150 L 468 66 L 606 66" stroke="#e53935" stroke-width="1.8" marker-end="url(#a2r)" fill="none"/>
+  <text class="lbl edge" x="598" y="58" font-size="11.5" text-anchor="end" fill="#c62828">off topic · unsafe</text>
+  <rect x="606" y="42" width="266" height="50" rx="10" fill="#fdecea" stroke="#e53935"/>
+  <text class="lbl big" x="626" y="64" fill="#b71c1c">Refused at the gate</text>
+  <text class="lbl note" x="626" y="82" fill="#b71c1c">0 input tokens · 0 output tokens · still audited</text>
+
+  <!-- simple branch -->
+  <path d="M430 215 L 606 215" stroke="#8892aa" stroke-width="1.8" marker-end="url(#a2)" fill="none"/>
+  <text class="lbl edge" x="598" y="206" font-size="11.5" text-anchor="end">p(complexity) ≤ θ</text>
+  <rect x="606" y="176" width="266" height="66" rx="10" fill="#e9f7ef" stroke="#43a047"/>
+  <text class="lbl big" x="626" y="200" fill="#1b5e20">Model A — the cheap one</text>
+  <text class="lbl note" x="626" y="219">small · local · billed at the base rate</text>
+  <text class="lbl note" x="626" y="235">most of your traffic lands here</text>
+
+  <!-- complex branch -->
+  <path d="M430 280 L 468 280 L 468 336 L 606 336" stroke="#8892aa" stroke-width="1.8" marker-end="url(#a2)" fill="none"/>
+  <text class="lbl edge" x="598" y="330" font-size="11.5" text-anchor="end">p(complexity) &gt; θ</text>
+  <rect x="606" y="302" width="266" height="72" rx="10" fill="#fff4e5" stroke="#fb8c00"/>
+  <text class="lbl big" x="626" y="326" fill="#e65100">Model B — the capable one</text>
+  <text class="lbl note" x="626" y="345">frontier · billed at the complex rate</text>
+  <text class="lbl note" x="626" y="363">only the prompts that need it</text>
+
+  <!-- ledger -->
+  <path d="M872 209 L 916 209" stroke="#8892aa" stroke-width="1.6" marker-end="url(#a2)" fill="none"/>
+  <path d="M872 336 L 894 336 L 894 232" stroke="#8892aa" stroke-width="1.6" marker-end="url(#a2)" fill="none"/>
+  <path d="M872 66 L 894 66 L 894 186" stroke="#8892aa" stroke-width="1.6" marker-end="url(#a2)" fill="none"/>
+  <rect x="916" y="176" width="242" height="66" rx="10" fill="#e0f7fa" stroke="#00838f"/>
+  <text class="lbl big" x="936" y="200" fill="#006064">Cost ledger + audit row</text>
+  <text class="lbl note" x="936" y="219">priced at the rate of the model</text>
+  <text class="lbl note" x="936" y="235">that actually answered</text>
+</svg>

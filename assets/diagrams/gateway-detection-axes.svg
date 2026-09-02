@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 470" width="100%" role="img" aria-label="The nine detection axes: six input/context axes scored before the LLM is called, three output axes scored after the answer is generated.">
+  <style>
+    .lbl   { font-family: Inter, "trebuchet ms", verdana, arial, sans-serif; fill: #1f2430; }
+    .grp   { font-size: 15px; font-weight: 700; letter-spacing: .02em; }
+    .axis  { font-size: 15px; font-family: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace; fill: #16204a; }
+    .note  { font-size: 12.5px; fill: #5a6377; }
+    .tag   { font-size: 11px; font-weight: 700; letter-spacing: .06em; }
+    .flow  { font-size: 13px; fill: #47506a; }
+    .stage { font-size: 15px; font-weight: 700; fill: #ffffff; }
+    .band  { fill: none; stroke-width: 1.5; }
+  </style>
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#8892aa"/>
+    </marker>
+  </defs>
+
+  <!-- ── stage rail ─────────────────────────────────────────────────────── -->
+  <rect x="24" y="212" width="122" height="46" rx="10" fill="#1a1f6e"/>
+  <text class="lbl stage" x="85" y="240" text-anchor="middle">Prompt</text>
+
+  <rect x="512" y="212" width="156" height="46" rx="10" fill="#3f51b5"/>
+  <text class="lbl stage" x="590" y="234" text-anchor="middle">Upstream LLM</text>
+  <text class="lbl stage" x="590" y="250" text-anchor="middle" font-size="11" font-weight="400" opacity=".85">generates the answer</text>
+
+  <rect x="1032" y="212" width="124" height="46" rx="10" fill="#00838f"/>
+  <text class="lbl stage" x="1094" y="240" text-anchor="middle">Response</text>
+
+  <path d="M146 235 L 186 235" stroke="#8892aa" stroke-width="1.6" marker-end="url(#ar)" fill="none"/>
+  <path d="M472 235 L 512 235" stroke="#8892aa" stroke-width="1.6" marker-end="url(#ar)" fill="none"/>
+  <path d="M668 235 L 708 235" stroke="#8892aa" stroke-width="1.6" marker-end="url(#ar)" fill="none"/>
+  <path d="M992 235 L 1032 235" stroke="#8892aa" stroke-width="1.6" marker-end="url(#ar)" fill="none"/>
+
+  <!-- ── input / context axes ───────────────────────────────────────────── -->
+  <rect class="band" x="186" y="48" width="286" height="374" rx="14" stroke="#c3c9de" fill="#f7f8fc"/>
+  <text class="lbl grp" x="329" y="78" text-anchor="middle">Input / context axes</text>
+  <text class="lbl note" x="329" y="97" text-anchor="middle">scored before the LLM is called</text>
+
+  <rect x="206" y="112" width="246" height="94" rx="9" fill="#fdeef1" stroke="#f48fb1"/>
+  <text class="tag lbl" x="222" y="132" fill="#ad1457">GUARDRAIL · CAN BLOCK</text>
+  <text class="axis" x="222" y="155">prompt_safety</text>
+  <text class="axis" x="222" y="176">jailbreak</text>
+  <text class="axis" x="222" y="197">rag_jailbreak</text>
+
+  <rect x="206" y="218" width="246" height="72" rx="9" fill="#f6eefb" stroke="#ce93d8"/>
+  <text class="tag lbl" x="222" y="238" fill="#6a1b9a">MODERATION · ANNOTATE</text>
+  <text class="axis" x="222" y="261">profanity</text>
+  <text class="axis" x="222" y="282">out_of_scope</text>
+  <text class="lbl note" x="222" y="303">needs a declared scope · blocking it</text>
+  <text class="lbl note" x="222" y="319">skips the upstream call entirely</text>
+
+  <rect x="206" y="332" width="246" height="70" rx="9" fill="#eef0fb" stroke="#9fa8da"/>
+  <text class="tag lbl" x="222" y="352" fill="#283593">ROUTING · NEVER BLOCKS</text>
+  <text class="axis" x="222" y="375">prompt_complexity</text>
+  <text class="lbl note" x="222" y="394">picks Model A or Model B</text>
+
+  <!-- ── output axes ────────────────────────────────────────────────────── -->
+  <rect class="band" x="708" y="48" width="284" height="374" rx="14" stroke="#c3c9de" fill="#f7f8fc"/>
+  <text class="lbl grp" x="850" y="78" text-anchor="middle">Output axes</text>
+  <text class="lbl note" x="850" y="97" text-anchor="middle">scored after the answer is generated</text>
+
+  <rect x="728" y="112" width="244" height="94" rx="9" fill="#eaf7fe" stroke="#4fc3f7"/>
+  <text class="tag lbl" x="744" y="132" fill="#01579b">HALLUCINATION</text>
+  <text class="axis" x="744" y="155">halluc_context</text>
+  <text class="axis" x="744" y="176">halluc_closedbook</text>
+  <text class="lbl note" x="744" y="196">closed-book needs upstream logprobs</text>
+
+  <rect x="728" y="218" width="244" height="72" rx="9" fill="#fff5e6" stroke="#ffcc80"/>
+  <text class="tag lbl" x="744" y="238" fill="#e65100">ANSWER SAFETY</text>
+  <text class="axis" x="744" y="261">answer_safety</text>
+  <text class="lbl note" x="744" y="281">also fires mid-stream, every 32 tokens</text>
+
+  <rect x="728" y="332" width="244" height="70" rx="9" fill="#ffffff" stroke="#c3c9de" stroke-dasharray="4 3"/>
+  <text class="lbl note" x="744" y="356">A flagged answer raises the brake:</text>
+  <text class="lbl note" x="744" y="374">withheld, annotated, or escalated</text>
+  <text class="lbl note" x="744" y="392">according to the Application policy.</text>
+
+  <!-- ── one pass note ──────────────────────────────────────────────────── -->
+  <text class="lbl flow" x="329" y="444" text-anchor="middle">all six scored in ONE detector pass</text>
+  <text class="lbl flow" x="850" y="444" text-anchor="middle">one pass over the completed answer</text>
+</svg>
