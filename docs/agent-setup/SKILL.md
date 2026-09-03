@@ -681,6 +681,116 @@ See §5. It is not free: `dca` costs tens of forward passes. Call it **on a flag
 
 ---
 
+## 4b. `verdict`, `brake`, `certificate` — three words, three different questions
+
+They appear in the same responses and they can legitimately disagree. Reading one as the other is the
+most common way to misreport a G-1 result.
+
+| Field | Where | Question it answers | Values |
+|---|---|---|---|
+| `verdict` | the `scan_*` / `verify_*` tools | **What should this surface do with this content?** | `allow` · `warn` · `block` |
+| `brake` | `glad.analyze` | **Would the OUTPUT be held back mid-generation?** | `true` · `false` |
+| `certificate.verdict` | `glad.analyze` | **What does the signed artifact record?** | `allowed` · `blocked` |
+
+**`verdict`** is per-surface and per-call: `scan_resource` says what to do with a page you just read;
+`verify_tool_call` says whether to execute. `warn` means *a signal fired but the operator asked for
+annotation, not blocking* — it is a real state, not a soft block.
+
+**`brake`** is only about the **output** path. It is true when a *brake axis* — `halluc_context` or
+`answer_safety` — flags, plus one exception: `halluc_closedbook` above its extreme-confidence ceiling
+(0.995), which normally only advises but at that level really does hold content back, and then carries
+`hard_block: true`. Input axes (`prompt_safety`, `jailbreak`) are **not** in the brake: the gateway
+blocks those earlier, on the prompt pass. So **`brake: false` does not mean "nothing fired"** — a
+jailbreak can be flagged with the brake down, because the brake is about what the model is *writing*,
+not what it was *asked*.
+
+**`certificate`** is the artifact a customer keeps as evidence. Its `verdict` is `blocked` when some
+axis is flagged **and** that axis actually holds content back in this deployment — `role: "enforce"`,
+or `hard_block`. Advisory, classifier and additional axes are all in the certificate but never move its
+verdict: a test artifact must document everything computed, while committing only to what enforces.
+
+Per axis the certificate carries:
+
+* **`role`** — `enforce` (can hold content back here) · `advisory` (reports only) · `classifier` (not a
+  risk judgement at all: `prompt_complexity` above threshold means *route to Model B*, and its `verdict`
+  field carries the label `complex`/`simple` so nobody reads a routing boundary as a refusal).
+* **`tier`** — `primary` or `additional`. Additional axes (`profanity`, `out_of_scope`,
+  `prompt_complexity`) are listed together in `additional_axes` at the top so a reviewer does not have
+  to recognise the names.
+* **`alpha`** and **`fpr_bound`** — the actual guarantee, and the reason the certificate is worth
+  keeping: `P(benign_score > threshold) <= α`, from a **split-conformal** calibration
+  (`thr_kind: "split-conformal"`). `brake_alpha` is α split Bonferroni across the *k* brake axes, so the
+  bound holds for the pair rather than for each axis separately.
+* **`calib_n`** — how many calibration samples that bound rests on. A tight α on a small `calib_n` is a
+  weak claim; say so rather than quoting the α alone.
+* **`p_model`** with **`score_reconciled: true`** — present when the *displayed* score was aligned to the
+  (more accurate) flag. `p_model` is the raw head output. Quote `p_detector` to a human and `p_model` in
+  an audit.
+
+**`certificate.sig`** is `hmac-sha256:…` when the deployment sets a signing key, and **`null` when it
+does not** — deliberately, rather than signing with a guessable default. A `null` signature means *this
+certificate is not verifiable*, and you should say that instead of presenting it as proof. The hosted
+demo returns `null`.
+
+### Reading them together
+
+```jsonc
+{ "brake": false,                       // the answer would not be held back
+  "dominant_axis": "jailbreak",         // the flagged axis with the highest p (null if none flagged)
+  "per_axis": { "jailbreak": { "p_detector": 0.9998, "flag": true, "threshold": 0.3259 } },
+  "certificate": { "verdict": "blocked", "axes": { "jailbreak": {
+      "role": "enforce", "tier": "primary", "alpha": 0.05,
+      "fpr_bound": "P(benign_score > threshold) <= 0.05", "thr_kind": "split-conformal" } },
+    "sig": null } }
+```
+
+Correct reading: *the prompt is a jailbreak and would be refused at the input; the brake is down because
+the brake is about output; the certificate records a block; the certificate is unsigned, so it documents
+rather than proves.* Saying "allowed, brake false" here would be wrong on every count.
+
+---
+
+## 4c. `glad.redact_pii` — take personal data out of what is about to leave
+
+Regex plus validators (Luhn, IBAN, VIN), 50+ entity types, multilingual, **no model and no network
+call** (~10 ms). Use it on anything about to leave your control: a document you are sending to a tool,
+writing to a log, pasting into a ticket, or forwarding to a third-party model.
+
+```jsonc
+{ "text": "Contact Maria Rossi at maria.rossi@acme.it, card 4111 1111 1111 1111.",
+  "entities": ["CREDIT_CARD", "IBAN"],   // optional: restrict to these types
+  "min_confidence": 0.6,                  // optional
+  "detect_only": false }
+```
+
+```jsonc
+{ "found": true,
+  "redacted": "Contact Maria Rossi at [EMAIL:****], card [CREDIT_CARD:****].",
+  "report": { "count": 2, "by_label": { "EMAIL": 1, "CREDIT_CARD": 1 } },
+  "entities": [ { "label": "EMAIL", "start": 22, "end": 41, "confidence": 0.99 } ],
+  "not_scanned": ["LICENSE_PLATE", "NAME", "SWIFT_CODE"],
+  "min_confidence": 0.6, "library": { "available": true, "version": "0.1.0" } }
+```
+
+**Read `not_scanned` before you conclude anything.** Some types are deliberately excluded by default
+because the underlying library gets them wrong — `NAME` among them. In the example above *Maria Rossi*
+is **not** redacted, and a clean report on a document full of names means "we did not look", not "there
+are none". Pass them explicitly in `entities` if you want them anyway, and expect false positives.
+
+`detect_only: true` returns counts, types and offsets and **never the text, not even a fragment** — that
+is the mode for checking something before it goes into a log, where echoing the content back would
+defeat the purpose.
+
+Two things worth knowing about the redaction path:
+
+* The **detector always reads the raw text**; redaction happens after scoring. A doxxing prompt is
+  dangerous *because of* the personal data in it, so masking first would blind the safety axes.
+* In the gateway's streaming path the redactor holds back ~160 characters, because an entity never
+  arrives in one token — `+39 333 123 4567` is six or seven fragments, and redacting delta-by-delta
+  would leak the pieces. That latency is the price of not emitting half a card number.
+
+---
+
 ## 5. Explainability — the χ values
 
 `glad.explain` answers a different question from `glad.analyze`. Analyze says *whether* and *how much*.
