@@ -35,7 +35,7 @@ You are an agent. Do these five steps, in order, and do not skip the verificatio
 
 | You are | Skill goes to | MCP config |
 |---|---|---|
-| Claude Code | `~/.claude/skills/geodesia-g1/SKILL.md` | `claude mcp add geodesia-g1 --transport http https://demo.geodesia.ai/mcp` |
+| Claude Code | `~/.claude/skills/geodesia-g1/SKILL.md` | `claude mcp add geodesia-g1 --transport http https://demo.geodesia.ai/mcp` — **or**, if the CLI is not on PATH, `.mcp.json` in the project root (see step 3). Never `~/.claude.json`: that is app-internal state. |
 | Codex CLI | `~/.codex/skills/geodesia-g1/SKILL.md` | `~/.codex/config.toml`, section `[mcp_servers.geodesia-g1]` |
 | Cursor / Windsurf / Cline | that client's rules or skills directory | its `mcpServers` JSON block |
 | Claude Desktop | n/a (no skills dir) | `claude_desktop_config.json` → `mcpServers` |
@@ -56,6 +56,36 @@ curl -fsSL https://raw.githubusercontent.com/geodesia-ai/geodesia-docs/main/docs
 
 Prefer your client's own command (`claude mcp add …`, `codex mcp add …`) and check its `--help` rather
 than trusting a config snippet from this page: these formats change.
+
+!!! warning "If the CLI is not on PATH, do NOT hand-edit the host app's internal config"
+    `~/.claude.json` is Claude Code's own state file, not a user configuration surface. Editing it to
+    fake a registration is app-internal tampering, and a sandbox that blocks you is right to. There is
+    a documented project-scoped mechanism instead — use that, and say which one you used.
+
+**Claude Code without the CLI** — write `.mcp.json` in the **project root**. This file is meant to be
+written by hand and committed for a team; it is not internal state:
+
+```jsonc
+// <project>/.mcp.json
+{ "mcpServers": { "geodesia-g1": { "type": "http", "url": "https://demo.geodesia.ai/mcp" } } }
+```
+
+If your build does not accept a remote server there, the stdio bridge works in every MCP client:
+
+```jsonc
+{ "mcpServers": { "geodesia-g1": {
+    "command": "npx", "args": ["-y", "mcp-remote", "https://demo.geodesia.ai/mcp"] } } }
+```
+
+Claude Code asks for approval the first time it sees a server from `.mcp.json`. To pre-approve it
+without a prompt, add to `.claude/settings.json` (or `settings.local.json` for yourself only):
+
+```jsonc
+{ "enabledMcpjsonServers": ["geodesia-g1"] }
+```
+
+Then tell the user: **the server is registered but a restart or rescan is needed**, because a session
+that has already loaded its MCP inventory will not see it. Do not report it as active until it is.
 
 If your client speaks **remote HTTP MCP** natively:
 
@@ -98,9 +128,26 @@ curl -sS -X POST $G1 -H 'content-type: application/json' -d '{"jsonrpc":"2.0","i
 Expected: **seven** `glad.*` tools · the second returns `"verdict":"block"` with `rag_jailbreak_p` above
 0.99 · the third returns `"verdict":"allow"`.
 
-**5. Report honestly.** Say **G-1 ready** only if all three passed. If the tools are installed but your
-session loaded its inventory before the install, say *"installed; restart or rescan required"* — do not
-claim they are active. If a step failed, say which one and what it returned.
+**These three answer only the first of two questions.** They prove *the endpoint works*. They say
+nothing about whether **you** can call the tools — that depends on the registration having been read by
+your client, which for most clients happens at session start. Check your own tool inventory for
+`glad.*` and treat the two results independently:
+
+| Endpoint | Tools visible to you | What to report |
+|---|---|---|
+| ✅ | ✅ | **G-1 ready** |
+| ✅ | ❌ | *"endpoint verified; registration written to `<the file you wrote>`; restart or rescan to load it"* — **not** "ready" |
+| ❌ | — | the endpoint failed: give the HTTP code and the body, and stop |
+
+A registration you could not perform is not a failure to hide. Say which mechanism you used, or which
+one you could not use and why — an operator who reads *"the CLI was not on PATH so I wrote
+`.mcp.json`"* knows exactly what to check.
+
+**5. Report honestly.** Say **G-1 ready** only when the endpoint checks passed **and** the tools are
+visible in your own session. If they are not, say *"installed; restart or rescan required"* — do not
+claim they are active. If a step failed, say which one and what it returned. And if you declined to do
+something — editing an app's internal state, for instance — say that too: it is information, not a
+shortfall.
 
 Two things that will otherwise waste your time:
 
