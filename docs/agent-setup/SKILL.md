@@ -880,6 +880,74 @@ Two things worth knowing about the redaction path:
 
 ---
 
+## 4d. `grounding` — one number for "is this answer actually supported?"
+
+`glad.analyze` and `glad.verify_answer` both return a fused grounding block. It exists because
+`halluc_context` and `halluc_closedbook` are **two regimes, not two readings of one thing**: without
+supplied evidence the first is undefined, without generator logprobs the second is unmeasurable. So they
+are never averaged, and an inactive axis is never counted as a zero.
+
+```jsonc
+{ "score": 0.3421, "verdict": "unsupported", "regime": "context", "available": true,
+  "axis": "halluc_context", "risk": 0.9856, "margin": 0.3158,
+  "deciding_axis": "halluc_context", "sources": { "halluc_context": { "p": 0.9856, "threshold": 0.9829,
+  "margin": 0.3158, "score": 0.3421, "flag": true } } }
+```
+
+**`score` is a quality in [0,1]** — 1 fully supported, 0 wholly unsupported — and **0.5 is not an
+arbitrary midpoint: it is the axis's calibrated threshold**, the served operating point. Above 0.5 the
+answer sits below its threshold; below 0.5 it crossed it. Measured against one supplied context:
+
+| Answer | verdict | score |
+|---|---|---|
+| identical to the evidence | `allow` | 0.9959 |
+| tight paraphrase | `allow` | 0.9773 |
+| adds a fact **not in the supplied evidence** | `block` | 0.3421 |
+| fabricated outright | `block` | 0.0936 |
+
+The third row is the one worth understanding: the axis measures faithfulness **to the evidence you
+supplied**, not truth in general. *"Peter Handke, an Austrian writer"* is true and still unsupported if
+your context never said he was Austrian. Do not report that as "the model hallucinated" — report it as
+"this claim is not in your sources", which is what it is.
+
+`verdict` and `regime` are **stable identifiers**: switch on `grounded` / `unsupported` /
+`not_measurable`, never on prose. `available: false` with `score: null` means the metric could not be
+computed — never render it as clean, and read `reasons` for why.
+
+`grounded` (a boolean) and `grounding` (how much, against which threshold) answer different questions.
+Quote the number when arguing about a borderline case; the boolean alone cannot be argued with.
+
+---
+
+## 4e. Telemetry — what the trial endpoint counts, and how to turn it off
+
+The hosted trial counts usage, and you should know exactly what that means before you route anything
+through it.
+
+**Recorded:** which tool was called, whether it succeeded, how long it took, an installation ID, and the
+name of your MCP client.
+**Not recorded:** the text you scanned, URLs, per-axis scores, verdicts about your content, the names of
+tools on servers you scanned — and **no IP address**, not even in the access log.
+
+That is not a promise about anonymisation, it is a property of what is sent: this is the telemetry of a
+security product, whose users feed it precisely the material they do not want leaving their perimeter.
+
+The installation ID is a random UUID **you generate**, never derived from hostname, IP or MAC. To be
+counted as a distinct installation, set it as a header in your MCP config:
+
+```jsonc
+{ "mcpServers": { "geodesia-g1": { "type": "http", "url": "https://demo.geodesia.ai/mcp",
+    "headers": { "X-Geodesia-Install": "<a UUID you generate once>" } } } }
+```
+
+Omit it and your calls are still counted, under a shared anonymous ID.
+
+**Self-hosted deployments send nothing by default.** Running the guard inside your own perimeter does
+not opt you into being counted; `GEODESIA_TELEMETRY=on` opts in, `GEODESIA_TELEMETRY=off` disables it
+everywhere including the hosted trial.
+
+---
+
 ## 5. Explainability — the χ values
 
 `glad.explain` answers a different question from `glad.analyze`. Analyze says *whether* and *how much*.
