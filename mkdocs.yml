@@ -155,6 +155,8 @@ nav:
     - Audio Input (Realtime Voice): g1-proxy/audio-input.md
     - Enforcement Modes: g1-proxy/enforcement-modes.md
     - Detection Axes: g1-proxy/detection-axes.md
+    - Grounding (fused metric): g1-proxy/grounding.md
+    - Closed-Book Calibration (SLEDGE): g1-proxy/closed-book-calibration.md
     - Token & Cost Control: g1-proxy/cost-control.md
     - Thinking Levels: g1-proxy/thinking-levels.md
     - Live Web Search: g1-proxy/web-search.md
@@ -168,6 +170,7 @@ nav:
   - MCP Security:
     - Overview: mcp/index.md
     - Guard Server: mcp/guard-server.md
+    - The glad.* Tools: mcp/tools.md
     - Interceptor: mcp/interceptor.md
     - Tool-aware Chat: mcp/chat-aware.md
     - Policy (App · Axis · Tool): mcp/policy.md

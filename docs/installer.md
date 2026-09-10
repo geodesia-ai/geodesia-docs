@@ -16,7 +16,7 @@ self-contained images, writes the config, and starts everything. This page is th
 ## Synopsis
 
 ```text
-./install.sh [both|g1-proxy|g1-studio] [--cpu|--gpu] [LICENSE]
+./install.sh [both|g1-proxy|g1-studio|light] [--cpu|--gpu] [LICENSE]
 ./install.sh update
 ./install.sh -h | --help
 ```
@@ -50,6 +50,14 @@ curl -s http://localhost:11434/api/tags   # your upstream (example: ollama)
 | `both` *(default)* | g1-proxy **+** g1-studio | the normal install |
 | `g1-proxy` | engine only | headless / API-only |
 | `g1-studio` | UI only | point it at an external engine with `GATEWAY_URL=` |
+| `light` | **g1-proxy-light alone** — engine *and* its own UI in **one** container, on the gateway port | evaluation, a single machine |
+
+!!! info "The `light` profile"
+    One container, no separate UI: nine axes with the GLAD-H cascade up to **thinking level 2**,
+    closed-book with SLEDGE, MuPAX and MCP. It is **GPU only** — no `-cpu` image is published — and it
+    carries no 8B deep-scan model, so `--cpu` and `DEEP_SCAN` do not apply to it.
+    `./install.sh light --cpu` is refused immediately with the alternative, instead of failing halfway
+    through a pull. For a machine without a GPU use `./install.sh both --cpu`.
 | `update` | — | checks the registry for newer images and updates per component (see [Updating](#updating)) |
 
 ---

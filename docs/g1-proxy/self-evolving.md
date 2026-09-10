@@ -7,6 +7,78 @@ consulted at scoring time, or the weights.
 
 ---
 
+## The idle judge — learning from your traffic, with no human and no retraining
+
+The feedback loop above needs someone to notice a bad decision. The **idle judge** removes that
+requirement for the cases a model can settle on its own.
+
+**While the box is serving, it does nothing and costs nothing.** When traffic stops, it wakes a **4B
+GGUF on llama.cpp**, takes served exchanges off a queue, asks **one yes/no question per axis**, and —
+where it and the detector disagree with enough confidence — writes a labelled cell into the
+**contrastive memory bank that the detector already consults at scoring time**. The next request is
+scored against a bank that learned from the last quiet hour. No retraining, no weights, no human.
+
+### It yields to traffic in ~50 ms
+
+The trick is that it is **two loops, not one**:
+
+* a **watchdog** thread does nothing but read a beacon every 50 ms and `SIGSTOP` / `SIGCONT` the judge
+  process. It never waits on the judge, so a request arriving in the middle of a prompt evaluation
+  freezes it *now* — not "at the end of the current item";
+* the **work loop** claims items and scores axes. It can be stopped at any instruction; its HTTP call
+  simply blocks until the watchdog thaws it. It never needs to know it was interrupted.
+
+Preemption granularity is a property of the watchdog, not of the work. That is why the judge cannot
+delay a served request.
+
+### Memory comes back in three steps, not one
+
+| state | what it costs | how it resumes |
+|---|---|---|
+| **running** | normal | — |
+| **frozen** | RSS still resident, KV cache intact, pages marked reclaimable first | a signal |
+| **unloaded** | nothing | re-reading a mmapped GGUF, usually still in page cache |
+
+Killing on every request would thrash. Freezing first and unloading only under sustained pressure is
+what keeps bursty traffic from causing a reload storm.
+
+### Promotion is deliberately hard to earn
+
+An automatic writer into the memory bank is a **poisoning vector**, so a judgement is not enough. To be
+promoted, an item must:
+
+1. **disagree** with the detector — agreement teaches nothing;
+2. clear a **confidence margin**;
+3. survive a **self-consistency re-ask with the question negated** — a judge that says yes to both
+   phrasings is not judging.
+
+On top of that there is a **daily quota**, and every row is stamped `reviewer='idle_judge'` so a curator
+can audit or revoke the whole set in one move.
+
+!!! tip "Turn it into a proposal queue"
+    `GW_IDLE_JUDGE_AUTOAPPROVE=0` keeps everything the judge finds, but writes nothing: each item waits
+    for a human. Recommended wherever an automatic write into the detector's memory is not acceptable.
+
+### Configuration
+
+| variable | default | what it does |
+|---|---|---|
+| `GW_IDLE_JUDGE` | `1` | supervisor installed |
+| `GW_IDLE_JUDGE_ENABLED` | `0` | actually run it |
+| `GW_IDLE_JUDGE_AUTOAPPROVE` | on | `0` → proposal queue only |
+| `GW_IDLE_JUDGE_IDLE_S` | `20` | seconds of quiet before it may start |
+| `GW_IDLE_JUDGE_UNLOAD_S` | `300` | frozen this long → give the RAM back |
+| `GW_IDLE_JUDGE_CORES_FRACTION` · `_CORES_MAX` | `0.25` · `8` | the share of cores it may use |
+| `GW_IDLE_JUDGE_AXES` | all | restrict which axes it judges |
+| `GW_IDLE_JUDGE_GPU` · `_GGUF_GPU` | off | run it on the GPU instead of the CPU |
+
+!!! note "CPU by default, on purpose"
+    The judge is background work. On a box where the GPU is reserved for serving it will run on the CPU
+    — slower, but it never competes with a request. If you want it on the GPU, say so explicitly with
+    the variables above; it will not take the device on its own.
+
+---
+
 ## REST API
 
 All routes are mounted under **`/v1/glad/feedback`** on **G1-Proxy** — reached as `/gw/v1/glad/feedback/…` through the unified port. The Application is resolved from `application_id` in the body/query or the `X-Geodesia-App` header (default `default`).
