@@ -117,7 +117,7 @@ Once created, the Application opens to its detail view, organised into tabs:
 | Tab | What you configure |
 |---|---|
 | **Model** | Upstream type, base URL, model, region, `logprobs`, and credential reference — with **live model discovery** and a **Test connection** probe (see below). |
-| **Policy** | The six-axis threshold sliders plus per-axis enforcement (`block` / `annotate` / `off`), `block_input`, CI injection, and the streaming brake. |
+| **Policy** | One threshold slider **per served axis** — the list comes from the running checkpoint, not a hard-coded number, so a 9-axis head shows nine rows and an older one fewer — plus per-axis enforcement (`block` / `annotate` / `off`), `block_input`, CI injection, and the streaming brake. `prompt_complexity` is **not** a safety axis: it routes to Model B and never blocks, so `block` is not offered for it. |
 | **Cost & Budget** | Per-Mtok rates, monthly budget, alert percentages, and the budget-exceeded action. See [Cost & Budget](cost.md). |
 | **Governance** | Applicable laws, risk classification, retention, FRIA link, and human-oversight thresholds. |
 | **API Keys** | Create, list, and revoke the Application's `g1k_live_…` keys. |

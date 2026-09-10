@@ -86,17 +86,32 @@ curl -s -X POST http://localhost:8800/upstream/test \
 
 ## Supported Backend Types
 
-| Type key | Description | Logprobs | Closed-book axis |
-|---|---|---|---|
-| `vllm` | vLLM serving engine | ✅ Full support | ✅ 5 axes |
-| `sglang` | SGLang serving framework | ✅ Full support | ✅ 5 axes |
-| `trtllm` / `tensorrt-llm` | NVIDIA TensorRT-LLM | ✅ Full support | ✅ 5 axes |
-| `openai` | OpenAI API or any OpenAI-compatible endpoint | ✅ When `logprobs=true` | ✅ 5 axes |
-| `ollama` | Ollama (local models) | ✅ Native (≥ 0.12) | ✅ 5 axes (older < 0.12: 4, or sidecar) |
-| `internal` | vLLM managed and lifecycle-controlled by the gateway itself | ✅ Full support | ✅ 5 axes |
+`logprobs` covers the **generated** tokens and gates the closed-book axis. `prompt_logprobs` covers the
+tokens of the **question** — a different feature, and the one that decides which
+[detector generation](closed-book-calibration.md#detector-generations) you can calibrate.
 
-!!! info "4 vs 5 axes"
-    The **closed-book fabrication** axis requires per-token log-probability values from the upstream. Log-probabilities are a measure of how "certain" the model is about each word it generates. When they are unavailable, this axis is automatically disabled and the gateway operates with 4 axes — no configuration change is needed. The `/health` endpoint tells you which mode is active.
+| Type key | Description | `logprobs` (generated) | Closed-book axis | `prompt_logprobs` (question) |
+|---|---|---|---|---|
+| `vllm` | vLLM serving engine | ✅ Full support | ✅ | **✅ → SLEDGE-Next v2** |
+| `internal` | vLLM managed by the gateway itself | ✅ Full support | ✅ | **✅ → SLEDGE-Next v2** |
+| `sglang` | SGLang serving framework | ✅ Full support | ✅ | ❌ → classic (fork) |
+| `trtllm` / `tensorrt-llm` | NVIDIA TensorRT-LLM | ✅ Full support | ✅ | ❌ → classic (fork) |
+| `openai` | OpenAI API or any OpenAI-compatible endpoint | ✅ When `logprobs=true` | ✅ | ❌ → classic (fork) |
+| `ollama` | Ollama (local models) | ✅ Native (≥ 0.12) | ✅ (older < 0.12: sidecar) | ❌ → classic (fork) |
+
+!!! info "9 vs 8 axes"
+    The **closed-book fabrication** axis needs per-token log-probabilities from the upstream — a measure
+    of how certain the model was about each word it generated. When they are unavailable the axis is
+    disabled automatically and the gateway serves **8 axes instead of 9**; no configuration change is
+    needed, and `/health` reports which mode is active.
+
+!!! tip "`prompt_logprobs` is a vLLM extension"
+    It is **not** part of the OpenAI API, so Ollama and OpenAI do not return it — they ignore the field
+    silently, with no error. An upstream can therefore show *closed-book available* and still have no
+    `prompt_logprobs`: the first is about the **answer**, the second about the **question**. Without it
+    the premise block has nothing to read, and G-1 keeps the detector on **classic (fork)** rather than
+    shipping 7 features stuck at zero. Serving the same model on **vLLM** is the whole fix — the default
+    moves to SLEDGE-Next v2 on its own at the next start.
 
 ---
 
