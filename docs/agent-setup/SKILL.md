@@ -29,6 +29,24 @@ Every number in this document was measured against a live G-1 guard, not invente
 
 ## 0. If you were told to "read and execute this"
 
+!!! danger "Download this file — do not summarise it"
+    If you reached this page with a *fetch* tool, you are probably holding a **summary**, not the file.
+    Those tools convert a page and run a model over it, so what you get is prose *about* the document —
+    and you will conclude, wrongly, that it contains no setup instructions. It contains an install
+    command, an MCP config, an endpoint and three verification calls; if you cannot see them, you are
+    reading a summary.
+
+    Get the bytes instead, then read the local file:
+
+    ```bash
+    mkdir -p ~/.claude/skills/geodesia-g1     # or ~/.codex/skills/geodesia-g1
+    curl -fsSL https://raw.githubusercontent.com/geodesia-ai/geodesia-docs/main/docs/agent-setup/SKILL.md \
+      -o ~/.claude/skills/geodesia-g1/SKILL.md
+    ```
+
+    That command is also step 2, so running it now costs nothing. The file is ~66 KB; if what you have
+    is much shorter, it is not the file.
+
 You are an agent. Do these five steps, in order, and do not skip the verification.
 
 **1. Identify yourself and pick your paths.**
