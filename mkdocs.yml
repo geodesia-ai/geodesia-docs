@@ -147,6 +147,7 @@ nav:
     - Cloud Upstreams & Scale-Out: studio/cloud-upstreams.md
   - G1-Proxy:
     - Introduction: g1-proxy/index.md
+    - G1-Proxy Light (and what it leaves out): g1-proxy/light.md
     - Complete API Map: g1-proxy/api-reference.md
     - Configuration: g1-proxy/configuration.md
     - Upstream Backends: g1-proxy/backends.md

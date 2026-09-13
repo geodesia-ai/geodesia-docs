@@ -299,6 +299,7 @@ Customer installer tokens. Full guide: [Licensing & Entitlements](licensing.md).
 |---|---|---|
 | `GET` | `/v1/glad/chat-sessions` | Sessions persisted by Studio. |
 | `GET` | `/v1/glad/chat-messages?session_id=…` | Turns of one session with the detection payload each was served with. **400** without `session_id`. |
+| `GET` | `/v1/glad/chat-export` | **Every** stored message as JSONL (one JSON object per line), ordered by (session, time) and scoped to the Application — `?application_id=` or the `X-Geodesia-App` header; `all` opts out. Streamed; a read that breaks halfway ends with an `{"_error": …}` line. This is what the **Download all chats (JSONL)** button on Human Oversight calls. |
 
 ---
 

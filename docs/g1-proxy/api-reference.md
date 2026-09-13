@@ -200,3 +200,4 @@ Frequently looked for here, actually on [G-1 Studio](../studio/api-reference.md)
 | Customer licence tokens | `/v1/glad/license-tokens/…` |
 | Model catalogue and switching | `/v1/glad/models/available`, `/v1/glad/models/switch` |
 | Stored chat history | `/v1/glad/chat-sessions`, `/v1/glad/chat-messages` |
+| Export every stored chat (JSONL) | `/v1/glad/chat-export` — one JSON object per line, ordered by (session, time), **scoped to the Application**. Streamed, so the response does not grow in memory. If the read breaks halfway the last line says so (`{"_error": …}`) instead of leaving a truncated file that opens fine and looks complete. |

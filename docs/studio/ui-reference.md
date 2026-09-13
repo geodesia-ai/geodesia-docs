@@ -83,9 +83,11 @@ Route `/applications`. The control-plane editor. See [Managing Applications](app
 
 ---
 
-## Chat
+## Playground
 
-Route `/chat`. The interactive console — every detection surface in one place.
+Route `/chat` (the screen is called **Playground** in the sidebar — it is not there to chat, it is there
+to *try*: you send a turn and watch the nine axes, the thresholds and the certificate on what comes back).
+The interactive console — every detection surface in one place.
 
 | Control | What it does | Calls |
 |---|---|---|
@@ -172,6 +174,7 @@ Route `/oversight`. See [Human Oversight](../compliance/oversight.md).
 | Counters | | `GET /v1/glad/oversight/summary` |
 | **Approve / Reject / Escalate / Modify** | Sends `review_id` plus the decision. `escalated` opens a fresh review one level up. | `POST /v1/glad/oversight/decide` |
 | **Verify chain** button | Proves the decision trail has not been altered. | `GET /v1/glad/chain/verify` |
+| **Download all chats (JSONL)** button | Exports **every stored message of the selected Application** — one JSON object per line, ordered by (session, time). Downloading another Application's transcripts would be handing one customer another's data, so the scope is the same one that governs the rest of the screen. Against a backend without the route it falls back to assembling in the browser and **says so** (`compatibility mode`), because that path is N+1 requests and not the same thing. | `GET /v1/glad/chat-export?application_id=…` |
 
 ---
 
