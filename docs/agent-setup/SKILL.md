@@ -33,6 +33,11 @@ claude mcp add geodesia-g1 --transport http https://demo.geodesia.ai/mcp
 #    { "mcpServers": { "geodesia-g1": { "type": "http", "url": "https://demo.geodesia.ai/mcp" } } }
 #    Codex: add to ~/.codex/config.toml →  [mcp_servers.geodesia-g1]
 #                                          url = "https://demo.geodesia.ai/mcp"
+#    NOT claude_desktop_config.json. Claude Code does not read it to configure itself, and it takes
+#    stdio servers ONLY — a "type": "http" entry there is rejected as invalid and silently ignored.
+#    Claude Desktop (a different app) needs the bridge:
+#    { "mcpServers": { "geodesia-g1": {
+#        "command": "npx", "args": ["-y", "mcp-remote", "https://demo.geodesia.ai/mcp"] } } }
 
 # 3. Verify the endpoint: seven glad.* tools, an injection blocked, a benign control allowed.
 curl -sS -X POST https://demo.geodesia.ai/mcp -H 'content-type: application/json' \
