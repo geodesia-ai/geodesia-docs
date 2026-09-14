@@ -104,7 +104,7 @@ You are an agent. Do these five steps, in order, and do not skip the verificatio
 | Claude Code | `~/.claude/skills/geodesia-g1/SKILL.md` | `claude mcp add geodesia-g1 --transport http https://demo.geodesia.ai/mcp` — **or**, if the CLI is not on PATH, `.mcp.json` in the project root (see step 3). Never `~/.claude.json`: that is app-internal state. |
 | Codex CLI | `~/.codex/skills/geodesia-g1/SKILL.md` | `~/.codex/config.toml`, section `[mcp_servers.geodesia-g1]` |
 | Cursor / Windsurf / Cline | that client's rules or skills directory | its `mcpServers` JSON block |
-| Claude Desktop | n/a (no skills dir) | `claude_desktop_config.json` → `mcpServers` |
+| Claude Desktop | n/a (no skills dir) | `claude_desktop_config.json` → `mcpServers`, **stdio form only** (see step 3) |
 | Something else | wherever this client reads standing instructions | its own MCP mechanism |
 
 The directory name must equal the `name:` in the frontmatter (`geodesia-g1`) and the file must be
@@ -153,7 +153,29 @@ without a prompt, add to `.claude/settings.json` (or `settings.local.json` for y
 Then tell the user: **the server is registered but a restart or rescan is needed**, because a session
 that has already loaded its MCP inventory will not see it. Do not report it as active until it is.
 
-If your client speaks **remote HTTP MCP** natively:
+!!! danger "`claude_desktop_config.json` takes stdio servers ONLY — and Claude Code never uses it"
+    Two mistakes travel together here, and one of them was in an earlier version of this page.
+
+    **Claude Code does not read `claude_desktop_config.json`** to configure itself. It can *import*
+    from it, and when it does it validates against Claude Desktop's schema — which accepts only
+    `command` + `args`. A `{"type": "http", "url": …}` entry written there is rejected with
+    *"not a valid MCP server configuration, ignored"*. For Claude Code use `claude mcp add`, or
+    `.mcp.json` in the project.
+
+    **Claude Desktop cannot reach a remote server directly.** It speaks stdio, so a hosted endpoint
+    needs the `mcp-remote` bridge. This is the only form that belongs in that file:
+
+    ```jsonc
+    // ~/Library/Application Support/Claude/claude_desktop_config.json   (macOS)
+    // %APPDATA%\Claude\claude_desktop_config.json                      (Windows)
+    { "mcpServers": { "geodesia-g1": {
+        "command": "npx", "args": ["-y", "mcp-remote", "https://demo.geodesia.ai/mcp"] } } }
+    ```
+
+    Verified against this endpoint on 2026-09-14: the bridge returns our `serverInfo` and the seven
+    tools over stdio. It needs Node on PATH. Restart Claude Desktop after editing.
+
+If your client speaks **remote HTTP MCP** natively (Claude Code, Codex, Cursor — **not** Desktop):
 
 ```toml
 # ~/.codex/config.toml
@@ -283,7 +305,8 @@ claude mcp add geodesia-g1 --transport http https://demo.geodesia.ai/mcp
 | Host | Command / config |
 |---|---|
 | **Claude Code** | the line above |
-| **Codex / Cursor / Windsurf / Claude Desktop** | `{"mcpServers":{"geodesia-g1":{"url":"https://demo.geodesia.ai/mcp"}}}` |
+| **Codex / Cursor / Windsurf** | `{"mcpServers":{"geodesia-g1":{"type":"http","url":"https://demo.geodesia.ai/mcp"}}}` |
+| **Claude Desktop** | the **stdio** form only — see the warning in step 3 |
 | **Anything that speaks HTTP** | `POST https://demo.geodesia.ai/mcp` with JSON-RPC |
 
 It is a **shared, rate-limited demo** (10 req/s per IP; over that you get `429`). Try it, benchmark it,
