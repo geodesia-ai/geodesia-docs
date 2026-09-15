@@ -492,7 +492,7 @@ the first `ls`. Set G1_ALLOWED_DOMAINS to your own hosts so `new_domain` is not 
 Fails OPEN by design: if the guard is unreachable the agent keeps working. A guard that bricks the
 session the moment it goes down gets uninstalled, and then it protects nothing.
 """
-import json, os, pathlib, re, sys, urllib.error, urllib.request
+import json, os, pathlib, re, sys, urllib.error, urllib.parse, urllib.request
 
 URL = os.environ.get("GEODESIA_G1_URL", "https://demo.geodesia.ai/mcp").rstrip("/")
 if not URL.endswith("/mcp"):
@@ -504,6 +504,14 @@ TAINT_DIR = pathlib.Path(os.environ.get("G1_TAINT_DIR", os.path.expanduser("~/.c
 # Without EGRESS the `sink` term is false for every call Claude Code makes (measured: PART 160).
 EGRESS = ["Bash", "Write", "Edit", "NotebookEdit", "WebFetch", "SendUserFile", "Artifact"]
 ALLOWLIST = [d.strip() for d in os.environ.get("G1_ALLOWED_DOMAINS", "").split(",") if d.strip()]
+# L'endpoint del guard sta SEMPRE in allow-list, e si ricava da GEODESIA_G1_URL invece di essere
+# scritto fisso, cosi' vale anche per chi ospita G-1 in proprio. Parlare col guard non e'
+# un'esfiltrazione: e' il meccanismo con cui il guard funziona. Se contasse come destinazione nuova,
+# una sessione sporca vedrebbe negata ogni chiamata legittima al proprio verificatore, e chi installa
+# passerebbe il pomeriggio a capire perche' il guard blocca se stesso.
+_GUARD = urllib.parse.urlsplit(URL).hostname or ""
+if _GUARD and _GUARD not in ALLOWLIST:
+    ALLOWLIST.append(_GUARD)
 # Sinks: tools that can send data out of the machine. A Bash command is treated as a sink only when
 # it actually reaches the network or writes — see _bash_is_sink.
 SINK_TOOLS = {"WebFetch", "Write", "Edit", "NotebookEdit", "SendUserFile", "Artifact"}
