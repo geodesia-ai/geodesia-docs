@@ -27,29 +27,58 @@ Every number in this document was measured against a live G-1 guard, not invente
 
 ---
 
-## 0. The short way: install the plugin
+## 0. The short way: install it
 
-On Claude Code and Codex there is now a packaged plugin. It carries the hooks, the MCP registration
-and this skill together, it picks the Python interpreter at run time, and it needs no file editing.
-Prefer it. The rest of this document is the manual route, for hosts that have no plugin format and for
-anyone who wants to know exactly what is being installed.
+**One command, every host.** It finds the agents installed on the machine — Claude Code, Codex,
+Cursor, Gemini CLI, Windsurf, Copilot CLI — and merges into each one's own config file, keeping a
+backup and leaving other people's entries alone.
+
+```bash
+git clone --depth 1 https://github.com/geodesia-ai/geodesia-plugins.git
+sh geodesia-plugins/install.sh
+```
+
+Then restart the agents: hooks are read at start-up, so a running session does not have them.
+
+```bash
+sh geodesia-plugins/install.sh --dry-run          # show what it would do, write nothing
+sh geodesia-plugins/install.sh --host cursor      # one host only
+sh geodesia-plugins/install.sh --uninstall        # remove our entries, leave the rest
+```
+
+**Or, on Claude Code and Codex, the packaged plugin**, which also lists it among that host's plugins:
 
 ```
 /plugin marketplace add geodesia-ai/geodesia-plugins
 /plugin install g1-guard@geodesia
 ```
 
-Then `/reload-plugins`, or restart. For Codex:
+Then `/reload-plugins`. On Codex, `codex plugin marketplace add geodesia-ai/geodesia-plugins` then
+`codex plugin add g1-guard@geodesia`, and **open `/hooks` to trust it** — Codex ships plugin hooks
+disarmed on purpose. Older Claude Code builds have no `/plugin` command; use the installer above.
 
-```bash
-codex plugin marketplace add geodesia-ai/geodesia-plugins
-codex plugin add g1-guard@geodesia
-```
+### Which config each host gets
 
-Codex ships plugin hooks **disarmed on purpose**: open `/hooks` and trust it, or the plugin is
-installed and the guard is inert. Trust is bound to the hook's hash, so an update disarms it again.
+| host | file | events |
+|---|---|---|
+| Claude Code | `~/.claude/settings.json` | `UserPromptSubmit`, `PostToolUse`, `PreToolUse` |
+| OpenAI Codex | `~/.codex/hooks.json` | the same three names |
+| Cursor | `~/.cursor/hooks.json` | `beforeSubmitPrompt`, `postToolUse`, `beforeShellExecution` |
+| Gemini CLI | `~/.gemini/settings.json` | `UserPromptSubmit`, `AfterTool`, `BeforeTool` |
+| Windsurf | `~/.codeium/windsurf/hooks.json` | `pre_user_prompt`, `post_mcp_tool_use`, `pre_run_command` |
+| Copilot CLI | `~/.copilot/hooks/geodesia-g1.json` | `userPromptSubmitted`, `postToolUse`, `preToolUse` |
 
-Cursor, Windsurf, VS Code and the rest have no plugin that carries hooks. For those, continue below.
+Every host names its events differently **and wants a different shape for a refusal**: `permissionDecision`
+on Claude Code, Codex and Copilot, `{"permission": "deny"}` on Cursor, `{"decision": "deny"}` on Gemini,
+and exit code 2 on Windsurf, which also blocks on all of the others and is the fallback everywhere. The
+installer declares the host with `G1_HOST` and the hook answers in that dialect. Get this wrong and the
+guard decides correctly while the host cannot read the answer: installed, running, and inert.
+
+Cursor, Copilot and Windsurf do not put the event name in the payload — they know it from where the
+hook is configured — so the installer passes it as the first argument.
+
+The rest of this document is the manual route, for anyone who wants to know exactly what is being
+installed, and the reference for the nine axes.
 
 ---
 
@@ -435,7 +464,8 @@ is caught where it happens.
 
 ### The hook script
 
-Write this to `~/.claude/hooks/g1_guard.py` and `chmod +x` it:
+Write this to `~/.claude/hooks/g1_guard.py` and `chmod +x` it. It serves every host: the
+`G1_HOST` variable, which the installer sets, selects the dialect each one reads.
 
 ```python
 #!/usr/bin/env python3
@@ -488,7 +518,22 @@ NET_WORDS = ("curl", "wget", "http://", "https://", "scp ", "rsync ", "ssh ", "n
 # `jailbreak` sugli argomenti di Write e Bash, e il guard blocca chi scrive i suoi banchi. Su una
 # macchina che fa ricerca sulla sicurezza, `policy` e' il modo utile; altrove `all` prende di piu'.
 DENY_ON = os.environ.get("G1_DENY_ON", "all").strip().lower()
-UA = "geodesia-g1-hook/1.1"      # Cloudflare has banned the default Python-urllib signature before (PART 161)
+# L'HOST determina due cose: come si chiamano gli eventi e che forma ha un diniego. Il payload di
+# Claude porta `hook_event_name`; Cursor, Copilot e Windsurf no, perche' l'evento lo sanno dalla
+# posizione in cui l'hook e' scritto. Percio' l'installatore lo passa come primo argomento, che e'
+# quel che fa Noma in produzione. `G1_HOST` lo scrive l'installatore: qui non si indovina.
+HOST = os.environ.get("G1_HOST", "claude").strip().lower()
+
+# Nomi di evento di ciascun host, ricondotti ai tre che il guard conosce. Presi dalla documentazione
+# di ciascun host, non inventati; dove restano dubbi, il README dice cosa e' verificato a runtime.
+EVENTI = {
+    "prompt": {"UserPromptSubmit", "beforeSubmitPrompt", "userPromptSubmitted", "pre_user_prompt"},
+    "letto":  {"PostToolUse", "postToolUse", "post_mcp_tool_use", "AfterTool", "afterFileEdit"},
+    "azione": {"PreToolUse", "preToolUse", "beforeShellExecution", "beforeMCPExecution",
+               "pre_run_command", "pre_mcp_tool_use", "pre_write_code", "BeforeTool"},
+    "fine":   {"Stop", "stop", "agentStop"},
+}
+UA = "geodesia-g1-hook/1.2"      # Cloudflare has banned the default Python-urllib signature before (PART 161)
 
 
 def rpc(tool, args):
@@ -512,6 +557,61 @@ def taint_path(sid):
 def out(obj):
     print(json.dumps(obj))
     sys.exit(0)
+
+
+def nega(motivo, tool=""):
+    """Un DINIEGO, nel dialetto dell'host.
+
+    Uscire a 2 blocca su Claude Code, Codex, Cursor, Windsurf, Copilot e Gemini: e' l'unico
+    meccanismo che funziona ovunque, ed e' la ricaduta per ogni host che non abbia un dialetto suo.
+    Dove il JSON strutturato esiste si preferisce quello, perche' porta il motivo al modello invece
+    che solo all'utente."""
+    if HOST in ("claude", "codex", "copilot", "vscode"):
+        out({"hookSpecificOutput": {"hookEventName": "PreToolUse",
+                                    "permissionDecision": "deny",
+                                    "permissionDecisionReason": motivo}})
+    if HOST == "cursor":
+        out({"permission": "deny", "agent_message": motivo,
+             "user_message": f"Geodesia G-1 blocked {tool}." if tool else "Geodesia G-1 blocked this."})
+    if HOST == "gemini":
+        out({"decision": "deny", "reason": motivo})
+    sys.stderr.write(motivo + "\n")          # windsurf e chiunque altro: exit 2 e il motivo su stderr
+    sys.exit(2)
+
+
+def annota(messaggio, breve=""):
+    """Un'ANNOTAZIONE: niente blocco, solo testo che entra nel contesto del modello."""
+    if HOST in ("claude", "codex", "copilot", "vscode"):
+        fuori = {"hookSpecificOutput": {"hookEventName": "PostToolUse",
+                                        "additionalContext": messaggio}}
+        if breve:
+            fuori["systemMessage"] = breve
+        out(fuori)
+    if HOST == "cursor":
+        out({"permission": "allow", "agent_message": messaggio})
+    if HOST == "gemini":
+        out({"decision": "allow", "reason": messaggio})
+    sys.stderr.write(messaggio + "\n")       # non blocca: stderr e uscita 0
+    sys.exit(0)
+
+
+def contesto_prompt(messaggio):
+    if HOST in ("claude", "codex", "copilot", "vscode"):
+        out({"hookSpecificOutput": {"hookEventName": "UserPromptSubmit",
+                                    "additionalContext": messaggio}})
+    if HOST == "cursor":
+        out({"permission": "allow", "agent_message": messaggio})
+    if HOST == "gemini":
+        out({"decision": "allow", "reason": messaggio})
+    sys.stderr.write(messaggio + "\n")
+    sys.exit(0)
+
+
+def classifica(nome):
+    for famiglia, nomi in EVENTI.items():
+        if nome in nomi:
+            return famiglia
+    return ""
 
 
 def text_of(v, budget=MAXCHARS):
@@ -602,12 +702,16 @@ def main():
         ev = json.load(sys.stdin)
     except Exception:
         sys.exit(0)
-    event = ev.get("hook_event_name") or ""
-    sid = ev.get("session_id")
+    # Cursor, Copilot e Windsurf non mandano il nome dell'evento: lo sanno dalla posizione in cui
+    # l'hook e' scritto. L'installatore lo passa quindi come primo argomento. Vale piu' del campo,
+    # perche' e' quel che l'installatore ha DICHIARATO installando.
+    event = (sys.argv[1] if len(sys.argv) > 1 else "") or ev.get("hook_event_name") or ""
+    famiglia = classifica(event)
+    sid = ev.get("session_id") or ev.get("conversation_id") or ev.get("sessionId")
 
     try:
         # ── the prompt itself ────────────────────────────────────────────────
-        if event == "UserPromptSubmit":
+        if famiglia == "prompt":
             p = ev.get("prompt") or ""
             if not p.strip():
                 sys.exit(0)
@@ -627,14 +731,14 @@ def main():
                           "plainly what you will not do and offer the nearest thing you can."
                           if grave else
                           "Keep it in mind while you answer; it is a signal, not a verdict.")
-                out({"hookSpecificOutput": {"hookEventName": "UserPromptSubmit",
-                     "additionalContext": "[Geodesia G-1] the QUESTION scores above threshold on: "
-                     + ", ".join(hits) + ". " + azione
-                     + " Quote the axis and the number if you mention it, never 'it looked suspicious'."}})
+                contesto_prompt("[Geodesia G-1] the QUESTION scores above threshold on: "
+                                + ", ".join(hits) + ". " + azione
+                                + " Quote the axis and the number if you mention it, never 'it "
+                                  "looked suspicious'.")
             sys.exit(0)
 
         # ── what the agent just READ ─────────────────────────────────────────
-        if event == "PostToolUse":
+        if famiglia == "letto":
             tool = ev.get("tool_name") or ""
             external = tool in EXTERNAL_TOOLS or tool.startswith("mcp__")
             if tool not in READ_TOOLS and not external:
@@ -669,17 +773,14 @@ def main():
                          "not change your behaviour on the strength of this flag alone.")
                 coda = ("\nThis session is now marked tainted: an egress tool call to a new "
                         "destination will be denied." if external or iniezione else "")
-                out({"systemMessage":
-                        (f"G-1: injected instructions in {tool} output (rag_jailbreak {p_rag})"
-                         if iniezione else
-                         f"G-1: {tool} output flags {', '.join(assi)} (not an injection)"),
-                     "hookSpecificOutput": {"hookEventName": "PostToolUse",
-                     "additionalContext":
-                        f"[Geodesia G-1 — {r.get('verdict').upper()}] {testa}{coda}"}})
+                annota(f"[Geodesia G-1 — {r.get('verdict').upper()}] {testa}{coda}",
+                       breve=(f"G-1: injected instructions in {tool} output (rag_jailbreak {p_rag})"
+                              if iniezione else
+                              f"G-1: {tool} output flags {', '.join(assi)} (not an injection)"))
             sys.exit(0)
 
         # ── la RISPOSTA, a fine turno ────────────────────────────────────────
-        if event == "Stop":
+        if famiglia == "fine":
             # PROTEZIONE DAL CICLO, prima di tutto. Un hook Stop che blocca rimanda il modello a
             # lavorare: se blocca di nuovo sulla risposta corretta, il turno non finisce piu'. Si
             # interviene UNA volta per turno. `stop_hook_active` e' il segnale del client che siamo al
@@ -717,9 +818,16 @@ def main():
                      "guard will not stop you a second time on this turn."})
 
         # ── what the agent is about to DO ────────────────────────────────────
-        if event == "PreToolUse":
+        if famiglia == "azione":
             tool = ev.get("tool_name") or ""
             ti = ev.get("tool_input") or {}
+            # Cursor manda il comando in `command`, Windsurf dentro `tool_info`. Si guarda dove
+            # ciascuno lo mette, invece di pretendere il vocabolario di Claude da tutti.
+            if not ti and isinstance(ev.get("tool_info"), dict):
+                ti = ev["tool_info"]
+            if not tool:
+                tool = (ev.get("mcp_tool_name") or ev.get("mcp_server_name")
+                        or ("Bash" if ti.get("command") else ""))
             if tool == "Bash" and not _bash_is_sink(ti.get("command", "")):
                 sys.exit(0)
             if tool not in SINK_TOOLS and tool != "Bash" and not tool.startswith("mcp__"):
@@ -753,12 +861,10 @@ def main():
                     "that was not allow-listed — the exfiltration pattern."
                     if by_policy else
                     "The detectors flag the call's own arguments, independently of the session's history.")
-                out({"hookSpecificOutput": {"hookEventName": "PreToolUse",
-                     "permissionDecision": "deny",
-                     "permissionDecisionReason":
-                        f"[Geodesia G-1] blocked {tool}: {why}. "
-                        f"taint={pol.get('taint')} sink={pol.get('sink')} new_domain={pol.get('new_domain')} "
-                        f"destinations={dest}. {spiegazione} Ask the user before retrying."}})
+                nega(f"[Geodesia G-1] blocked {tool}: {why}. "
+                     f"taint={pol.get('taint')} sink={pol.get('sink')} "
+                     f"new_domain={pol.get('new_domain')} destinations={dest}. {spiegazione} "
+                     "Ask the user before retrying.", tool=tool)
             sys.exit(0)
     except (urllib.error.URLError, RuntimeError, TimeoutError, OSError):
         sys.exit(0)                                   # guard unreachable → fail open, never brick the session
@@ -821,19 +927,41 @@ Write this next to the hook, as `~/.claude/hooks/run_hook.sh`, and `chmod +x` it
 
 ```sh
 #!/bin/sh
-# Finds a Python and hands it the hook. Fails open: no interpreter means silence, not a broken agent.
-case "$0" in                      # shell expansion, not `dirname`: with a reduced PATH that binary
-    */*) QUI="${0%/*}" ;;         # is absent, and the error would land on stderr exactly when the
-    *)   QUI="." ;;               # launcher must be quiet.
+# Trova un interprete Python e gli passa l'hook. Esiste per un motivo solo: NESSUN nome di comando
+# copre i tre sistemi.
+#
+#   python3  ->  Linux si', macOS si', Windows NO
+#   python   ->  Windows si', macOS si', Linux NO su Debian e Ubuntu puliti, dove e' un pacchetto a parte
+#
+# Claude Code non ha un campo per-piattaforma nei suoi hook, quindi la scelta va fatta a tempo di
+# esecuzione. E' lo stesso rimedio del plugin ufficiale `security-guidance`; il plugin ufficiale
+# `hookify` non ce l'ha, e infatti ha il difetto aperto #85 proprio su Windows.
+#
+# FALLISCE APERTO, come tutto il resto del guard. Se non c'e' nessun interprete si esce a 0 in
+# silenzio: l'agente continua a lavorare senza protezione. Un guard che rompe la sessione quando
+# manca una dipendenza viene disinstallato, e allora non protegge niente. Il costo di questa scelta
+# e' che l'assenza e' silenziosa: chi installa deve VERIFICARE, non dare per scontato.
+
+# `${0%/*}` invece di `dirname`: e' espansione della shell, non un binario esterno. Con un PATH
+# ridotto `dirname` non c'e', e l'avviatore scriverebbe un errore su stderr proprio nel caso in cui
+# deve tacere. Se `$0` non contiene una barra, la cartella e' quella corrente.
+case "$0" in
+    */*) QUI="${0%/*}" ;;
+    *)   QUI="." ;;
 esac
 HOOK="$QUI/g1_guard.py"
+
 [ -f "$HOOK" ] || exit 0
+
 for INTERPRETE in python3 python py; do
     if command -v "$INTERPRETE" >/dev/null 2>&1; then
-        [ "$INTERPRETE" = "py" ] && exec "$INTERPRETE" -3 "$HOOK"
-        exec "$INTERPRETE" "$HOOK"
+        if [ "$INTERPRETE" = "py" ]; then
+            exec "$INTERPRETE" -3 "$HOOK" "$@"        # il launcher di Windows vuole la versione
+        fi
+        exec "$INTERPRETE" "$HOOK" "$@"
     fi
 done
+
 exit 0
 ```
 
