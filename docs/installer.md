@@ -54,10 +54,11 @@ curl -s http://localhost:11434/api/tags   # your upstream (example: ollama)
 
 !!! info "The `light` profile"
     One container, no separate UI: nine axes with the GLAD-H cascade up to **thinking level 2**,
-    closed-book with SLEDGE, MuPAX and MCP. It is **GPU only** — no `-cpu` image is published — and it
-    carries no 8B deep-scan model, so `--cpu` and `DEEP_SCAN` do not apply to it.
-    `./install.sh light --cpu` is refused immediately with the alternative, instead of failing halfway
-    through a pull. For a machine without a GPU use `./install.sh both --cpu`.
+    closed-book with SLEDGE, MuPAX and MCP. **Both `--gpu` and `--cpu` exist** since 2026-09-13 —
+    `light --cpu` used to be refused because no `-cpu` image was published, and that is no longer true.
+    It carries no 8B deep-scan model in **either** variant, so `DEEP_SCAN` does not apply to it.
+    The two variants are different images (`TAG-gpu` and `TAG-cpu`), and `install.sh update` re-pulls
+    the one the install originally chose.
 | `update` | — | checks the registry for newer images and updates per component (see [Updating](#updating)) |
 
 ---
