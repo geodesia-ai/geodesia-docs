@@ -2,10 +2,10 @@
 
 **Thinking level** is a per-request dial that trades a little latency for a stricter, more careful verdict from **G1-Hummingbird**. It is a single integer on the request body — `thinking_level` — and it changes *how hard the detector thinks* about the turn, not *what* it reports: the response shape, the axis names and the thresholds are identical at every level.
 
-Level `0` is the default and is what you get if you never send the field at all.
+Level `2` (**Extra High Thinking**) is the default since 2026-09-18: it is what you get if you never send the field at all. Send `0` (**Low Latency**) explicitly when you need the fastest verdict and accept a weaker one on borderline traffic.
 
 !!! abstract "TL;DR"
-    Leave it at `0` for ordinary traffic. Raise it to `1` when you want a stricter opinion but only on the calls that are genuinely borderline. Use `2` for high-stakes turns. Use `3` — **MAX** — when correctness matters more than latency and you want the strictest verdict the product can produce.
+    Leave the field out (level `2`, Extra High Thinking) for ordinary traffic. Send `0` (Low Latency) only when latency matters more than accuracy. Use `1` for a stricter opinion only on the calls that are genuinely borderline. Use `2` for high-stakes turns. Use `3` — **MAX** — when correctness matters more than latency and you want the strictest verdict the product can produce.
 
 ---
 
@@ -34,7 +34,7 @@ Level `0` is the default and is what you get if you never send the field at all.
         json={
             "model": "my-model",
             "stream": False,
-            "thinking_level": 3,          # 0 (default) … 3 (MAX)
+            "thinking_level": 3,          # 0 (Low Latency) … 3 (Max); omitted = 2 (default)
             "messages": [{"role": "user", "content": "Summarise the contract clause…"}],
         },
         timeout=120,
@@ -52,7 +52,7 @@ Level `0` is the default and is what you get if you never send the field at all.
       body: JSON.stringify({
         model: "my-model",
         stream: false,
-        thinking_level: 3,               // 0 (default) … 3 (MAX)
+        thinking_level: 3,               // 0 (Low Latency) … 3 (Max); omitted = 2 (default)
         messages: [{ role: "user", content: "Summarise the contract clause…" }],
       }),
     })
@@ -92,10 +92,10 @@ Nothing else about the payload changes. A fused axis still reports one `p_detect
 
 | Level | Name | Extra work | When to use it |
 |---|---|---|---|
-| `0` | **Standard** *(default)* | none | Ordinary traffic. Lowest latency; the calibrated detector you get with no configuration at all. |
-| `1` | **Careful** | only on turns the detector is *unsure* about | Broad quality lift for near-zero average cost. Confident calls behave exactly like level 0. |
-| `2` | **High** | on every turn | High-stakes traffic where you would rather pay the latency on every request than miss a borderline call. |
-| `3` | **MAX** | on every turn, maximum depth | The strictest verdict the product produces. Legal, medical, financial, agentic tool-use — anywhere a miss is expensive. |
+| `0` | **Low Latency** | none | Lowest latency: GLAD-G only. Trades accuracy for speed on borderline traffic; ask for it explicitly. |
+| `1` | **High Thinking** | only on turns the detector is *unsure* about | Broad quality lift for near-zero average cost. Confident calls behave exactly like level 0. |
+| `2` | **Extra High Thinking** *(default)* | on every turn | High-stakes traffic where you would rather pay the latency on every request than miss a borderline call. |
+| `3` | **Max Thinking** | on every turn, maximum depth | The strictest verdict the product produces. Legal, medical, financial, agentic tool-use — anywhere a miss is expensive. |
 
 ### Why level 1 is nearly free
 
