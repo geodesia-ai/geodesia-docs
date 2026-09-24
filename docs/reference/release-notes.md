@@ -104,6 +104,9 @@ schema version changes only when the shape of the `geodesia` object changes.
   Applications are invisible (`404`), naming another Application is refused (`403`), no key is `401`. Operators
   (gateway token) may name any Application or act across all of them.
 - `scores` accepts the schema-1.0 `geodesia` object or its `axes`.
+- The **default** Application's "Learn from feedback" switch is honoured (it was ignored: the default
+  Application ran on the gateway configuration only). G1-Studio accepts policies that carry the 9-axis head's
+  additional axes even when `GB_EXTRA_AXES` is not set in its container.
 - When a thinking level is requested but Geodesia-H is unavailable, the verdict now declares
   `thinking: {level, tiers_used: ["geodesia_g"]}` instead of looking like level 0.
 
