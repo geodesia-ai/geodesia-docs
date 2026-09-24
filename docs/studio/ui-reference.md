@@ -97,7 +97,7 @@ The interactive console — every detection surface in one place.
 | **Web search** toggle | Sets `web_search: true`. | body field — [Live Web Search](../g1-proxy/web-search.md) |
 | **Knowledge base** picker | Sets `rag: {collection_id, …}`. | body field — [Knowledge Base](../rag/index.md) |
 | **Microphone** button | Streams PCM to the voice guard and brakes mid-utterance. | `WS /gw/v1/glad/audio/stream`, config from `GET /gw/v1/glad/audio/status` |
-| **Score overlay** / **Energy panel** | Per-axis probability, threshold and flag. Read straight from `geodesia.axis_energy` in the chat response — **no second call**. | — |
+| **Score overlay** / **Energy panel** | Per-axis score, threshold and flagged state. Read straight from `geodesia.axes` and `geodesia.additional_axes` in the chat response — **no second call**. See [Response Format](../reference/response-format.md#axis-object). | — |
 | **Token heatmap** / **Prompt XAI** / **Response XAI** cards | The dual-surface attribution that runs automatically at verdict time: which *prompt* tokens caused a block, which *answer* tokens caused a flag. | `POST /gw/v1/glad/causal-explainability/analyze` with `method: "dca_dual"` |
 | **RAG sources** panel | Retrieved passages and claim verification. From `geodesia.rag` in the response. | — |
 | **Web research** panel | Pages searched, screened and used. From the response. | — |

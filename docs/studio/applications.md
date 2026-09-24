@@ -224,19 +224,22 @@ The policy is scored across the **nine** G1-Hummingbird axes. Each axis has its 
 | `optional_detectors` | `dict[str, bool]` | `{causal_xai: false, self_consistency: false}` | Opt-in extra detectors. |
 | `streaming_brake` | `dict` | `{enabled: true, cadence_tokens: 32}` | Mid-stream re-scoring: whether the brake is on and how often (in tokens) it fires. |
 
-**Defaults** (`DEFAULT_THRESHOLDS` / `DEFAULT_ENFORCEMENT` — the serving calibration of the 9-axis head; `prompt_safety` and `jailbreak` share a joint 2 % false-positive budget measured on a **multilingual** benign pool):
+**Defaults** (`DEFAULT_THRESHOLDS` / `DEFAULT_ENFORCEMENT`). New Applications take the thresholds of the
+deployment's serving calibration, which is per deployment; `prompt_safety` and `jailbreak` share one false-positive
+budget measured on a **multilingual** benign pool. For scale, the **demo calibration, September 2026** (the live
+value is always the `threshold` each axis reports in the response):
 
-| Axis | Region | Default threshold | Default enforcement |
+| Axis | Region | Demo calibration, September 2026 | Default enforcement |
 |---|---|---|---|
-| `prompt_safety` | prompt | `0.9215` | `block` |
-| `jailbreak` | prompt | `0.9997` | `block` |
-| `rag_jailbreak` | prompt / context | `0.2501` | `block` |
-| `halluc_context` | answer | `0.6475` | `annotate` |
-| `halluc_closedbook` | answer | `0.58` (advisory) | `annotate` |
-| `answer_safety` | answer | `0.7295` | `annotate` |
-| `profanity` | prompt | `0.90` | `annotate` |
-| `out_of_scope` | prompt | `0.90` | `annotate` |
-| `prompt_complexity` | prompt | `0.50` (routing boundary) | `off` |
+| `prompt_safety` | prompt | `0.6377` | `block` |
+| `jailbreak` | prompt | `0.9864` | `block` |
+| `rag_jailbreak` | prompt / context | `0.5768` | `block` |
+| `halluc_context` | answer | `0.7551` | `annotate` |
+| `halluc_closedbook` | answer | no stored default — conformal τ per model and language (demo: `0.8555`) | `annotate` |
+| `answer_safety` | answer | `0.7953` | `annotate` |
+| `profanity` | prompt | `0.7` | `annotate` |
+| `out_of_scope` | prompt | `0.9534` | `annotate` |
+| `prompt_complexity` | prompt | `0.5` (routing boundary) | `off` |
 
 !!! warning "Thresholds do not transfer across detector builds"
     These values belong to a specific checkpoint. A new detector build means a new calibration — an Application created before the change keeps the thresholds stored in its own config. Tune yours against real traffic with [Policy Lens](policy-lens.md) rather than by copying numbers.

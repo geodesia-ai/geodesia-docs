@@ -8,61 +8,91 @@ detector** and grounds the answer only in the ones that pass. One boolean on the
 
 ## Use it
 
-**What it does.** Set `web_search: true` on any chat request. The proxy searches, screens each fetched
-page through the detector, keeps only the safe ones as grounding context, and cites them back in
-`geodesia.rag`. On by default (`GW_WEBSEARCH_ENABLED=1`).
+**What it does.** Set `web_search: true` on a `POST /v1/chat/completions` request. The proxy searches, screens
+each fetched page through the detector, keeps only the safe ones as grounding context, and streams the search
+progress to you as [research events](#streaming-research-events) before the answer. On by default
+(`GW_WEBSEARCH_ENABLED=1`).
+
+!!! warning "A web-search request is always answered as a stream"
+    With `web_search: true` the response is **always** an SSE stream (`text/event-stream`) — research events
+    first, then the answer, then the `final` event — **whatever `stream` says**. Read it with a streaming client.
+    The pages used as sources arrive as `page_read` research events (`url`, `title`); they are **not** repeated
+    under `geodesia.rag` in the final event.
 
 === "curl"
 
     ```bash
-    curl -s http://localhost:8080/gw/v1/chat/completions \
+    curl -N -s http://localhost:8080/gw/v1/chat/completions \
       -H "Content-Type: application/json" \
       -d '{
         "model": "my-model",
-        "stream": false,
+        "stream": true,
         "web_search": true,
         "messages": [{"role":"user","content":"What were the headline announcements at the latest Apple event?"}]
-      }' | jq '{answer: .choices[0].message.content, sources: [.geodesia.rag.sources[]?.url]}'
+      }'
     ```
 
 === "Python"
 
     ```python
-    import httpx
+    from openai import OpenAI
 
-    r = httpx.post("http://localhost:8080/gw/v1/chat/completions", json={
-        "model": "my-model",
-        "stream": False,
-        "web_search": True,
-        "messages": [{"role": "user", "content": "What were the headline announcements at the latest Apple event?"}],
-    }, timeout=120).json()
+    client = OpenAI(base_url="http://localhost:8080/gw/v1", api_key="not-needed-locally")
 
-    print(r["choices"][0]["message"]["content"])
-    for s in (r["geodesia"].get("rag") or {}).get("sources", []):
-        print(" •", s.get("url"))
+    stream = client.chat.completions.create(
+        model="my-model",
+        stream=True,                                   # web search always streams
+        messages=[{"role": "user", "content": "What were the headline announcements at the latest Apple event?"}],
+        extra_body={"web_search": True},
+    )
+
+    sources, verdict = [], None
+    for chunk in stream:
+        g = (chunk.model_extra or {}).get("geodesia")
+        if g and g["event"] == "research":
+            ev = g["research"]
+            if ev["type"] == "page_read":
+                sources.append(ev["url"])
+            elif ev["type"] == "page_blocked":
+                print(f"blocked {ev['url']} ({ev['axis']}: {ev['reason']})")
+        elif g and g["event"] == "final":
+            verdict = g
+        if chunk.choices and chunk.choices[0].delta.content:
+            print(chunk.choices[0].delta.content, end="", flush=True)
+
+    print("\nsources:", sources)
+    print("decision:", verdict["decision"])
     ```
 
 === "TypeScript"
 
     ```ts
-    const r = await fetch("http://localhost:8080/gw/v1/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "my-model",
-        stream: false,
-        web_search: true,
-        messages: [{ role: "user", content: "What were the headline announcements at the latest Apple event?" }],
-      }),
-    }).then(r => r.json())
+    import OpenAI from "openai"
 
-    console.log(r.choices[0].message.content)
-    console.log(r.geodesia.rag?.sources?.map((s: any) => s.url))
+    const client = new OpenAI({ baseURL: "http://localhost:8080/gw/v1", apiKey: "not-needed-locally" })
+
+    const stream = await client.chat.completions.create({
+      model: "my-model",
+      stream: true,                                  // web search always streams
+      messages: [{ role: "user", content: "What were the headline announcements at the latest Apple event?" }],
+      // @ts-expect-error — Geodesia extension field
+      web_search: true,
+    })
+
+    const sources: string[] = []
+    let verdict: any = null
+    for await (const chunk of stream) {
+      const g = (chunk as any).geodesia
+      if (g?.event === "research" && g.research.type === "page_read") sources.push(g.research.url)
+      if (g?.event === "final") verdict = g
+      process.stdout.write(chunk.choices[0]?.delta?.content ?? "")
+    }
+    console.log("\nsources:", sources, "decision:", verdict?.decision)
     ```
 
-**What comes back** — the ordinary chat response. The pages that were searched, read or blocked arrive as
-[research events](#streaming-research-events) when `stream: true`, and the grounding sources under
-`geodesia.rag`.
+**What comes back** — an SSE stream: `research` events narrating the search (which pages were found, read or
+blocked, and why), the answer tokens, and the `final` event with the turn's verdict. The answer is grounded in
+the safe pages, which are passed as context, so `halluc_context` measures faithfulness to them.
 
 !!! info "A search that finds nothing usable does not become a refusal"
     If the engine is rate-limited, every page fails to fetch, or every page is blocked by the firewall,
@@ -249,16 +279,60 @@ Then send a request with `web_search: true` — see [Use it](#use-it).
 
 ## Streaming research events
 
-When `stream: true`, the gateway emits research events before the answer so the UI can narrate the search:
+The gateway emits research events before the answer so the UI can narrate the search.
+Each one is an SSE chunk with an empty delta whose `geodesia` object has `event: "research"` and carries one
+progress event in `geodesia.research`:
 
-| Event | Meaning |
+```text
+data: {"id":"chatcmpl-geodesia-ws-…","object":"chat.completion.chunk","choices":[{"index":0,"delta":{},"finish_reason":null}],
+       "geodesia":{"schema_version":"1.0","event":"research",
+                   "research":{"type":"search_started","query":"…","provider":"tavily"}}}
+```
+
+`research.type` is one of:
+
+| `type` | Meaning |
 |---|---|
-| `search_started` | The query was sent; carries the `provider` actually used. |
-| `page_found` | A result URL/title was returned by the search. |
-| `page_read` | The page passed the firewall and is grounding the answer (carries per-axis scores + an excerpt). |
-| `page_blocked` | The page tripped a firewall axis — carries `axes`, `dominant`, and a human-readable `reason`. |
-| `page_skipped` | The page could not be fetched (anti-bot 403, timeout, non-HTML). |
+| `search_started` | The query was sent; carries the `query` and the `provider` actually used. |
+| `page_found` | A result `url` / `title` was returned by the search. |
+| `page_read` | The page passed the firewall and is grounding the answer. Carries the page's per-axis screening scores (`axes`), an `excerpt`, and `snippet_only: true` when the page could not be fetched and the search snippet was used instead. |
+| `page_blocked` | The page tripped a firewall axis. Carries `axes`, `axis` (the deciding axis: the one furthest over its threshold) and a human-readable `reason`. |
+| `page_skipped` | The page could not be fetched (anti-bot 403, timeout, non-HTML); carries a `reason`. |
 | `search_done` | Summary counts: `found`, `read`, `blocked`. |
+| `search_error` | The search itself failed; carries an `error` message. The answer is still generated. |
+
+The per-page `axes` inside a research event are the page-screening scores, one entry per firewall axis
+(`rag_jailbreak`, `answer_safety`, `prompt_safety`, `jailbreak`) as `{"score": …, "threshold": …, "flagged": …}`.
+They describe the page, not the turn: they are not the turn's `geodesia.axes`.
+
+```json
+"research": {
+  "type": "page_blocked", "url": "https://…", "title": "…",
+  "axes": {
+    "rag_jailbreak": { "score": 0.9984, "threshold": 0.5768, "flagged": true },
+    "answer_safety": { "score": 0.0421, "threshold": 0.7953, "flagged": false },
+    "prompt_safety": { "score": 0.1033, "threshold": 0.6377, "flagged": false },
+    "jailbreak":     { "score": 0.2210, "threshold": 0.9864, "flagged": false }
+  },
+  "axis": "rag_jailbreak",
+  "reason": "Prompt-injection / manipulation hidden in the page"
+}
+```
+
+Research events are informational. The turn's verdict arrives, as always, only in the last chunk, the one with
+`event: "final"` (see [Streaming](../reference/response-format.md#streaming)):
+
+```python
+for chunk in stream:                      # parsed SSE chunks
+    g = chunk.get("geodesia")
+    if not g:
+        continue
+    if g["event"] == "research":
+        ev = g["research"]
+        print(ev["type"], ev.get("url", ""))
+    elif g["event"] == "final":
+        print("decision:", g["decision"])
+```
 
 If the search returns nothing usable (engine rate-limited, all pages unfetchable, or all blocked), the gateway instructs the model to answer from its own knowledge and append a one-line note that live results weren't available — rather than emitting a flat *"I cannot search the web"* refusal.
 

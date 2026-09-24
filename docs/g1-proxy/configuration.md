@@ -123,23 +123,24 @@ Only the fields listed in the gateway source as "persistable" are saved: upstrea
 |---|---|---|---|
 | `thresholds` | `dict[str, float]` | See below | Per-axis detection thresholds in **probability space** (0.0–1.0). A score above the threshold for an axis causes that axis to flag. |
 
-**Serving-calibrated defaults for the nine-axis head:**
+**Calibrated thresholds** are per deployment. For scale, the **demo calibration, September 2026** (the live
+value is always the `threshold` reported by each axis in the response):
 
-| Axis key | Default | Enforcement |
+| Axis key | Demo calibration, September 2026 | Enforcement |
 |---|---|---|
-| `prompt_safety` | `0.9215` | `block` |
-| `jailbreak` | `0.9997` | `block` |
-| `rag_jailbreak` | `0.2501` | `block` |
-| `halluc_context` | `0.6475` | `annotate` |
-| `halluc_closedbook` | `0.58` | `annotate` |
-| `answer_safety` | `0.7295` | `annotate` |
-| `profanity` | `0.90` | `annotate` |
-| `out_of_scope` | `0.90` | `annotate` |
-| `prompt_complexity` | `0.50` | `off` (routing boundary, not a safety threshold) |
+| `prompt_safety` | `0.6377` | `block` |
+| `jailbreak` | `0.9864` | `block` |
+| `rag_jailbreak` | `0.5768` | `block` |
+| `halluc_context` | `0.7551` | `annotate` |
+| `halluc_closedbook` | `0.8555` (conformal τ per model and language; no fixed default) | `annotate` |
+| `answer_safety` | `0.7953` | `annotate` |
+| `profanity` | `0.7` | `annotate` |
+| `out_of_scope` | `0.9534` | `annotate` |
+| `prompt_complexity` | `0.5` | `off` (routing boundary, not a safety threshold) |
 
 !!! warning "These numbers do not transfer across checkpoints"
     They are the operating point of **one** calibration on **one** checkpoint — `prompt_safety` and
-    `jailbreak` share a 2 % false-positive budget measured on a multilingual benign pool; the rest sit on
+    `jailbreak` share one false-positive budget measured on a multilingual benign pool; the rest sit on
     their dev split. A new checkpoint means re-running the calibration. An Application created before a
     change keeps the thresholds stored in its own policy.
 

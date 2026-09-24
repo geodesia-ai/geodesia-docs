@@ -116,31 +116,36 @@ it is not a hard auth wall unless you put one in front (nginx/Cloudflare).
 
 ## 4. Read the (non-streaming) response
 
-The body is a normal OpenAI `chat.completion` **plus** two things: top-level `glad_*` fields and a `geodesia`
-block with the per-axis detector output.
+The body is a normal OpenAI `chat.completion` **plus** exactly one extra top-level key, `geodesia`, which
+holds the verdict and the per-axis detector output (schema 1.0). The full field reference is in
+[Response Format](reference/response-format.md).
 
 ```json
 {
   "id": "chatcmpl-geodesia-…",
-  "choices": [{ "index": 0, "message": { "role": "assistant", "content": "A hash function is …" },
-                "finish_reason": "length" }],
-  "usage": { "prompt_tokens": 1723, "completion_tokens": 25, "total_tokens": 1748 },
-
-  "glad_mode": "blocking",          // "blocking" = it may withhold; "passthrough" = score-only
-  "glad_decision": "passed",        // "passed" | "blocked"  ← the headline verdict
+  "choices": [{ "index": 0, "message": { "role": "assistant", "content": "The capital of France is **Paris**." },
+                "finish_reason": "stop" }],
+  "usage": { "prompt_tokens": 1826, "completion_tokens": 23, "total_tokens": 1849 },
 
   "geodesia": {
-    "axis_energy": { …per-axis… },     // the 6 PRIMARY axes (below)
+    "schema_version": "1.0",
+    "event": "final",
+    "decision": "allowed",          // "allowed" | "flagged" | "blocked"  ← the headline verdict
+    "mode": "blocking",             // "blocking" = it may withhold; "passthrough" = report only
+    "reason": null,                 // why the decision is not "allowed" (null when it is)
+    "axes": { …per-axis… },            // the PRIMARY axes (below)
     "additional_axes": { …per-axis… }, // profanity / out-of-scope / prompt-complexity — annotate only
-    "brake": false,                 // true = the gateway decided to block
-    "dominant_axis": "halluc_context",
-    "energy_unit": "J",
-    "energy_dHmax_joule": 1.87
+    "grounding": { "available": true, "verdict": "grounded", "score": 0.7261, … },
+    "pii": { "enabled": true, "input": { "count": 0, "by_type": {} }, "output": { "count": 0, "by_type": {} } }
   }
 }
 ```
 
-### The 9 axes (`geodesia.axis_energy` + `geodesia.additional_axes`)
+`decision` has three values: `allowed` (no enforcing axis flagged), `flagged` (a violation was detected but the
+content was delivered, e.g. in `passthrough` mode) and `blocked` (the content was withheld). To ask "was this
+turn a violation?", test `decision != "allowed"`.
+
+### The 9 axes (`geodesia.axes` + `geodesia.additional_axes`)
 
 Each axis is an **independent** risk signal with its **own** calibrated threshold — read each on its own, it is
 not one blended score.
@@ -149,7 +154,7 @@ not one blended score.
 |---|---|---|
 | `prompt_safety` | the user's prompt is harmful/unsafe | input |
 | `jailbreak` | the prompt tries to override the assistant's rules | input |
-| `rag_jailbreak` | malicious instructions injected via retrieved/context docs (only `active` when context is present) | input/context |
+| `rag_jailbreak` | malicious instructions injected via retrieved/context docs (only `available` when context is present) | input/context |
 | `halluc_context` | the answer drifts from the provided/RAG context (ungrounded) | output |
 | `halluc_closedbook` | with no context, the answer is likely an unsupported fabrication | output |
 | `answer_safety` | the model's answer contains harmful content | output |
@@ -157,7 +162,7 @@ not one blended score.
 | `out_of_scope` | the prompt is off-topic for the Application's declared scope (silent without one) | input |
 | `prompt_complexity` | the prompt is "complex" — a routing signal, never a guardrail | input |
 
-The first six are **primary**: they travel in `axis_energy`, they are what the product commits to, and
+The first six are **primary**: they travel in `axes`, they are what the product commits to, and
 they are the ones benchmarked against out-of-distribution attack corpora.
 
 The last three are **additional**: they travel in a separate `additional_axes` object, they annotate and
@@ -165,7 +170,8 @@ never withhold, and they **cannot be promoted to blocking by configuration** —
 ignores them. (Enabling off-topic refusal for one Application is still possible through that Application's
 own enforcement policy, which is an explicit per-customer choice rather than a global switch.)
 
-Every axis in both blocks carries `tier` (`primary` | `additional`), so a client can tell them apart without
+Every axis also carries a `role` — `enforce` (a flag withholds content in blocking mode), `advisory` (a flag is
+a warning, never a block) or `classifier` (a label, not a risk) — so a client can tell how to treat it without
 knowing the names. See [Detection Axes](g1-proxy/detection-axes.md#primary-axes-vs-additional-axes) and
 [Token & Cost Control](g1-proxy/cost-control.md).
 
@@ -173,36 +179,40 @@ knowing the names. See [Detection Axes](g1-proxy/detection-axes.md#primary-axes-
 
 ```json
 "jailbreak": {
-  "p_detector": 0.0081,   // ← the calibrated probability you act on (0..1)
-  "threshold":  0.8991,   // ← this axis's decision threshold
-  "flag":       false,    // ← p_detector >= threshold ?  (the per-axis verdict)
-  "p_energy":   0.0053,   // energy-space view of the same signal (diagnostic)
-  "delta_E_joule": -3.97  // signed "energy" margin vs the boundary (negative = safe side)
+  "score": 0.3333,        // ← the calibrated risk score you act on (0..1); null = not measured, never 0
+  "threshold": 0.9864,    // ← this axis's decision threshold
+  "flagged": false,       // ← score over threshold?  (the per-axis verdict)
+  "available": true,      // false = the axis had nothing to read this turn (see unavailable_reason)
+  "role": "enforce",      // enforce | advisory | classifier
+  "details": { "head_score": 0.00059, "linear_probe_z": -9.6043 }   // optional axis-specific evidence
 }
 ```
 
-Rule of thumb: **`flag`** is the per-axis yes/no; **`p_detector` vs `threshold`** is the "how close". The
-overall request is blocked when `geodesia.brake == true` / `glad_decision == "blocked"`.
+Rule of thumb: **`flagged`** is the per-axis yes/no; **`score` vs `threshold`** is the "how close". The
+overall request is blocked when `geodesia.decision == "blocked"`, and `geodesia.reason.axis` names the axis
+that decided. Classifier axes (`prompt_complexity`) also carry a `label` (`simple` / `complex`).
 
 ### Closed-book extras (evidence for hallucination)
 
-`halluc_closedbook` carries extra fields useful for XAI:
-- `p_sledge`, `sledge_tau`, `sledge_length_class`, `closedbook_method` — the per-model SLEDGE calibrator;
-- `mean_surprisal`, `lsc_span` (least-confident span), and `token_surprisal[]` — per-token generator
-  surprisal `{i, text, s, start, end}` with offsets into the raw answer string. Use these to highlight which
-  answer tokens look fabricated.
+`halluc_closedbook` carries extra fields in `details`, useful for XAI:
+- `method` — the closed-book scoring method used; `fact_seeking` / `abstained` — whether the prompt asks for a
+  fact and whether the model declined;
+- `mean_surprisal`, `uncertain_span` (the least-confident span, `{text, start, end, surprisal}`) and
+  `token_surprisal[]` — per-token generator surprisal `{index, text, surprisal, start, end}`. Use these to
+  highlight which answer tokens look fabricated.
 
-### If the dilution guard is enabled
+### If an input guard recovered an attack
 
-When `GW_DILUTION_GUARD=shadow|enforce` and the guard fires, `geodesia` (or `geodesia.input`) includes:
+When the dilution guard (`GW_DILUTION_GUARD=shadow|enforce`) or the decode guard recovers a camouflaged,
+diluted or encoded attack that slipped the pooled head, the affected prompt axis reports it in `details`:
 
 ```json
-"dilution_guard": { "axis": "jailbreak", "full": 0.114, "seg_max": 0.919,
-                    "gap": 0.804, "tier2": 0.583, "block": true }
+"jailbreak": { "score": 0.919, "threshold": 0.9864, "flagged": true, "available": true, "role": "enforce",
+               "details": { "pooled_score": 0.114, "recovered_by": "dilution_guard" } }
 ```
-`full` = pooled whole-prompt score, `seg_max` = best sub-segment score (dilution recovery), `tier2` =
-de-dilution re-score, `block` = whether it forced the block. This is how a camouflaged/diluted attack that
-slipped the pooled head still gets caught.
+
+`pooled_score` is the whole-prompt score before the guard; `recovered_by` is `dilution_guard` or
+`decode_guard`.
 
 ---
 
@@ -220,21 +230,34 @@ curl -s http://127.0.0.1:8800/v1/chat/completions \
   "id": "geodesia-block-…",
   "choices": [{ "message": { "role": "assistant", "content": "[Geodesia blocked — jailbreak (input)]" },
                 "finish_reason": "content_filter" }],   // ← the tell: content_filter
-  "glad_decision": "blocked",
-  "glad_scores": { "safety_decision_rule": "jailbreak" },
-  "geodesia": { "flagged_axis": "jailbreak", "brake": true, "axis_energy": { … } }
+  "geodesia": {
+    "schema_version": "1.0",
+    "event": "final",
+    "decision": "blocked",
+    "mode": "blocking",
+    "reason": { "stage": "input", "axis": "jailbreak", "detail": null },
+    "axes": {
+      "jailbreak": { "score": 0.9981, "threshold": 0.9864, "flagged": true, "available": true, "role": "enforce", … },
+      …
+    }
+  }
 }
 ```
 
-Detect a block programmatically by **any** of: `glad_decision == "blocked"`, `geodesia.brake == true`, or
-`choices[0].finish_reason == "content_filter"`. `flagged_axis` tells you *why*.
+Detect a block programmatically with `geodesia.decision == "blocked"` (the answer also has
+`choices[0].finish_reason == "content_filter"`). `geodesia.reason` tells you *why*: `stage` is where the
+decision was taken (`input`, `output`, `tools`, `quota`) and `axis` is the axis that decided.
+
+In `passthrough` mode the same prompt returns the real answer with `"decision": "flagged"` and the same
+`reason`: the violation is reported, not enforced.
 
 ---
 
 ## 6. Streaming (`"stream": true`)
 
 The gateway streams **Server-Sent Events**: lines of `data: {json}`, terminated by `data: [DONE]`. The safety
-verdict is delivered as extra `geodesia` payloads inside otherwise-normal OpenAI chunks.
+verdict is delivered as a `geodesia` object inside otherwise-normal OpenAI chunks; its `event` field says what
+the chunk reports.
 
 ```bash
 curl -s -N http://127.0.0.1:8800/v1/chat/completions \
@@ -244,12 +267,17 @@ curl -s -N http://127.0.0.1:8800/v1/chat/completions \
 ```
 
 Frame sequence:
-1. **First frame** — empty `delta`, but carries `geodesia.axis_energy` with the **input** verdict
-   (prompt_safety/jailbreak). If the input is blocked, this frame's content is the block message with
-   `finish_reason: "content_filter"`, then `[DONE]` — generation never starts.
-2. **Content frames** — the tokens: `choices[0].delta.content`. Concatenate these for the answer text.
-3. **Final frame** — `finish_reason: "stop"`, carrying the **full** `geodesia` block (answer axes +
-   `brake` + `dominant_axis` + closed-book `token_surprisal`). This is the authoritative end-of-turn verdict.
+1. **Input scan** — empty `delta`, carrying `geodesia` with `event: "input_scan"` and the prompt axes
+   (prompt_safety/jailbreak, plus `additional_axes`). Informational only: it has no `decision`.
+2. **Content frames** — the tokens: `choices[0].delta.content`. Concatenate these for the answer text. Some
+   frames may carry `event: "progress"` (periodic re-scoring) or, with web search, `event: "research"`; both
+   are informational.
+3. **Final frame** — the chunk with `finish_reason`, carrying `geodesia` with `event: "final"`: the **full**
+   verdict (`decision`, `mode`, `reason`, answer axes, closed-book `token_surprisal`). This is the only
+   authoritative end-of-turn verdict. If the input is blocked, the final frame arrives straight away with the
+   block message and `finish_reason: "content_filter"` — generation never starts. If the answer is halted
+   mid-stream, the final frame has `decision: "blocked"`, `reason.stage: "output"` and
+   `finish_reason: "content_filter"`.
 4. `data: [DONE]`.
 
 Minimal client parser:
@@ -261,7 +289,7 @@ r = requests.post("http://127.0.0.1:8800/v1/chat/completions",
                   json={"model":"ministral3","stream":True,"max_tokens":40,
                         "messages":[{"role":"user","content":"Name two prime numbers."}]},
                   stream=True)
-answer, verdict = [], None
+answer, final = [], None
 for line in r.iter_lines():
     if not line or not line.startswith(b"data: "):
         continue
@@ -272,11 +300,12 @@ for line in r.iter_lines():
     delta = chunk["choices"][0].get("delta", {})
     if delta.get("content"):
         answer.append(delta["content"])
-    if "geodesia" in chunk:                 # first + final frames carry it
-        verdict = chunk["geodesia"]         # keep the latest = the final full verdict
-print("answer :", "".join(answer))
-print("blocked:", bool(verdict and verdict.get("brake")))
-print("axes   :", {a: v.get("p_detector") for a, v in (verdict or {}).get("axis_energy", {}).items()})
+    g = chunk.get("geodesia")
+    if g and g.get("event") == "final":      # input_scan / progress / research are informational
+        final = g
+print("answer  :", "".join(answer))
+print("decision:", final and final["decision"], "| reason:", final and final["reason"])
+print("axes    :", {a: v["score"] for a, v in (final or {}).get("axes", {}).items()})
 ```
 
 > If you don't care about the safety telemetry and just want tokens, ignore every chunk that has no
@@ -309,5 +338,6 @@ Every call made with the key is stamped with `application_id` in the metrics and
 | Full scoring dump | `POST /v1/glad/evaluate` | gateway :8800 |
 | Health | `GET /health` | gateway :8800 |
 
-Key format: `g1k_live_…` · Verdict headline: `glad_decision` (`passed`/`blocked`) · Per-axis: `flag` +
-`p_detector` vs `threshold` · Block tells: `brake==true` / `finish_reason=="content_filter"`.
+Key format: `g1k_live_…` · Verdict headline: `geodesia.decision` (`allowed`/`flagged`/`blocked`) · Why:
+`geodesia.reason` · Per-axis: `flagged` + `score` vs `threshold` · Streaming: read the `event: "final"` chunk ·
+Full schema: [Response Format](reference/response-format.md).

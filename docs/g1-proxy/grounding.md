@@ -5,17 +5,23 @@ supported by the **context it was given**; `halluc_closedbook` asks whether the 
 from memory** when there is no context at all. Reading them separately means deciding, per response,
 which one applies.
 
-The **`grounding`** block does that for you. Every response carries it:
+The **`grounding`** block (`geodesia.grounding`) does that for you. Every scored response carries it:
 
 ```json
 "grounding": {
-  "score": 0.83,
+  "available": true,
   "verdict": "grounded",
+  "score": 0.9277,
+  "risk": 0.1092,
+  "margin": -0.8554,
+  "regime": "both",
   "axis": "halluc_context",
-  "advisory_score": 0.61,
-  "available": true
+  "advisory_score": 0.7534
 }
 ```
+
+`verdict` is `grounded`, `unsupported` or `not_measurable`; the full field list is in the
+[Response Format reference](../reference/response-format.md#grounding).
 
 ---
 
@@ -47,12 +53,24 @@ The other is reported as **`advisory_score`**, for information. It did not decid
 ## When it cannot be measured
 
 ```json
-"grounding": { "score": null, "verdict": null, "available": false }
+"grounding": {
+  "available": false,
+  "verdict": "not_measurable",
+  "score": null,
+  "risk": null,
+  "margin": null,
+  "regime": "not_measurable",
+  "axis": null,
+  "reasons": [
+    "no context supplied: faithfulness to context is undefined",
+    "no upstream logprobs: closed-book cannot be measured"
+  ]
+}
 ```
 
 !!! danger "`null`, never `0`"
     With neither grounding context nor logprobs, there is nothing to measure. The block says so with
-    `null` and `available: false`.
+    `score: null`, `available: false` and `verdict: "not_measurable"`, and `reasons` says why.
 
     It is deliberately **not** `0`. A zero would be read as "completely unsupported" — a strong claim —
     when the truth is "not measured". Silence dressed as a score is worse than no score, and *not

@@ -29,7 +29,7 @@ Environment variables:
 
 ### Per-request override
 
-Use the `mode` (or `glad_mode`) field to override the global setting for one request:
+Use the `mode` field to override the global setting for one request:
 
 ```bash
 # Force passthrough for this request (review mode)
@@ -41,7 +41,7 @@ curl -X POST http://localhost:8800/v1/chat/completions \
   -d '{"model":"my-model","messages":[...],"mode":"block","stream":false}'
 ```
 
-**Accepted values for `mode` / `glad_mode`:**
+**Accepted values for `mode`:**
 
 | Value | Effect |
 |---|---|
@@ -76,11 +76,20 @@ The notice names the detection axis that triggered the block.
     "message": {"role": "assistant", "content": "[Geodesia blocked — prompt safety (input)]"},
     "finish_reason": "content_filter"
   }],
-  "glad_decision": "blocked",
-  "glad_mode": "blocking",
-  "glad_scores": {"safety_decision_rule": "prompt_safety"}
+  "geodesia": {
+    "schema_version": "1.0",
+    "event": "final",
+    "decision": "blocked",
+    "mode": "blocking",
+    "reason": {"stage": "input", "axis": "prompt_safety", "detail": null},
+    "axes": {
+      "prompt_safety": {"score": 0.9143, "threshold": 0.6377, "flagged": true, "available": true, "role": "enforce"}
+    }
+  }
 }
 ```
+
+(Other axes omitted for brevity.)
 
 ### Passthrough Mode
 
@@ -101,19 +110,30 @@ Passthrough is useful when:
     "message": {"role": "assistant", "content": "The full answer, even if flagged."},
     "finish_reason": "stop"
   }],
-  "glad_decision": "blocked",
-  "glad_mode": "passthrough",
-  "glad_scores": {"safety_decision_rule": "answer_safety"},
   "geodesia": {
-    "brake": true,
-    "axis_energy": {
-      "answer_safety": {"p_detector": 0.73, "flag": true, "threshold": 0.57}
+    "schema_version": "1.0",
+    "event": "final",
+    "decision": "flagged",
+    "mode": "passthrough",
+    "reason": {"stage": "output", "axis": "answer_safety", "detail": null},
+    "axes": {
+      "answer_safety": {"score": 0.73, "threshold": 0.57, "flagged": true, "available": true, "role": "enforce"}
     }
   }
 }
 ```
 
-Key distinction: `glad_decision` is `"blocked"` (the axis fired), but `glad_mode` is `"passthrough"` (no content was withheld). Your application can inspect `glad_decision` to decide whether to show the answer.
+Key distinction: `decision` is `"flagged"` (an enforcing axis fired, but the content was delivered) and `mode` is
+`"passthrough"`. In blocking mode the same turn would report `"blocked"` and withhold the answer. To ask "was this
+turn a violation?" regardless of mode, test `geodesia.decision != "allowed"`:
+
+```python
+g = resp["geodesia"]
+if g["decision"] != "allowed":
+    print("violation on", g["reason"]["stage"], "axis", g["reason"]["axis"])
+```
+
+See the [Response Format reference](../reference/response-format.md#decision) for the full decision table.
 
 ---
 
@@ -123,10 +143,10 @@ For streaming requests in blocking mode, the gateway performs **mid-stream check
 
 1. The gateway emits the last complete text chunk
 2. Appends: `\n\n[Geodesia: generation halted — energy barrier]`
-3. Sends the final SSE chunk with `finish_reason: "content_filter"` and the full `geodesia` detection payload
+3. Sends the final SSE chunk with `finish_reason: "content_filter"` and the `geodesia` object with `event: "final"`, `decision: "blocked"` and `reason: {"stage": "output", "detail": "halted mid-stream"}`
 4. Closes the stream with `data: [DONE]`
 
-The user may have received some content before the brake fires. If your application must never display partially-generated flagged content, use non-streaming mode (`stream: false`) or filter on the `finish_reason` field.
+The user may have received some content before the brake fires. If your application must never display partially-generated flagged content, use non-streaming mode (`stream: false`) or filter on the `finish_reason` field. Take the verdict only from the `final` event; `input_scan` and `progress` events are informational (see [Streaming](../reference/response-format.md#streaming)).
 
 ```
 cadence_tokens: 32   →  Check at tokens 32, 64, 96, ...
@@ -157,12 +177,12 @@ For RAG deployments where prompt safety is less of a concern (the model only ans
 
 ---
 
-## Dominant Axis
+## Deciding Axis
 
-When multiple axes flag simultaneously, the **dominant axis** is the one with the highest `p_detector` score among the flagged axes. This is what gets reported in `glad_scores.safety_decision_rule` and in the block notice. It is the most likely cause of the violation.
+When multiple axes flag simultaneously, the **deciding axis** is the one with the highest `score` among the flagged axes. It is reported in `geodesia.reason.axis` and named in the block notice. It is the most likely cause of the violation.
 
 ```json
-"glad_scores": {"safety_decision_rule": "jailbreak"}
+"reason": {"stage": "input", "axis": "jailbreak", "detail": null}
 ```
 
-The dominant axis is also stored in `geodesia.dominant_axis`.
+`reason.stage` says where the decision was taken (`input`, `output`, `tools` or `quota`); `reason` is `null` when the decision is `allowed`.

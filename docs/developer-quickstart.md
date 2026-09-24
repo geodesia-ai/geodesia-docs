@@ -89,29 +89,37 @@ Two things matter: the **answer** and the **verdict**.
 {
   "choices": [{ "message": { "content": "The capital of France is Paris." } }],  // ← the answer
 
-  "glad_decision": "passed",     // ← "passed" or "blocked"  (the headline)
-  "geodesia": {
-    "brake": false,              // ← true means it was blocked
-    "axis_energy": {
-      "prompt_safety": { "p_detector": 0.03, "threshold": 0.69, "flag": false },
-      "jailbreak":     { "p_detector": 0.01, "threshold": 0.90, "flag": false },
-      "answer_safety": { "p_detector": 0.00, "threshold": 0.92, "flag": false }
+  "geodesia": {                  // ← the only extra key Geodesia adds
+    "schema_version": "1.0",
+    "event": "final",
+    "decision": "allowed",       // ← "allowed", "flagged" or "blocked"  (the headline)
+    "mode": "blocking",
+    "reason": null,              // ← why, when the decision is not "allowed"
+    "axes": {
+      "prompt_safety": { "score": 0.0076, "threshold": 0.6377, "flagged": false, "available": true, "role": "enforce" },
+      "jailbreak":     { "score": 0.3333, "threshold": 0.9864, "flagged": false, "available": true, "role": "enforce" },
+      "answer_safety": { "score": 0.021,  "threshold": 0.7953, "flagged": false, "available": true, "role": "enforce" }
       // …6 primary axes
     },
     "additional_axes": {         // ← annotate only, never block
-      "out_of_scope":      { "p_detector": 0.11, "threshold": 0.95, "flag": false },
-      "prompt_complexity": { "p_detector": 0.22, "threshold": 0.50, "verdict": "simple" }
+      "out_of_scope":      { "score": 0.0678, "threshold": 0.9534, "flagged": false, "available": true, "role": "advisory" },
+      "prompt_complexity": { "score": 0.0155, "threshold": 0.5, "flagged": false, "available": true,
+                             "role": "classifier", "label": "simple" }
     }
   }
 }
 ```
 
 Read it like this:
-- **`glad_decision`** — `"passed"` = you can use the answer; `"blocked"` = it was withheld.
-- Each **axis** is one risk check. **`flag: true`** = that check tripped. `p_detector` vs `threshold` tells
-  you how close it was.
+- **`geodesia.decision`** — `"allowed"` = you can use the answer; `"flagged"` = a violation was detected but
+  the answer was delivered anyway (passthrough mode); `"blocked"` = it was withheld.
+- Each **axis** is one risk check. **`flagged: true`** = that check tripped. `score` vs `threshold` tells
+  you how close it was. `score: null` with `available: false` means the axis had nothing to read this turn
+  (for example no context was supplied) — it is never reported as `0`.
 
-**The 6 primary axes** (in `axis_energy`) are the guardrails: `prompt_safety`, `jailbreak`,
+The full field list is in [Response Format](reference/response-format.md).
+
+**The 6 primary axes** (in `axes`) are the guardrails: `prompt_safety`, `jailbreak`,
 `rag_jailbreak` on the user side; `answer_safety`, `halluc_context`, `halluc_closedbook` on the answer
 side (unsafe content or made-up facts). These are what the product commits to.
 
@@ -124,7 +132,7 @@ claim, and no environment variable can promote them to blocking. See
 
 Quick check in one line:
 ```bash
-# ... | jq '{answer: .choices[0].message.content, decision: .glad_decision}'
+# ... | jq '{answer: .choices[0].message.content, decision: .geodesia.decision, why: .geodesia.reason.axis}'
 ```
 
 ---
@@ -142,13 +150,19 @@ curl -s http://127.0.0.1:8800/v1/chat/completions \
 {
   "choices": [{ "message": { "content": "[Geodesia blocked — jailbreak (input)]" },
                 "finish_reason": "content_filter" }],
-  "glad_decision": "blocked",
-  "geodesia": { "flagged_axis": "jailbreak", "brake": true }
+  "geodesia": {
+    "schema_version": "1.0",
+    "event": "final",
+    "decision": "blocked",
+    "mode": "blocking",
+    "reason": { "stage": "input", "axis": "jailbreak", "detail": null },
+    "axes": { "jailbreak": { "score": 0.9981, "threshold": 0.9864, "flagged": true, … }, … }
+  }
 }
 ```
 
-To detect a block in code, check any of: `glad_decision == "blocked"`, `geodesia.brake == true`, or
-`finish_reason == "content_filter"`. `flagged_axis` says why.
+To detect a block in code, check `geodesia.decision == "blocked"` (the answer also has
+`finish_reason == "content_filter"`). `geodesia.reason.axis` says why.
 
 ---
 
@@ -164,9 +178,10 @@ curl -s -N http://127.0.0.1:8800/v1/chat/completions \
 ```
 
 What you receive, in order:
-1. a **first** frame with the input verdict (`geodesia.axis_energy`),
+1. a **first** frame with the prompt scores (`geodesia.event == "input_scan"`) — informational, no decision,
 2. many **content** frames — the tokens are in `choices[0].delta.content` (concatenate them),
-3. a **final** frame (`finish_reason: "stop"`) with the full `geodesia` verdict,
+3. a **final** frame (the one with `finish_reason`) whose `geodesia.event == "final"` — the only frame that
+   carries the verdict (`decision`, `reason`, all axes),
 4. `data: [DONE]`.
 
 Tiny reader:
@@ -176,12 +191,17 @@ r = requests.post("http://127.0.0.1:8800/v1/chat/completions",
                   headers={"Authorization": f"Bearer {API_KEY}"},
                   json={"model":"ministral3","stream":True,"max_tokens":40,
                         "messages":[{"role":"user","content":"Name two prime numbers."}]}, stream=True)
+final = None
 for line in r.iter_lines():
     if line.startswith(b"data: ") and line[6:] != b"[DONE]":
         chunk = json.loads(line[6:])
         piece = chunk["choices"][0].get("delta", {}).get("content")
         if piece:
             print(piece, end="", flush=True)
+        g = chunk.get("geodesia")
+        if g and g.get("event") == "final":   # take the verdict only from the final event
+            final = g
+print("\ndecision:", final and final["decision"])
 ```
 
 ---
@@ -197,5 +217,5 @@ for line in r.iter_lines():
 | Your usage | `GET :8080/v1/glad/apps/{app_id}/metrics` |
 
 - Key looks like `g1k_live_…` and is shown **once**.
-- Answer is in `choices[0].message.content`. Verdict is `glad_decision` + the `geodesia` block.
+- Answer is in `choices[0].message.content`. Verdict is `geodesia.decision` (`allowed` / `flagged` / `blocked`), with `geodesia.reason` saying why.
 - No key → runs as the `default` app. Unknown key → also falls back to `default` (never a 401).

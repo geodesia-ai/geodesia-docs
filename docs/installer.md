@@ -53,7 +53,7 @@ curl -s http://localhost:11434/api/tags   # your upstream (example: ollama)
 | `light` | **g1-proxy-light alone** — engine *and* its own UI in **one** container, on the gateway port | evaluation, a single machine |
 
 !!! info "The `light` profile"
-    One container, no separate UI: nine axes with the GLAD-H cascade up to **thinking level 2**,
+    One container, no separate UI: nine axes with the Geodesia-H cascade up to **thinking level 2**,
     closed-book with SLEDGE, MuPAX and MCP. **Both `--gpu` and `--cpu` exist** since 2026-09-13 —
     `light --cpu` used to be refused because no `-cpu` image was published, and that is no longer true.
     It carries no 8B deep-scan model in **either** variant, so `DEEP_SCAN` does not apply to it.

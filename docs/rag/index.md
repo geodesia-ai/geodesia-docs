@@ -253,9 +253,12 @@ When RAG is active, the `geodesia.rag` field in the response contains retrieval 
 
 ```json
 "geodesia": {
+  "schema_version": "1.0",
+  "event": "final",
+  "decision": "allowed",
   "rag": {
     "collection_id": "c_a3f7b2d1",
-    "n_sources": 3,
+    "source_count": 3,
     "sources": [
       {
         "text": "Our return policy allows refunds within 30 days...",
@@ -276,14 +279,15 @@ When RAG is active, the `geodesia.rag` field in the response contains retrieval 
         }
       ]
     }
-  },
-  "brake": false
+  }
 }
 ```
 
+(Other `geodesia` fields omitted; see the [Response Format](../reference/response-format.md#rag) reference.)
+
 | Field | Description |
 |---|---|
-| `n_sources` | Number of chunks retrieved |
+| `source_count` | Number of chunks retrieved |
 | `sources` | List of retrieved chunks with text, relevance score, and document metadata |
 | `verification.n_total` | Total claims extracted from the answer |
 | `verification.n_grounded` | Claims supported by the retrieved chunks |

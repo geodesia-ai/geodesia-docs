@@ -180,8 +180,9 @@ The gateway exposes an OpenAI-compatible `/v1/chat/completions` endpoint. Any cl
 
     # Access Geodesia detection results
     geodesia = response.model_extra.get("geodesia") or {}
-    print("Brake:", geodesia.get("brake"))
-    print("Axes:", geodesia.get("axis_energy"))
+    print("Decision:", geodesia.get("decision"))    # "allowed" | "flagged" | "blocked"
+    print("Reason:", geodesia.get("reason"))        # {stage, axis, detail} or None
+    print("Scores:", {name: ax["score"] for name, ax in geodesia.get("axes", {}).items()})
     ```
 
 === "curl"
@@ -213,8 +214,13 @@ The gateway exposes an OpenAI-compatible `/v1/chat/completions` endpoint. Any cl
 
     const data = await response.json();
     console.log(data.choices[0].message.content);
-    console.log("Detection:", data.geodesia);
+    console.log("Decision:", data.geodesia.decision);   // "allowed" | "flagged" | "blocked"
+    console.log("Reason:", data.geodesia.reason);       // { stage, axis, detail } or null
+    console.log("Jailbreak score:", data.geodesia.axes.jailbreak?.score);
     ```
+
+Every response carries exactly one extra key, `geodesia`. Its full structure — axes, reasons, streaming
+events — is described in [Response Format](reference/response-format.md).
 
 ---
 

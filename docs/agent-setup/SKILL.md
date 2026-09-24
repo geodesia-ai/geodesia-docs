@@ -1060,16 +1060,16 @@ threshold means**, and **whether a flag may hold anything back**.
   promotable to blocking, not even by configuration**: their out-of-distribution numbers do not support
   it, and an axis that does not hold is worth less than an absent one.
 
-| # | Axis | Reads | Detects | Chat threshold | MCP scan threshold | Role |
+| # | Axis | Reads | Detects | Chat threshold (demo, Sep 2026) | MCP scan threshold | Role |
 |---|---|---|---|---|---|---|
-| 1 | `prompt_safety` | prompt | harmful request in the user turn | 0.9215 | 0.70 | enforce (input) |
-| 2 | `jailbreak` | prompt | policy override — persona, roleplay, encoding, DAN | 0.9997 | 0.50 | enforce (input) |
-| 3 | `rag_jailbreak` | **context** | **indirect** injection hidden in retrieved/fetched content | 0.2501 | 0.50 | advisory in chat, **primary in MCP** |
-| 4 | `halluc_context` | answer vs context | answer not grounded in the supplied evidence | 0.6475 | 0.60 | enforce (output brake) |
+| 1 | `prompt_safety` | prompt | harmful request in the user turn | 0.6377 | 0.70 | enforce (input) |
+| 2 | `jailbreak` | prompt | policy override — persona, roleplay, encoding, DAN | 0.9864 | 0.50 | enforce (input) |
+| 3 | `rag_jailbreak` | **context** | **indirect** injection hidden in retrieved/fetched content | 0.5768 | 0.50 | advisory in chat, **primary in MCP** |
+| 4 | `halluc_context` | answer vs context | answer not grounded in the supplied evidence | 0.7551 | 0.60 | enforce (output brake) |
 | 5 | `halluc_closedbook` | answer + **generator logprobs** | fabrication with no evidence supplied | conformal τ per model **and per language** | n/a over MCP — see below | advisory; hard-blocks above 0.995 |
-| 6 | `answer_safety` | answer | harmful generated content | 0.7295 | 0.50 | enforce (output brake) |
-| 7 | `profanity` | text | obscene language | 0.90 | — | **additional** |
-| 8 | `out_of_scope` | text vs declared scope | outside the application's stated purpose | 0.90 | — | **additional** |
+| 6 | `answer_safety` | answer | harmful generated content | 0.7953 | 0.50 | enforce (output brake) |
+| 7 | `profanity` | text | obscene language | 0.7 | — | **additional** |
+| 8 | `out_of_scope` | text vs declared scope | outside the application's stated purpose | 0.9534 | — | **additional** |
 | 9 | `prompt_complexity` | prompt | *routing label*: `complex` → Model B | 0.50 | — | **classifier**, never a block |
 
 The MCP scanning thresholds differ **on purpose**. Chat classifies a user turn; MCP vets arbitrary
@@ -1079,7 +1079,7 @@ benign material through. Any per-application `axis_thresholds` override wins ove
 
 **Read the threshold the response reports; never hard-code one.** The live value comes from the
 deployment's calibration or the Application policy and will not match the table. On one live guard the
-served `jailbreak` threshold was **0.3259**, not 0.9997.
+served `jailbreak` threshold was **0.3259**, not 0.9864.
 
 ### Per-axis detail
 
@@ -1104,7 +1104,8 @@ distribution (AUROC 0.9405).
 * The **system prompt is not evidence.** Passing a system message as context manufactures hallucination
   flags. Only actual retrieved material belongs in `context`.
 * It can be suppressed: when every claim is independently verified the response carries
-  `suppressed_by: "rag_claim_verification"` and the pre-suppression score in `p_detector_raw`.
+  `suppressed_by: "rag_claim_verification"` and the pre-suppression score in `p_detector_raw` (in the
+  chat response: `details.suppressed_by` and `raw_score`).
 
 **5 `halluc_closedbook`** — fabrication with no evidence to check against, and the axis most often
 misreported:
@@ -1112,7 +1113,9 @@ misreported:
 * It requires **generator token logprobs**. The MCP guard scores text you hand it and does not generate,
   so over MCP the axis reports `available: false` and never flags. **`p_detector: 0.0` on an unavailable
   axis means "not measured", never "not hallucinating".** For real closed-book coverage use the
-  generation path — `POST /v1/glad/evaluate` or the gateway's `/v1/chat/completions`.
+  generation path — `POST /v1/glad/evaluate` or the gateway's `/v1/chat/completions`. Those endpoints
+  report the axis in the `geodesia` object (schema 1.0), where an unmeasured axis has `score: null`,
+  `available: false` and an `unavailable_reason`.
 * It is gated by `fact_seeking`: a question the gate does not classify as fact-seeking cannot flag.
 * Its threshold is a **conformal τ carried in the SLEDGE artifact, per model and per language** — not a
   constant.
@@ -1144,6 +1147,11 @@ mislabel ordinary hard questions.
 | `fact_seeking` | closed-book only: the gate that must be true before the axis can flag |
 | `suppressed_by` | why a score was discounted, e.g. `"rag_claim_verification"` |
 | `delta_E_joule` | energy barrier — distance from the boundary, useful for ranking flags |
+
+These are the field names of the **MCP tools** (the `scan_*` / `verify_*` tools shorten the score to
+`p`). The chat gateway response uses the public `geodesia` object, schema 1.0, with different names:
+`score`, `flagged`, `threshold`, `available`, `role`, and `raw_score` for the pre-alignment score. Do
+not mix the two vocabularies when you parse.
 
 ### Which axes run on which surface
 
@@ -1288,8 +1296,8 @@ text arrives in the prompt region.
   "thinking_level": 1, "application_id": "support-bot" }
 ```
 
-`scope` is the only input of `out_of_scope`. `thinking_level` selects the tier fusion: `0` is GLAD-G
-alone, `1` adds GLAD-H on the grey band, `2`/`3` add further tiers — the levels above 0 are what carry
+`scope` is the only input of `out_of_scope`. `thinking_level` selects the tier fusion: `0` is Geodesia-G
+alone, `1` adds Geodesia-H on the grey band, `2`/`3` add further tiers — the levels above 0 are what carry
 recall outside English.
 
 Measured, one live guard, positives and their benign twins:
@@ -1340,20 +1348,25 @@ verdict: a test artifact must document everything computed, while committing onl
 Per axis the certificate carries:
 
 * **`role`** — `enforce` (can hold content back here) · `advisory` (reports only) · `classifier` (not a
-  risk judgement at all: `prompt_complexity` above threshold means *route to Model B*, and its `verdict`
-  field carries the label `complex`/`simple` so nobody reads a routing boundary as a refusal).
+  risk judgement at all: `prompt_complexity` above threshold means *route to Model B*, and its `label`
+  field carries the class `complex`/`simple` so nobody reads a routing boundary as a refusal).
 * **`tier`** — `primary` or `additional`. Additional axes (`profanity`, `out_of_scope`,
   `prompt_complexity`) are listed together in `additional_axes` at the top so a reviewer does not have
   to recognise the names.
 * **`alpha`** and **`fpr_bound`** — the actual guarantee, and the reason the certificate is worth
   keeping: `P(benign_score > threshold) <= α`, from a **split-conformal** calibration
-  (`thr_kind: "split-conformal"`). `brake_alpha` is α split Bonferroni across the *k* brake axes, so the
+  (`threshold_method: "split-conformal"`). `brake_alpha` is α split Bonferroni across the *k* brake axes, so the
   bound holds for the pair rather than for each axis separately.
 * **`calib_n`** — how many calibration samples that bound rests on. A tight α on a small `calib_n` is a
   weak claim; say so rather than quoting the α alone.
-* **`p_model`** with **`score_reconciled: true`** — present when the *displayed* score was aligned to the
-  (more accurate) flag. `p_model` is the raw head output. Quote `p_detector` to a human and `p_model` in
-  an audit.
+* **`score`**, **`threshold`**, **`flagged`**, **`available`** — the same reading as the axis result; an
+  axis that was not measured has `score: null` and `available: false`, never a zero.
+* **`raw_score`** — present when the *displayed* score was aligned to the (more accurate) flag; it is the
+  raw head output (in `per_axis` the same pair appears as `p_model` with `score_reconciled: true`).
+  Quote `score` to a human and `raw_score` in an audit.
+
+The certificate `version` is `geodesia-cert-3`. At the top level it also carries a `calibration` record
+(`model`, `bank_version`) naming what the thresholds were calibrated on.
 
 **`certificate.sig`** is `hmac-sha256:…` when the deployment sets a signing key, and **`null` when it
 does not** — deliberately, rather than signing with a guessable default. A `null` signature means *this
@@ -1366,9 +1379,10 @@ demo returns `null`.
 { "brake": false,                       // the answer would not be held back
   "dominant_axis": "jailbreak",         // the flagged axis with the highest p (null if none flagged)
   "per_axis": { "jailbreak": { "p_detector": 0.9998, "flag": true, "threshold": 0.3259 } },
-  "certificate": { "verdict": "blocked", "axes": { "jailbreak": {
+  "certificate": { "version": "geodesia-cert-3", "verdict": "blocked", "axes": { "jailbreak": {
+      "score": 0.9998, "available": true, "threshold": 0.3259, "flagged": true,
       "role": "enforce", "tier": "primary", "alpha": 0.05,
-      "fpr_bound": "P(benign_score > threshold) <= 0.05", "thr_kind": "split-conformal" } },
+      "fpr_bound": "P(benign_score > threshold) <= 0.05", "threshold_method": "split-conformal" } },
     "sig": null } }
 ```
 

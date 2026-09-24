@@ -1,235 +1,440 @@
-# Response Format Reference
+# Response Format Reference — `geodesia` object, schema 1.0
 
-Every response from the Geodesia G-1 gateway includes a `geodesia` extension object. This page is the authoritative reference for all fields in that object.
+Every chat response from **G1-Proxy** and **G1-Proxy Light** is a standard OpenAI (or Ollama) response with
+exactly **one** extra top-level key: `geodesia`. Nothing else is added. Everything Geodesia measured and decided
+for the turn lives inside that object.
+
+This page is the authoritative reference for the object. It applies to:
+
+| Endpoint | Format |
+|---|---|
+| `POST /v1/chat/completions` | OpenAI chat completion / SSE chunks |
+| `POST /v1/completions` | OpenAI legacy text completion |
+| `POST /api/chat` | Ollama chat (JSON / NDJSON) |
+| `POST /v1/glad/evaluate` | OpenAI chat completion |
+
+!!! info "Versioning"
+    `schema_version` is the version of this **API schema**, not of the product. It is always the first key of the
+    object. It changes only when the shape of the object changes: a minor increase (`1.1`) adds optional fields; a
+    major increase (`2.0`) removes or renames fields. Product releases (g1-proxy 0.4.2, …) do not change it.
 
 ---
 
-## Gateway Response Structure
-
-When you make a request to `POST /v1/chat/completions`, the response follows the standard OpenAI format with an additional `geodesia` key:
+## Example — answer allowed
 
 ```json
 {
-  "id": "chatcmpl-abc123",
+  "id": "chatcmpl-geodesia-1790234386650",
   "object": "chat.completion",
-  "created": 1749555000,
-  "model": "mistralai/Mistral-7B-v0.3",
-  "choices": [
-    {
-      "index": 0,
-      "message": {
-        "role": "assistant",
-        "content": "The capital of France is Paris."
-      },
-      "finish_reason": "stop"
-    }
-  ],
-  "usage": { ... },
+  "created": 1790234393,
+  "model": "ministral3",
+  "choices": [{
+    "index": 0,
+    "message": { "role": "assistant", "content": "The capital of France is **Paris**." },
+    "logprobs": null,
+    "finish_reason": "stop"
+  }],
+  "usage": { "prompt_tokens": 1826, "completion_tokens": 23, "total_tokens": 1849 },
   "geodesia": {
-    "call_id": "call_abc123",
-    "session_id": "sess_xyz",
-    "prompt_blocked": false,
-    "answer_blocked": false,
-    "block_reason": null,
-    "dominant_axis": null,
-    "axes_available": ["halluc_context", "halluc_closedbook", "prompt_safety", "answer_safety",
-                       "jailbreak", "rag_jailbreak", "profanity", "out_of_scope", "prompt_complexity"],
-    "scores": { ... },
-    "thresholds": { ... },
-    "watermark": { ... },
-    "rag": null,
-    "latency_ms": 312
+    "schema_version": "1.0",
+    "event": "final",
+    "decision": "allowed",
+    "mode": "blocking",
+    "reason": null,
+    "axes": {
+      "halluc_context": {
+        "score": null, "threshold": 0.7551, "flagged": false, "available": false,
+        "role": "enforce", "unavailable_reason": "no context supplied"
+      },
+      "halluc_closedbook": {
+        "score": 0.4687, "threshold": 0.8555, "flagged": false, "available": true, "role": "advisory",
+        "details": {
+          "mean_surprisal": 0.369,
+          "method": "sledge(head⊕logprob+conformal)",
+          "fact_seeking": true,
+          "abstained": false,
+          "token_surprisal": [
+            { "index": 0, "text": "The", "surprisal": 0.217, "start": 0, "end": 3 },
+            { "index": 1, "text": " capital", "surprisal": 0.004, "start": 3, "end": 11 }
+          ],
+          "uncertain_span": { "text": "anything else", "start": 19, "end": 21, "surprisal": 1.093 }
+        }
+      },
+      "prompt_safety": { "score": 0.0076, "threshold": 0.6377, "flagged": false, "available": true, "role": "enforce" },
+      "answer_safety": { "score": 0.021, "threshold": 0.7953, "flagged": false, "available": true, "role": "enforce" },
+      "jailbreak": {
+        "score": 0.3333, "threshold": 0.9864, "flagged": false, "available": true, "role": "enforce",
+        "details": { "head_score": 0.00059, "linear_probe_z": -9.6043 }
+      },
+      "rag_jailbreak": {
+        "score": null, "threshold": 0.5768, "flagged": false, "available": false,
+        "role": "advisory", "unavailable_reason": "no context supplied"
+      }
+    },
+    "additional_axes": {
+      "profanity": { "score": 0.026, "threshold": 0.7, "flagged": false, "available": true, "role": "advisory" },
+      "out_of_scope": { "score": 0.0678, "threshold": 0.9534, "flagged": false, "available": true, "role": "advisory" },
+      "prompt_complexity": {
+        "score": 0.0155, "threshold": 0.5, "flagged": false, "available": true,
+        "role": "classifier", "label": "simple"
+      }
+    },
+    "grounding": {
+      "available": true, "verdict": "grounded", "score": 0.7261, "risk": 0.4687,
+      "margin": -0.4521, "regime": "closed_book", "axis": "halluc_closedbook"
+    },
+    "pii": {
+      "enabled": true,
+      "input": { "count": 0, "by_type": {} },
+      "output": { "count": 0, "by_type": {} }
+    }
   }
+}
+```
+
+## Example — prompt blocked
+
+The answer is withheld: `finish_reason` is `content_filter` and the message carries the block notice.
+
+```json
+{
+  "id": "geodesia-block-1790232549895",
+  "object": "chat.completion",
+  "created": 1790232549,
+  "model": "ministral3",
+  "choices": [{
+    "index": 0,
+    "message": { "role": "assistant", "content": "[Geodesia blocked — jailbreak (input)]" },
+    "finish_reason": "content_filter"
+  }],
+  "geodesia": {
+    "schema_version": "1.0",
+    "event": "final",
+    "decision": "blocked",
+    "mode": "blocking",
+    "reason": { "stage": "input", "axis": "jailbreak", "detail": null },
+    "axes": {
+      "prompt_safety": { "score": 0.9143, "threshold": 0.6377, "flagged": true, "available": true, "role": "enforce" },
+      "jailbreak": {
+        "score": 0.9981, "threshold": 0.9864, "flagged": true, "available": true, "role": "enforce",
+        "details": { "head_score": 0.993179, "linear_probe_z": 4.8373 }
+      }
+    }
+  }
+}
+```
+
+(Other axes omitted for brevity; a real response lists every axis the deployment serves.)
+
+## Example — flagged in passthrough mode
+
+With `"mode": "passthrough"` the real answer is returned and the violation is reported.
+
+```json
+"geodesia": {
+  "schema_version": "1.0",
+  "event": "final",
+  "decision": "flagged",
+  "mode": "passthrough",
+  "reason": { "stage": "input", "axis": "jailbreak", "detail": null },
+  "axes": { "…": "…" }
 }
 ```
 
 ---
 
-## `geodesia` Object
+## Top-level fields
 
-### Top-Level Fields
+| Field | Type | Present | Description |
+|---|---|---|---|
+| `schema_version` | string | always | Version of this schema (`"1.0"`). Always the first key. |
+| `event` | string | always | What this object reports: `final`, `input_scan`, `progress` or `research`. See [Streaming](#streaming). |
+| `decision` | string | `final` only | `allowed`, `flagged` or `blocked`. See [Decision](#decision). |
+| `mode` | string | `final` only | Enforcement mode applied to this request: `blocking` or `passthrough`. |
+| `reason` | object \| null | `final` only | Why the decision is not `allowed`; `null` when it is. See [Reason](#reason). |
+| `axes` | object | when scored | Primary detection axes, keyed by axis name. See [Axis object](#axis-object). |
+| `additional_axes` | object | when scored | Annotation-only axes (never block), same shape as `axes`. |
+| `grounding` | object | when scored | Fused grounding metric. See [Grounding](#grounding). |
+| `thinking` | object | thinking level ≥ 1 | Which detector tiers produced the verdict. See [Thinking](#thinking). |
+| `pii` | object | PII guard on | Personal data removed from the traffic, counts only. See [PII](#pii). |
+| `rag` | object | knowledge base used | Retrieval sources and claim verification. See [RAG](#rag). |
+| `routing` | object | complexity routing on | Which model answered and why. See [Routing](#routing). |
+| `context_judge` | object | claim judge on | Per-claim grounding verdicts (advisory, uncalibrated). See [Context judge](#context-judge). |
+| `certificate` | object | certificates on | Signed verdict certificate. See [Certificate](#certificate). |
+| `reasoning_budget` | object | reasoning upstream | `max_tokens` raised so a reasoning model can still answer. |
+| `quota` | object | quota exceeded | Plan or budget limit that rejected the request. |
+| `tool_guard` | object | tool guard blocked | MCP/tool-call findings that blocked the request. |
+| `research` | object | `research` events | One web-search progress event. |
+
+Optional sections are **omitted** when they do not apply; they are never sent as empty placeholders.
+
+## Decision
+
+| `decision` | Content returned? | Meaning |
+|---|---|---|
+| `allowed` | yes | No enforcing axis flagged. |
+| `flagged` | yes | A policy violation was detected but the content was delivered: the request ran in `passthrough` mode, or (streaming) the violation was found only after the answer had been streamed. |
+| `blocked` | no | Content was withheld. `finish_reason` is `content_filter` and the message carries a `[Geodesia blocked — …]` notice. |
+
+A client that only needs "was this turn a violation?" can test `decision != "allowed"`.
+
+## Reason
+
+```json
+"reason": { "stage": "input", "axis": "jailbreak", "detail": null }
+```
+
+| Field | Values | Description |
+|---|---|---|
+| `stage` | `input`, `output`, `tools`, `quota` | Where the decision was taken: the prompt, the generated answer, the tool/MCP pre-flight, or the plan/budget gate. |
+| `axis` | axis name \| null | The axis that decided (highest-scoring flagged axis). `null` for `tools` and `quota`. |
+| `detail` | string \| null | Extra context, e.g. `"system prompt leak"`, `"halted mid-stream"`, or the tool/quota message. |
+
+## Axis object
+
+Every entry of `axes` and `additional_axes` has the same shape.
 
 | Field | Type | Description |
 |---|---|---|
-| `call_id` | `string` | Unique identifier for this call. Use this to look up the call in the audit chain or oversight queue. |
-| `session_id` | `string` | Session grouping identifier. |
-| `prompt_blocked` | `boolean` | `true` if the input prompt was blocked before generation. When `true`, `choices[0].message.content` is `null` (or contains a block notice). |
-| `answer_blocked` | `boolean` | `true` if the generated answer was withheld due to a detection threshold. |
-| `block_reason` | `string` \| `null` | Plain-language reason for blocking. `null` if not blocked. |
-| `dominant_axis` | `string` \| `null` | Which detection axis was the primary reason for blocking when multiple axes triggered. |
-| `axes_available` | `array[string]` | List of detection axes that were actually computed. Depends on which model is loaded and whether context was provided. |
-| `scores` | `object` | Per-axis detection scores. See below. |
-| `thresholds` | `object` | The threshold values that were applied (after any per-request overrides). |
-| `watermark` | `object` | Watermark metadata. See below. |
-| `rag` | `object` \| `null` | RAG retrieval results, if RAG was triggered. See below. |
-| `latency_ms` | `integer` | Total wall-clock latency for this request in milliseconds. |
+| `score` | number \| null | Risk score in [0, 1] that the decision is based on. `null` when the axis could not be measured on this turn — **never `0`**. |
+| `threshold` | number \| null | Calibrated decision threshold. The axis is flagged when `score` exceeds it. |
+| `flagged` | boolean | The axis is over its threshold. For `classifier` axes this means "on the far side of the boundary", not "unsafe". |
+| `available` | boolean | `false` when the axis had nothing to read (no context, no logprobs, no answer yet). |
+| `role` | string | `enforce` (flag withholds content in blocking mode), `advisory` (flag is a warning, never a block), `classifier` (a label, not a risk). |
+| `label` | string | `classifier` axes only: the class, e.g. `simple` / `complex`. |
+| `raw_score` | number | Present when the displayed `score` was aligned to the final decision (fusion, guards, context verification); the model's own score before that step. |
+| `hard_block` | boolean | Present and `true` when an `advisory` axis withheld content anyway (e.g. closed-book hallucination above its extreme-confidence ceiling, or a verified system-prompt leak). |
+| `unavailable_reason` | string | Present when `available` is `false`: human-readable reason. |
+| `details` | object | Optional axis-specific evidence, see below. |
 
----
+### Axes
 
-### `scores` Object
+| Axis | Group | Role | Reads | Description |
+|---|---|---|---|---|
+| `prompt_safety` | axes | enforce | prompt | Harmful request. |
+| `jailbreak` | axes | enforce | prompt | Jailbreak / instruction override / system-prompt extraction. |
+| `answer_safety` | axes | enforce | answer | Harmful answer content. |
+| `halluc_context` | axes | enforce | answer + context | Answer not supported by the supplied context (RAG faithfulness). |
+| `halluc_closedbook` | axes | advisory | answer + generator logprobs | Likely fabricated fact without context. Needs an upstream that exposes logprobs. |
+| `rag_jailbreak` | axes | advisory | context | Prompt injection hidden in retrieved/supplied context. |
+| `halluc_context_joint` | axes | advisory | answer + context | Joint claim–evidence verifier (when deployed). |
+| `sysprompt_leak` | axes | enforce | answer | Verbatim or fragmentary reproduction of the protected system prompt/tool descriptions. Present when system-prompt protection is on. |
+| `profanity` | additional_axes | advisory | prompt | Profane language. |
+| `out_of_scope` | additional_axes | advisory | prompt + declared scope | Request outside the application's declared scope. |
+| `prompt_complexity` | additional_axes | classifier | prompt | `simple` / `complex`; drives Model A/B routing. |
 
-Contains one field per available detection axis:
+### `details` fields
 
-```json
-"scores": {
-  "prompt_safety": {
-    "score": 0.12,
-    "logit": -1.98,
-    "triggered": false
-  },
-  "answer_safety": {
-    "score": 0.08,
-    "logit": -2.44,
-    "triggered": false,
-    "combined_score": 0.07,
-    "combined_logit": -2.51,
-    "combined_threshold": 0.11,
-    "combined_triggered": false,
-    "per_signal": { ... }
-  },
-  "halluc_context": {
-    "score": 0.23,
-    "logit": -1.19,
-    "triggered": false,
-    "combined_score": 0.18,
-    "combined_logit": -1.52,
-    "combined_threshold": 0.617,
-    "combined_triggered": false,
-    "per_signal": { ... },
-    "n_signals": 10
-  },
-  "halluc_closedbook": {
-    "score": 0.09,
-    "triggered": false
-  },
-  "jailbreak": {
-    "score": 0.03,
-    "triggered": false
-  }
-}
-```
+| Field | Axis | Description |
+|---|---|---|
+| `method` | `halluc_closedbook` | Closed-book scoring method used. |
+| `mean_surprisal` | `halluc_closedbook` | Mean per-token surprisal of the answer (nats). |
+| `fact_seeking` | `halluc_closedbook` | The prompt asks for a fact (the axis gates on it). |
+| `abstained` | `halluc_closedbook` | The model declined to answer. |
+| `token_surprisal` | `halluc_closedbook` | Per-token surprisal: `[{index, text, surprisal, start, end}]` (`start`/`end` are token offsets). Only on the final event. |
+| `uncertain_span` | `halluc_closedbook` | The most uncertain span: `{text, start, end, surprisal}`. |
+| `context_support` | `halluc_context` | Lexical support of the answer by the context, in [0, 1]. |
+| `suppressed_by` | hallucination axes | Why a flag was withdrawn, e.g. `context_support`, `rag_claim_verification`, `benign_tech_command`. |
+| `head_score` | `jailbreak` | Score of the base detector head before the linear-probe combination. |
+| `linear_probe_z` | `jailbreak` | Logit of the linear intent probe combined with the head. |
+| `pooled_score` | prompt axes | Score before an input guard recovered a diluted or encoded attack. |
+| `recovered_by` | prompt axes | `dilution_guard` or `decode_guard`: the guard that recovered the attack. |
+| `flag_kept_from_level_0` | any | At thinking level ≥ 1 the fused score alone would not flag; the flag comes from the level-0 verdict (fusion can only add flags, never remove them). |
+| `verification_status` | `halluc_context_joint` | Verifier status. |
+| `leak_source` | `sysprompt_leak` | Which protected field leaked, e.g. `messages.system`, `tools.<name>.description`. |
+| `leak_kind` | `sysprompt_leak` | `whole_field`, `verbatim` or `fragments`. |
+| `leak_coverage` | `sysprompt_leak` | Fraction of the protected field reproduced. |
+| `shadow_mode` | `sysprompt_leak` | `true` when the leak is only reported, not enforced. |
 
-#### Per-Axis Score Fields
+The protected text itself is never echoed back.
+
+## Grounding
+
+A single grounding number fusing `halluc_context` and `halluc_closedbook` on each axis's own threshold.
 
 | Field | Description |
 |---|---|
-| `score` | Calibrated probability [0–1]. **Use this for display and threshold comparison.** Higher = more likely the issue is present. |
-| `logit` | Raw logit (uncalibrated). Present for advanced users and debugging only. |
-| `triggered` | `true` if `score` exceeded the configured threshold |
-| `combined_score` | For `halluc_context` and `answer_safety`: the output of the calibrated multi-signal combiner, which aggregates several internal detection signals. This is the definitive score used for blocking decisions. |
-| `combined_logit` | Raw logit from the combiner |
-| `combined_threshold` | The threshold used for the combined score decision |
-| `combined_triggered` | Whether the combined score triggered a block decision |
-| `per_signal` | Breakdown of each internal signal's contribution to the combined score |
-| `n_signals` | Number of signals included in the combined score |
+| `available` | `false` when neither axis could be measured. |
+| `verdict` | `grounded`, `unsupported` or `not_measurable`. |
+| `score` | [0, 1]; 1 = fully grounded, **0.5 = the calibrated operating point**. Below 0.5 an axis crossed its threshold. |
+| `risk` | Raw probability of the deciding axis. |
+| `margin` | Normalised distance from the threshold (negative = safe side). |
+| `regime` | `context`, `closed_book`, `both` or `not_measurable`. |
+| `axis` | Axis that produced the number. |
+| `deciding_axis` | Axis whose flag produced `unsupported` (present only then). |
+| `advisory_score` | Score of the advisory (out-of-regime) axis when both were measured. |
+| `reasons` | Present when not measurable. |
 
-!!! info "Which score to use"
-    Always use `combined_score` when it is present (for `halluc_context` and `answer_safety`). The `combined_score` is calibrated with AUROC > 0.97 and is more reliable than the raw `score`. Use raw `score` for axes that do not have a combiner (`halluc_closedbook`, `jailbreak`, `prompt_safety`).
+## Thinking
 
----
-
-### `thresholds` Object
-
-The thresholds that were applied to produce the `triggered` values. These may differ from the default configuration if per-request `threshold_overrides` were provided.
+Present when the request ran at thinking level ≥ 1.
 
 ```json
-"thresholds": {
-  "prompt_safety": 0.35,
-  "answer_safety": 0.11,
-  "halluc_context": 0.617,
-  "halluc_closedbook": 0.50,
-  "jailbreak": 0.50
-}
+"thinking": { "level": 2, "tiers_used": ["geodesia_g", "geodesia_h"], "escalated": true }
 ```
 
----
+`tiers_used` lists the detector tiers that **actually** contributed (`geodesia_g`, `geodesia_h`, `geodesia_a`,
+`native`); it can be fewer than requested. `escalated` appears at level 1 only (cascade).
 
-### `watermark` Object
+## PII
 
 ```json
-"watermark": {
-  "token": "hmac:v1:a8b3c1d4e5f6...",
-  "generated_by": "Geodesia G-1",
-  "call_id": "call_abc123",
-  "timestamp": "2026-06-10T10:23:45Z",
-  "disclosure": "This content was generated by an AI system."
-}
+"pii": { "enabled": true, "input": { "count": 1, "by_type": { "EMAIL": 1 } }, "output": { "count": 0, "by_type": {} } }
 ```
 
-| Field | Description |
-|---|---|
-| `token` | HMAC-SHA256 token for verification. Pass to `POST /v1/glad/watermark/verify` to confirm authorship. |
-| `generated_by` | System identifier |
-| `call_id` | Matches `geodesia.call_id` |
-| `timestamp` | ISO 8601 generation timestamp |
-| `disclosure` | Plain-language AI disclosure string (configurable in `watermark.disclosure_text`) |
+Counts per entity type only; detected values are never included.
 
----
+## RAG
 
-### `rag` Object
+`{ "collection_id", "sources": [...], "source_count", "verification" }` — present when the request used a knowledge
+base collection (`rag` request field). `verification` carries the claim-level check of the answer against the
+retrieved sources.
 
-Present when RAG retrieval was triggered for this request.
+## Routing
 
-```json
-"rag": {
-  "retrieved_chunks": [
-    {
-      "text": "Paris is the capital of France.",
-      "source": "geography-kb/europe.pdf",
-      "score": 0.97,
-      "rank": 1
-    }
-  ],
-  "collection_id": "my-knowledge-base",
-  "query_used": "capital of France",
-  "n_retrieved": 3,
-  "reranked": true
-}
-```
+`{ "enabled", "used_complex_model", "axis", "score", "threshold", "model" }` — present when the application uses
+complexity routing. `axis_missing: true` means the complexity axis was unavailable and Model A answered.
 
-| Field | Description |
-|---|---|
-| `retrieved_chunks` | List of retrieved document chunks, sorted by relevance |
-| `retrieved_chunks[].text` | The chunk text |
-| `retrieved_chunks[].source` | Source document identifier |
-| `retrieved_chunks[].score` | Retrieval relevance score (0–1) |
-| `retrieved_chunks[].rank` | Rank position after reranking |
-| `collection_id` | Which RAG collection was queried |
-| `query_used` | The query sent to the vector store (may differ from the original prompt if the gateway rewrote it) |
-| `n_retrieved` | Number of chunks retrieved |
-| `reranked` | Whether the BGE reranker was applied |
+## Context judge
 
----
-
-## Blocked Response
-
-When `prompt_blocked` or `answer_blocked` is `true` in blocking mode, the response `content` is replaced with a block notice:
+Present when `enable_judge_for_context_hallucination` is on. Advisory and uncalibrated: it never changes
+`decision`, `axes` or `grounding`.
 
 ```json
-{
-  "choices": [
-    {
-      "message": {
-        "role": "assistant",
-        "content": "[Response withheld: answer_safety threshold exceeded (score: 0.78, threshold: 0.11)]"
-      },
-      "finish_reason": "content_filter"
-    }
+"context_judge": {
+  "available": true, "calibrated": false, "score": 0.82, "threshold": 0.5, "flagged": true,
+  "verdict_counts": { "supported": 3, "unsupported": 1 },
+  "claims_total": 4, "claims_judged": 4, "truncated": false, "model": "Qwen3.5-9B", "seconds": 6.4,
+  "claims": [
+    { "index": 3, "start": 120, "end": 171, "verdict": "unsupported", "quote": null,
+      "quote_verified": false, "confidence": 0.9, "risk": 0.82 }
   ]
 }
 ```
 
-In passthrough mode, the original response is delivered and `answer_blocked` is set to `true` as an annotation.
+`verdict` per claim is `supported`, `contradicted`, `unsupported`, `no_claim` or `unjudged`. When the judge cannot
+run, `available` is `false`, `score` is `null` and `reason` explains why.
+
+## Certificate
+
+Present when certificates are enabled (`GW_CERTIFICATE=on`). A self-contained, optionally HMAC-signed record of the
+verdict, with the same axis vocabulary as above.
+
+```json
+"certificate": {
+  "version": "geodesia-cert-3",
+  "verdict": "allowed",
+  "alpha": 0.05,
+  "brake_alpha": 0.025,
+  "axes": {
+    "jailbreak": {
+      "score": 0.3333, "available": true, "threshold": 0.9864, "flagged": false,
+      "role": "enforce", "tier": "primary", "alpha": 0.05,
+      "fpr_bound": "P(benign_score > threshold) <= 0.05", "threshold_method": "split-conformal"
+    }
+  },
+  "calibration": { "model": null, "bank_version": 0 },
+  "additional_axes": ["out_of_scope", "profanity", "prompt_complexity"],
+  "sig": "hmac-sha256:…"
+}
+```
+
+`verdict` is the **policy** verdict: `blocked` when an axis that withholds content in blocking mode flagged,
+independently of the request's `mode`. In `passthrough` a turn can therefore carry `decision: "flagged"` with
+`certificate.verdict: "blocked"` — the certificate attests what the policy would do, `decision` what the gateway
+did. `sig` is `null` when no signing key is configured.
 
 ---
 
-## Streaming Format
+## Streaming
 
-In streaming mode (`stream: true`), the `geodesia` object is delivered in the final chunk — the chunk with `finish_reason: "stop"` or `"content_filter"`. All preceding chunks are standard OpenAI SSE format without the `geodesia` extension.
+With `"stream": true` the response is a sequence of SSE chunks. Each chunk that carries Geodesia information has a
+`geodesia` object with an `event`:
 
-```
-data: {"id":"chatcmpl-abc","choices":[{"delta":{"content":"Paris"},...}],...}
-data: {"id":"chatcmpl-abc","choices":[{"delta":{"content":"."},...}],...}
-data: {"id":"chatcmpl-abc","choices":[{"delta":{},"finish_reason":"stop"}],"geodesia":{...}}
+| `event` | When | Contains |
+|---|---|---|
+| `input_scan` | As soon as the prompt is scored (before or while the answer streams) | `axes` / `additional_axes` for the prompt axes. No decision. |
+| `research` | Web search only, before the answer | `research`: one progress event (`search_started`, `page_found`, `page_read`, `page_blocked`, `page_skipped`, `search_done`, `search_error`). `page_read` / `page_blocked` carry `axes: {<axis>: {score, threshold, flagged}}`; `page_blocked` also `reason` and `axis` (the deciding axis). |
+| `progress` | Periodic re-scoring during generation | `axes` with the current scores. No decision. |
+| `final` | Last chunk (with `finish_reason`) | The complete verdict, same shape as the non-streaming object. |
+
+Rules for clients:
+
+- Take the verdict **only** from the `final` event. `input_scan` and `progress` are informational.
+- If the answer is halted mid-stream, the `final` event has `decision: "blocked"`, `reason.stage: "output"` and the
+  chunk's `finish_reason` is `content_filter`.
+- A violation found after the answer was fully streamed is reported as `decision: "flagged"` (the text was already
+  delivered).
+- A request with `web_search: true` is always answered as a stream (`research` events first), whatever `stream` says.
+- A quota refusal (`reason.stage: "quota"`) ends with `finish_reason: "stop"`; content and tool-guard blocks end with
+  `content_filter`. Every block is delivered in the format the client asked for (SSE / NDJSON when streaming).
+
+```text
+data: {"id":"chatcmpl-geodesia-…","object":"chat.completion.chunk","choices":[{"index":0,"delta":{},"finish_reason":null}],
+       "geodesia":{"schema_version":"1.0","event":"input_scan","axes":{"prompt_safety":{…},"jailbreak":{…}}}}
+data: {"id":"chatcmpl-geodesia-…","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"content":"Waves"},"finish_reason":null}]}
+…
+data: {"id":"chatcmpl-geodesia-…","object":"chat.completion.chunk","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],
+       "geodesia":{"schema_version":"1.0","event":"final","decision":"allowed","mode":"blocking","reason":null,"axes":{…}}}
 data: [DONE]
 ```
+
+Ollama streaming (`/api/chat`, NDJSON) carries the same objects on its frames.
+
+---
+
+## Request fields
+
+Geodesia-specific request fields (all optional, never forwarded to the upstream model):
+
+| Field | Type | Description |
+|---|---|---|
+| `mode` | string | `block` / `blocking` or `passthrough`. Overrides the deployment default for this request. |
+| `thinking_level` | integer | 0–3. Default 2. See [Thinking Levels](../g1-proxy/thinking-levels.md). |
+| `context` | string | Grounding document for `halluc_context` (also injected into the upstream prompt). |
+| `rag` | object | `{ "collection_id": "…" }` — retrieve context from a knowledge base. |
+| `pii_guard` | boolean | Turn the PII guard on/off for this request. |
+| `scan` | boolean | `false` bypasses all scoring for this request (internal tools only). |
+| `axes` | array \| string | Restrict the reported axes. Enforcing axes are always scored. |
+| `threshold_overrides` | object | Per-axis thresholds, e.g. `{ "jailbreak": 0.9 }`. |
+| `domain` | string | Closed-book calibration domain (`general`, `legal`, …). |
+| `web_search` | boolean | Live web search with per-page screening. |
+| `enable_judge_for_context_hallucination` | boolean | Per-claim judge (`context_judge`). |
+| `application_id` / `session_id` | string | Application routing and conversation grouping. |
+
+---
+
+## Migrating from the pre-1.0 payload
+
+Before schema 1.0 the gateway added several top-level keys and used internal names. They are gone; there is no
+compatibility layer.
+
+| Before | Schema 1.0 |
+|---|---|
+| top-level `glad_decision` (`passed` / `blocked`) | `geodesia.decision` (`allowed` / `flagged` / `blocked`) |
+| top-level `glad_mode` | `geodesia.mode` |
+| top-level `glad_scores.safety_decision_rule`, `geodesia.flagged_axis` | `geodesia.reason.axis` |
+| top-level `geodesia_research` (stream) | `geodesia.research` with `event: "research"` |
+| `geodesia.axis_energy` | `geodesia.axes` |
+| axis `p_detector` / `flag` / `verdict` | `score` / `flagged` / `label` |
+| axis `p_model`, `p_detector_raw` | `raw_score` |
+| axis `active` | `available` |
+| axis `p_pozzi`, `lin_z` | `details.head_score`, `details.linear_probe_z` |
+| axis `combinato`, `guardia_*`, `p_v5`/`p_v6`/`p_v7`, `sledge_*`, `prem_*`, `tier` | removed (internal) |
+| `closedbook_method`, `lsc_span`, `token_surprisal[].i/.s` | `details.method`, `details.uncertain_span`, `details.token_surprisal[].index/.surprisal` |
+| `geodesia.dominant_axis`, `geodesia.brake`, `geodesia.input` | removed (use `decision` and `reason`) |
+| axis `tier` | removed: the group (`axes` / `additional_axes`) says it; still present inside the certificate |
+| `energy_unit`, `energy_dHmax_joule`, axis `delta_E_joule` / `p_energy` (debug payload, `GW_CLEAN_PAYLOAD=0`) | removed |
+| `dilution_guard` / `decode_guard` blocks, axis `dilution_recovered` / `decode_recovered` | `details.pooled_score` + `details.recovered_by` |
+| `context_judge.flag`, `claims[].i`, `claims[].span`, `claims_truncated`, `advisory`, `score_kind` | `context_judge.flagged`, `claims[].index`, `claims[].start`/`end`, `truncated` (advisory is implied) |
+| research page `axes.{p, thr, flag}`, `dominant` | `axes.{score, threshold, flagged}`, `axis` |
+| `geodesia.sysprompt_leak` | `geodesia.axes.sysprompt_leak` (the protected text is no longer echoed) |
+| `geodesia.thinking_level`, `thinking_tiers_used`, `thinking_escalated` | `geodesia.thinking.level`, `.tiers_used`, `.escalated` |
+| tier names `glad_g`, `glad_h`, `glad_a`, `tier1_native` | `geodesia_g`, `geodesia_h`, `geodesia_a`, `native` |
+| `geodesia.pii_guard` (`by_label`) | `geodesia.pii` (`by_type`) |
+| `geodesia.ragionamento` | `geodesia.reasoning_budget` |
+| `geodesia.entitlement` + `glad_decision: "quota_exceeded"` | `geodesia.quota` + `decision: "blocked"`, `reason.stage: "quota"` |
+| `geodesia.mcp` | `geodesia.tool_guard` |
+| `rag.n_sources` | `rag.source_count` |
+| certificate `glad-cert-2` (`p_detector`, `flag`, `verdict`, `p_model`, `thr_kind`, `calib`) | `geodesia-cert-3` (`score`, `flagged`, `label`, `raw_score`, `threshold_method`, `calibration`) |
+| request `glad_mode`, `glad_thinking_level`, `glad_scan`, `glad_pii_guard`, `glad_axes`, `glad_enable_judge_for_context_hallucination` | `mode`, `thinking_level`, `scan`, `pii_guard`, `axes`, `enable_judge_for_context_hallucination` |

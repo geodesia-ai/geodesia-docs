@@ -431,18 +431,15 @@ The match is a cosine similarity on the unit sphere with a **high floor** (`τ`,
 
 **Per Application.** `policy.feedback_learning` opts a single Application in without flipping the global default, so one tenant can learn from its own corrections while another stays byte-identical.
 
-When a bank match moves a score, the affected axis carries an `exemplar_match` annotation in the response — the contribution is always auditable:
+When a bank match moves a score, the gateway's internal record of that axis carries an `exemplar_match`
+annotation (`{"verdict": "false_negative", "sim": 0.93}`: the matched exemplar's verdict and its cosine
+similarity), so the contribution stays auditable. The annotation is internal: it is **not** part of the public
+`geodesia` object (schema 1.0). In the chat response you see only the effect — the axis `score` and `flagged`
+already include the bank's contribution:
 
 ```json
-{
-  "axis_energy": {
-    "jailbreak": {
-      "p_detector": 0.94,
-      "threshold": 0.9997,
-      "flag": true,
-      "exemplar_match": { "verdict": "false_negative", "sim": 0.93 }
-    }
-  }
+"axes": {
+  "jailbreak": { "score": 0.9931, "threshold": 0.9864, "flagged": true, "available": true, "role": "enforce" }
 }
 ```
 
@@ -455,7 +452,7 @@ An opt-in second-generation memory that ships **alongside** v1 — the live path
 | A one-sided raise/suppress nudge drifts into over-refusal | **Contrastive cells**: the danger is stored paired with a benign twin, and the cell fires only if the query is more danger-like than the twin by a margin |
 | Nearest-neighbour on a single exemplar is fragile to one mislabelled row | A **vote over k neighbours** (distance-weighted), plus a **credibility gate** — how much the neighbourhood agrees with the winning class |
 | `τ = 0.88` is a magic number with no false-positive guarantee | A **split-conformal threshold per (region, axis)**, calibrated on benign serving traffic, with a finite-sample bound on the false-positive lift |
-| Rewriting `p_detector` and then re-flagging against the old conformal threshold breaks that threshold's guarantee | v2 is a **separate OR-term**: it raises its own `flag` and **never rewrites** `p_detector` |
+| Rewriting the axis score and then re-flagging against the old conformal threshold breaks that threshold's guarantee | v2 is a **separate OR-term**: it raises its own flag and **never rewrites** the axis score |
 | One pooled vector loses compositional intent | **Per-span matching** (MaxSim over spans) plus a lexical surface-form channel |
 
 Each cell keeps the originating `feedback_id`, which is what makes provenance, audit and **GDPR deletion of a single incident** possible.

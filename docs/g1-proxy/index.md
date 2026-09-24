@@ -3,7 +3,7 @@
 !!! tip "Looking for the full endpoint list?"
     Every route G1-Proxy exposes, in one page: **[Complete API Map](api-reference.md)**.
 
-**G1-Proxy** is an OpenAI-compatible HTTP proxy that adds real-time AI validation to any LLM backend. It listens for chat requests, screens them, forwards them to the configured upstream model, validates the response, and returns the result — with a `geodesia` field attached containing the full detection payload.
+**G1-Proxy** is an OpenAI-compatible HTTP proxy that adds real-time AI validation to any LLM backend. It listens for chat requests, screens them, forwards them to the configured upstream model, validates the response, and returns the result — with a single `geodesia` object attached containing the verdict and the full detection payload.
 
 ## Call it
 
@@ -17,7 +17,7 @@ shape you already handle, with the verdict attached.
       -H "Content-Type: application/json" \
       -d '{"model":"my-model","stream":false,
            "messages":[{"role":"user","content":"What is the capital of France?"}]}' \
-      | jq '{answer: .choices[0].message.content, decision: .glad_decision}'
+      | jq '{answer: .choices[0].message.content, decision: .geodesia.decision, reason: .geodesia.reason}'
     ```
 
 === "Python"
@@ -31,7 +31,8 @@ shape you already handle, with the verdict attached.
         messages=[{"role": "user", "content": "What is the capital of France?"}],
     )
     print(r.choices[0].message.content)
-    print(r.model_extra["glad_decision"], r.model_extra["geodesia"]["dominant_axis"])
+    g = r.model_extra["geodesia"]
+    print(g["decision"], g["reason"] and g["reason"]["axis"])
     ```
 
 === "TypeScript"
@@ -45,7 +46,7 @@ shape you already handle, with the verdict attached.
       messages: [{ role: "user", content: "What is the capital of France?" }],
     })) as any
 
-    console.log(r.choices[0].message.content, r.glad_decision)
+    console.log(r.choices[0].message.content, r.geodesia.decision, r.geodesia.reason?.axis)
     ```
 
 Full request/response contract: **[Chat API](chat-api.md)**. Every route: **[Complete API Map](api-reference.md)**.
@@ -112,17 +113,24 @@ Every standard OpenAI request body is accepted verbatim. Geodesia adds the follo
 | Field | Type | Description |
 |---|---|---|
 | `context` | string | Explicit grounding context text. G1-Hummingbird scores the answer against this to detect faithfulness violations. |
-| `mode` / `glad_mode` | `"block"` \| `"passthrough"` | Per-request enforcement mode. Overrides the gateway's configured `block_input` / `block_output`. |
+| `mode` | `"block"` \| `"passthrough"` | Per-request enforcement mode. Overrides the gateway's configured `block_input` / `block_output`. |
 | `threshold_overrides` | object | Per-axis detection thresholds (probability 0–1) that override the calibrated defaults for this request only. |
 | `rag` | object | RAG configuration: `collection_id`, `top_k`, `rerank`, `verify`. See [Knowledge Base](../rag/index.md). |
 | `pass_extra` | integer | Number of extra generation samples for the closed-book uncertainty estimate. Default `1` (no extra). |
 | `self_consistency` | boolean | Enable self-consistency sampling for closed-book uncertainty. |
 | `self_consistency_samples` | integer | Number of samples when `self_consistency` is `true`. |
 
-The response carries the standard OpenAI structure with three extra top-level fields:
+The full list of request fields (`thinking_level`, `pii_guard`, `axes`, `web_search`, …) is in the
+[Response Format reference](../reference/response-format.md#request-fields).
+
+The response carries the standard OpenAI structure with exactly **one** extra top-level key, `geodesia`
+(schema `1.0`). Its most-read fields:
 
 | Field | Value |
 |---|---|
-| `glad_decision` | `"passed"` or `"blocked"` |
-| `glad_mode` | `"blocking"` or `"passthrough"` — the mode that was actually used |
-| `geodesia` | Full detection payload. See [API Response Format](../reference/response-format.md). |
+| `geodesia.decision` | `"allowed"`, `"flagged"` (violation detected, content delivered) or `"blocked"` (content withheld) |
+| `geodesia.mode` | `"blocking"` or `"passthrough"` — the mode that was actually used |
+| `geodesia.reason` | `{stage, axis, detail}` — why the decision is not `allowed`; `null` when it is |
+| `geodesia.axes` / `geodesia.additional_axes` | Per-axis `score`, `threshold`, `flagged`, `available`, `role` |
+
+See [API Response Format](../reference/response-format.md) for the complete object.

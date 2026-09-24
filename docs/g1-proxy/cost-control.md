@@ -68,14 +68,21 @@ The refusal comes back in the shape the caller expects — an OpenAI `finish_rea
                "message": {"role": "assistant",
                            "content": "[Geodesia blocked — out of scope (input)]"},
                "finish_reason": "content_filter"}],
-  "glad_decision": "blocked",
   "geodesia": {
-    "glad_decision": "blocked",
-    "flagged_axis": "out_of_scope",
-    "axis_energy": {"out_of_scope": {"p_detector": 0.998, "threshold": 0.90, "flag": true}}
+    "schema_version": "1.0",
+    "event": "final",
+    "decision": "blocked",
+    "mode": "blocking",
+    "reason": {"stage": "input", "axis": "out_of_scope", "detail": null},
+    "additional_axes": {
+      "out_of_scope": {"score": 0.998, "threshold": 0.90, "flagged": true, "available": true, "role": "advisory"}
+    }
   }
 }
 ```
+
+(Other axes omitted.) `reason.axis` names the axis that refused the request; the full object is described in the
+[Response Format reference](../reference/response-format.md).
 
 The blocked call is still written to the audit ledger with its axis scores — you keep the compliance record without paying for the generation.
 

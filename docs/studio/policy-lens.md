@@ -46,7 +46,7 @@ Per-axis probabilities are read from the call's stored metadata; the response ca
 The counterfactual is a one-line computation you can reproduce in any language:
 
 ```python
-theta_new, theta_deployed, axis = 0.85, 0.9997, "jailbreak"
+theta_new, theta_deployed, axis = 0.85, 0.9864, "jailbreak"
 scored = [m for m in items if axis in m["axes"]]
 
 would_block   = [m for m in scored if theta_new <= m["axes"][axis] < theta_deployed]

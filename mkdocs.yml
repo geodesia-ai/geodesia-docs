@@ -197,4 +197,5 @@ nav:
     - Environment Variables: configuration/env-vars.md
   - Reference:
     - API Response Format: reference/response-format.md
+    - Release Notes: reference/release-notes.md
     - Detection Thresholds: reference/thresholds.md

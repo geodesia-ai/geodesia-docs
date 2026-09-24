@@ -36,10 +36,10 @@ and see the [Studio API map](../studio/api-reference.md) instead.
 
 | Method | Path | What it does | Docs |
 |---|---|---|---|
-| `POST` | `/v1/chat/completions` | OpenAI-compatible chat. Screens the prompt, forwards to the upstream LLM, scores the answer, returns the OpenAI body plus `glad_decision` / `geodesia`. Supports SSE streaming with a mid-stream brake. | [Chat API](chat-api.md) |
+| `POST` | `/v1/chat/completions` | OpenAI-compatible chat. Screens the prompt, forwards to the upstream LLM, scores the answer, returns the OpenAI body plus a single `geodesia` object ([schema 1.0](../reference/response-format.md)). Supports SSE streaming with a mid-stream brake. | [Chat API](chat-api.md) |
 | `POST` | `/api/chat` | The same pipeline in the **Ollama** wire format (NDJSON streaming). | [Chat API](chat-api.md#ollama-format-post-apichat) |
 | `POST` | `/v1/completions` | OpenAI **legacy** text completion. The proxy wraps `prompt` into a one-message chat, runs the full pipeline, and unwraps the result back into the legacy shape. | [Chat API](chat-api.md) |
-| `POST` | `/v1/glad/evaluate` | Generate **and** score in one call, returning every internal detection metric rather than a chat-shaped body. Use it for batch scoring and for evaluating a corpus. | [Evaluate](../product-api/evaluate.md) |
+| `POST` | `/v1/glad/evaluate` | Generate **and** score in one call (non-streaming). Returns an OpenAI chat completion with the same `geodesia` object as the chat endpoint. Use it for batch scoring and for evaluating a corpus. | [Response Format](../reference/response-format.md) |
 
 All four accept the same [Geodesia extension fields](chat-api.md#geodesia-extension-fields) (`context`, `rag`, `mode`, `threshold_overrides`, `thinking_level`, `web_search`, …) and forward every other body key to the upstream verbatim, which is what makes the proxy a drop-in for vLLM.
 
@@ -144,6 +144,10 @@ See [Audio Input](audio-input.md).
 | Method | Path | | What it does |
 |---|---|---|---|
 | `POST` | `/v1/glad/causal-explainability/analyze` | 🔒 | Black-box token attribution over the detector — no upstream-model internals, no gradients. Body: `{prompt, response\|full_response, context?, method?, axis?}`. `422` when neither prompt nor context is given, or when `response` is missing for any method other than `dca_dual`. |
+| `GET` | `/v1/glad/causal-explainability/verdict/oracles` | 🔒 | Models whose verdict can be explained (`g1` plus any guard declared server-side) and the supported `unit_schemes`. |
+| `POST` | `/v1/glad/causal-explainability/verdict/jobs` | 🔒 | **MuPAX Advanced** — start an asynchronous explanation of the *whole* G1 verdict (decision, reason and every axis) by replaying it at level 0. Returns `202` with the job. See [Explaining a served verdict](causal-xai.md#explaining-a-served-verdict-mupax-advanced). |
+| `GET` | `/v1/glad/causal-explainability/verdict/jobs/{job_id}` | 🔒 | Job status, progress and, when `completed`, the result. |
+| `DELETE` | `/v1/glad/causal-explainability/verdict/jobs/{job_id}` | 🔒 | Cancel a queued or running job. |
 
 | `method` | What it computes | Typical latency |
 |---|---|---|

@@ -19,7 +19,7 @@ light profile does differently lives behind **one switch** — `GW_LIGHT=1`, imp
 | | |
 |---|---|
 | detection axes | **all nine**, same weights, same thresholds |
-| thinking levels | **0 · 1 · 2** (GLAD-G + the GLAD-H cascade) |
+| thinking levels | **0 · 1 · 2** (Geodesia-G + the Geodesia-H cascade) |
 | `halluc_closedbook` + SLEDGE | yes — including **recalibration on the model you actually serve** |
 | MCP guard (`glad.*` tools) | yes |
 | Causal explainability (MuPAX / DCA) | yes |
@@ -34,7 +34,7 @@ whether you can turn it on.
 
 | missing | why | can I enable it? |
 |---|---|---|
-| **GLAD-A / thinking level 3** | the checkpoint is 16 GB; it is exactly what this profile exists to leave out | no — use G1-Proxy |
+| **Geodesia-A / thinking level 3** | the checkpoint is 16 GB; it is exactly what this profile exists to leave out | no — use G1-Proxy |
 | **Knowledge Base (RAG)** | no embedder, no reranker, no vector store in the image | no |
 | **Audio input** | the ASR model is not shipped | no |
 | **Idle judge / feedback queue** | no `llama.cpp` binary and no GGUF in the image | **yes** — mount a binary and a model and set `GW_IDLE_JUDGE=1`; the capability endpoint then reports it as available |
@@ -69,8 +69,12 @@ curl -s http://localhost:8080/v1/glad/capabilities | jq '{tiers, max_thinking_le
 }
 ```
 
+The `tiers` keys of this admin endpoint (`glad_g`, `glad_h`, `glad_a`) are the internal identifiers of
+Geodesia-G, Geodesia-H and Geodesia-A. In a chat response the same tiers appear in `geodesia.thinking.tiers_used`
+as `geodesia_g`, `geodesia_h`, `geodesia_a` (see [Thinking Levels](thinking-levels.md)).
+
 Two ceilings are reported separately, and conflating them is a support ticket waiting to happen: what the
-**image** can do (are the GLAD-H artifacts present?) and what the **licence** allows. The effective level
+**image** can do (are the Geodesia-H artifacts present?) and what the **licence** allows. The effective level
 is the lower of the two.
 
 `GW_UI_HIDDEN_VIEWS="a,b,c"` overrides the hidden list without rebuilding — an empty string hides nothing.
@@ -81,7 +85,7 @@ is the lower of the two.
 |---|---|
 | one machine, one click, no second container | **G1-Proxy Light** |
 | compliance surfaces (audit trail, FRIA, reports, oversight queue) | G1-Proxy **+** G-1 Studio |
-| thinking level 3 (GLAD-A) | G1-Proxy |
+| thinking level 3 (Geodesia-A) | G1-Proxy |
 | document grounding (RAG) or audio input | G1-Proxy |
 | many Applications with separate policies and keys | G1-Proxy **+** G-1 Studio |
 

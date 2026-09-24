@@ -328,7 +328,7 @@ The `event` field is `"alert"` unless the Application is **over budget** *and* i
 
 === "`on_budget_exceeded: "block"`"
 
-    Once the Application is over budget for the period, the gateway **refuses new chat requests** before they reach the upstream — the same HTTP-level refusal shape as the free-tier daily-quota refusal: `glad_decision: "quota_exceeded"`, `entitlement.tier: "budget"`, with a budget message. A `block` event also fires (deduped, once per period).
+    Once the Application is over budget for the period, the gateway **refuses new chat requests** before they reach the upstream — the same HTTP-level refusal shape as the free-tier daily-quota refusal: `geodesia.decision: "blocked"` with `geodesia.reason.stage: "quota"`, and `geodesia.quota.tier: "budget"` (plus `used` / `limit` / `remaining`), with a budget message. See the [Response Format](../reference/response-format.md#top-level-fields) reference. A `block` event also fires (deduped, once per period).
 
     ```text
     [Geodesia — Monthly budget exceeded for this Application (512.40/500.0 EUR).

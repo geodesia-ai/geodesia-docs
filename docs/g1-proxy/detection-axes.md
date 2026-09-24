@@ -31,48 +31,47 @@ The same vocabulary is served to the feedback UI at `GET /v1/glad/feedback/schem
 
 ## Reading Axis Results
 
-Each axis produces a per-axis object in the `geodesia.axis_energy` response field:
+Each axis produces a per-axis object in the `geodesia.axes` response field (primary axes) or
+`geodesia.additional_axes` (additional axes). Every entry has the same shape:
 
 ```json
 {
-  "halluc_context": {
-    "p_detector": 0.72,
-    "flag": true,
-    "threshold": 0.6475,
-    "available": true,
-    "suppressed_by": null,
-    "p_detector_raw": null
+  "axes": {
+    "halluc_context": {
+      "score": 0.1092, "threshold": 0.7551, "flagged": false, "available": true, "role": "enforce",
+      "details": { "context_support": 1.0, "suppressed_by": "context_support" }
+    },
+    "halluc_closedbook": {
+      "score": null, "threshold": 0.5, "flagged": false, "available": false, "role": "advisory",
+      "unavailable_reason": "upstream does not expose per-token logprobs"
+    }
   },
-  "out_of_scope": {
-    "p_detector": 0.998,
-    "flag": true,
-    "threshold": 0.90,
-    "available": true
-  },
-  "prompt_complexity": {
-    "p_detector": 0.81,
-    "flag": true,
-    "threshold": 0.50,
-    "available": true
+  "additional_axes": {
+    "out_of_scope": { "score": 0.9922, "threshold": 0.9534, "flagged": true, "available": true, "role": "advisory" },
+    "prompt_complexity": {
+      "score": 0.0155, "threshold": 0.5, "flagged": false, "available": true,
+      "role": "classifier", "label": "simple"
+    }
   }
 }
 ```
 
 | Field | Type | Description |
 |---|---|---|
-| `p_detector` | `float` [0, 1] | Detection probability. Higher means more likely to be the kind of content this axis detects. |
-| `flag` | `bool` | `true` if the score crossed this axis's threshold. Whether a flag *does* anything depends on the axis's enforcement mode. |
-| `threshold` | `float` | The threshold used for this request (may be overridden by the Application policy or `threshold_overrides`). |
-| `available` | `bool` | `false` if the axis cannot run (e.g. `halluc_closedbook` when the upstream has no logprobs, or an axis the served checkpoint does not have). A `false` axis never flags. |
-| `fact_seeking` | `bool` | (closed-book only) Whether the question was classified as fact-seeking. Only fact-seeking questions can flag. |
-| `suppressed_by` | `string` \| `null` | Reason why the axis was suppressed despite the score. Example: `"rag_claim_verification"` when all RAG claims are verified. |
-| `p_detector_raw` | `float` \| `null` | The original score before suppression, for audit purposes. |
-| `exemplar_match` | `object` \| `null` | Present when the [feedback exemplar bank](self-evolving.md#3-the-fast-loop-episodic-memory) moved this score, with the matched verdict and similarity. |
+| `score` | `float` [0, 1] \| `null` | Detection probability. Higher means more likely to be the kind of content this axis detects. `null` when the axis could not be measured on this turn — never `0`. |
+| `threshold` | `float` \| `null` | The threshold used for this request (may be overridden by the Application policy or `threshold_overrides`). |
+| `flagged` | `bool` | `true` if the score crossed this axis's threshold. Whether a flag *does* anything depends on the axis's `role` and enforcement mode. |
+| `available` | `bool` | `false` if the axis cannot run (e.g. `halluc_closedbook` when the upstream has no logprobs, or `halluc_context` with no context). An unavailable axis never flags. |
+| `role` | `string` | `enforce` (a flag withholds content in blocking mode), `advisory` (a flag is a warning), `classifier` (a label, not a risk). |
+| `label` | `string` | Classifier axes only, e.g. `simple` / `complex` for `prompt_complexity`. |
+| `raw_score` | `float` | Present when the displayed `score` was aligned to the final decision (suppression, fusion, guards): the model's own score before that step, for audit. |
+| `unavailable_reason` | `string` | Present when `available` is `false`. |
+| `details` | `object` | Axis-specific evidence, e.g. `fact_seeking` (closed-book: only fact-seeking questions can flag) or `suppressed_by` (why a flag was withdrawn, e.g. `"rag_claim_verification"` when all RAG claims are verified). |
 
-The `geodesia.brake` field is `true` if any **answer-region** axis (`halluc_context`, `halluc_closedbook`, `answer_safety`) has `flag: true`. Input-region axes affect the input phase separately.
+The full list of fields and `details` keys is in the [Response Format reference](../reference/response-format.md#axis-object).
 
 !!! tip "A flag is not a block"
-    `flag: true` on `profanity` or `out_of_scope` means *the axis fired*, not *the request was refused*. Read `glad_decision` / `flagged_axis` for what the gateway actually did.
+    `flagged: true` on `profanity` or `out_of_scope` means *the axis fired*, not *the request was refused*. Read `geodesia.decision` and `geodesia.reason.axis` for what the gateway actually did.
 
 ---
 
@@ -155,7 +154,7 @@ Not every axis is a guardrail, and the distinction is enforced in the product, n
 
 | Group | Axes | Travels in | Default enforcement |
 |---|---|---|---|
-| **Primary** | `prompt_safety`, `jailbreak`, `rag_jailbreak`, `halluc_context`, `halluc_closedbook`, `answer_safety` | `axis_energy` | `block` on the input axes, `annotate` on the answer axes |
+| **Primary** | `prompt_safety`, `jailbreak`, `rag_jailbreak`, `halluc_context`, `halluc_closedbook`, `answer_safety` | `axes` | `block` on the input axes, `annotate` on the answer axes |
 | **Additional** | `profanity`, `out_of_scope`, `prompt_complexity` | `additional_axes` | `annotate` (`off` for `prompt_complexity`) |
 
 **Primary axes are what the product commits to.** They are the ones benchmarked against out-of-distribution
@@ -166,20 +165,20 @@ vulgar one, a complex one — but they are held to a different standard, and the
 detection claim about them. `prompt_complexity` is not a detector at all: it is the Model A / Model B routing
 boundary.
 
-Since v0.3 they ship in a **separate payload field**, so a consumer never has to know the axis names to tell
+They ship in a **separate payload field**, so a consumer never has to know the axis names to tell
 the two apart:
 
 ```json
 {
   "geodesia": {
-    "axis_energy":      { "jailbreak": { "…": "…", "tier": "primary" } },
-    "additional_axes":  { "out_of_scope": { "…": "…", "tier": "additional" } }
+    "axes":             { "jailbreak":    { "score": 0.3333, "flagged": false, "role": "enforce", "…": "…" } },
+    "additional_axes":  { "out_of_scope": { "score": 0.0678, "flagged": false, "role": "advisory", "…": "…" } }
   }
 }
 ```
 
-Every axis also carries an explicit `tier` (`primary` | `additional`) in both blocks and in the signed
-certificate, which additionally lists them under a top-level `additional_axes` key. Nothing is hidden: an
+The signed certificate carries an explicit `tier` (`primary` | `additional`) on every axis and additionally lists
+the additional axes under a top-level `additional_axes` key. Nothing is hidden: an
 additional axis is fully scored, fully audited and fully certified — it is *labelled*, not removed.
 
 `/health` and `/upstream/test` report the split too:
@@ -220,7 +219,7 @@ Application that wants it, not to the whole gateway.
 | Variable | Default | Meaning |
 |---|---|---|
 | `GW_ADDITIONAL_AXES` | `profanity,out_of_scope,prompt_complexity` | Which axes are additional. Set it to `""` to make every axis primary. |
-| `GW_ADDITIONAL_INLINE` | `0` | `1` also emits the additional axes inside `axis_energy`, for a client written before this field existed. |
+| `GW_ADDITIONAL_INLINE` | `0` | `1` also emits the additional axes inside `axes`, for a client that reads a single axis map. |
 
 ---
 
@@ -236,9 +235,9 @@ Application that wants it, not to the whole gateway.
 
 **What is NOT context:** The **system prompt is an instruction, not evidence**. "You are a travel-booking assistant" is not something a correct answer needs to be entailed by, so system messages are deliberately excluded from the grounding context — feeding them in made the axis flag perfectly grounded replies. The system prompt instead feeds `out_of_scope`, which is the axis it actually belongs to. Set `GW_SYSTEM_AS_CONTEXT=1` to restore the old behaviour if your deployment ships its knowledge base inside the system message.
 
-**RAG interaction:** When RAG claim-level verification confirms that every claim in the answer is cited from a retrieved chunk, the gateway suppresses this axis regardless of its score. The raw score is preserved in `p_detector_raw` with a `suppressed_by: "rag_claim_verification"` note for audit purposes.
+**RAG interaction:** When RAG claim-level verification confirms that every claim in the answer is cited from a retrieved chunk, the gateway suppresses this axis regardless of its score. The raw score is preserved in `raw_score`, with `details.suppressed_by: "rag_claim_verification"` for audit purposes.
 
-**Calibrated default:** `0.6475`
+**Demo calibration, September 2026:** `0.7551`
 
 ---
 
@@ -254,7 +253,7 @@ Application that wants it, not to the whole gateway.
 
 **Advisory by default:** the SLEDGE conformal calibration is what actually decides this axis at serving time; the threshold below is the display/advisory value.
 
-**Calibrated default:** `0.58` (advisory)
+**Demo calibration, September 2026:** `0.8555` (advisory; `0.5` is reported when the axis is unavailable)
 
 ---
 
@@ -274,7 +273,7 @@ Application that wants it, not to the whole gateway.
 
 **Note on evasive framing:** The detector is specifically trained to see through common evasion techniques: fiction wrappers ("write a story where a character explains how to…"), professional authority claims ("I'm a nurse and need to know…"), and encoding tricks. Legitimate professional questions (pharmacist asking about drug interactions, security researcher studying exploits) are distinguished from genuinely unsafe requests by intent and specificity.
 
-**Calibrated default:** `0.9215` — jointly calibrated with `jailbreak` on a **2 % false-positive budget** measured on a *multilingual* benign pool. See [the calibration note](#a-note-on-the-calibrated-defaults).
+**Demo calibration, September 2026:** `0.6377` — calibrated jointly with `jailbreak` on a shared false-positive budget measured on a *multilingual* benign pool. See [the calibration note](#a-note-on-the-calibrated-thresholds).
 
 ---
 
@@ -286,7 +285,7 @@ Application that wants it, not to the whole gateway.
 
 **Why this axis exists separately:** Models can produce unsafe content even from benign prompts — through indirect prompt injection (malicious instructions hidden in retrieved documents), jailbreak techniques that slip past input screening, or spontaneous model failure. Having a separate output scorer catches these cases.
 
-**Calibrated default:** `0.7295`
+**Demo calibration, September 2026:** `0.7953`
 
 ---
 
@@ -302,7 +301,7 @@ Application that wants it, not to the whole gateway.
 
 This axis targets the **user prompt**. Adversarial instructions that arrive through retrieved documents or tool outputs are handled by `rag_jailbreak` instead.
 
-**Calibrated default:** `0.9997` — high by construction: the axis is extremely confident on real attacks, so the operating point sits far out on the tail while still holding the joint 2 % false-positive budget.
+**Demo calibration, September 2026:** `0.9864` — high by construction: the axis is very confident on real attacks, so the operating point sits far out on the tail while holding the false-positive budget it shares with `prompt_safety`.
 
 ---
 
@@ -316,7 +315,7 @@ This axis targets the **user prompt**. Adversarial instructions that arrive thro
 
 **Relationship to `jailbreak`:** `jailbreak` watches the **user prompt**; `rag_jailbreak` watches everything that enters through the **context region**. Together they cover both direct and indirect prompt-injection surfaces.
 
-**Calibrated default:** `0.2501` (aggressive by design — legitimate context almost never contains imperative instructions aimed at the model, so injected commands stand out sharply.)
+**Demo calibration, September 2026:** `0.5768` (legitimate context almost never contains imperative instructions aimed at the model, so injected commands stand out sharply.)
 
 ---
 
@@ -330,7 +329,7 @@ This axis targets the **user prompt**. Adversarial instructions that arrive thro
 
 **Typical use:** `annotate` in the audit trail and a tone-moderation hook in the application; `block` only for public-facing surfaces with a strict code of conduct.
 
-**Calibrated default:** `0.90`
+**Demo calibration, September 2026:** `0.7`
 
 ---
 
@@ -351,7 +350,7 @@ Measured on the demo deployment: with a declared scope the axis returns **0.999*
 
 **Why it is also a cost control:** an off-topic prompt that is refused at the gate never reaches the upstream model, so it costs **zero** input and output tokens. See [Token & Cost Control](cost-control.md#out_of_scope-refusing-before-you-pay).
 
-**Calibrated default:** `0.90`
+**Demo calibration, September 2026:** `0.9534`
 
 ---
 
@@ -367,15 +366,37 @@ Measured on the demo deployment: with a declared scope the axis returns **0.999*
 
 **Enforcement:** `off`. This axis never blocks anything.
 
-**Default routing boundary:** `0.50`
+**Demo calibration, September 2026:** `0.5` (the routing boundary)
 
 ---
 
-## A note on the calibrated defaults
+## A note on the calibrated thresholds
 
-The thresholds above are the serving-calibrated values for the 9-axis head and they mirror `runs/glad_bert/axis_calib.json`. Two things follow from how they were produced:
+Thresholds are **calibrated per deployment**: they depend on the detector checkpoint, and on the model and domain
+an Application serves. The values quoted on this page are the **demo calibration, September 2026** — the
+thresholds served by the public demo at that date — and are there to give a sense of scale, not to be copied:
 
-- **`prompt_safety` and `jailbreak` share a joint 2 % false-positive budget** measured on a **multilingual** benign pool (Italian- and English-heavy). This matters: a threshold calibrated on an English-only benign pool produced a **13 % false-positive rate on Italian traffic**. If your traffic is dominated by a language that is not represented in your calibration pool, re-calibrate — do not just nudge the number.
+| Axis | Demo calibration, September 2026 |
+|---|---|
+| `halluc_context` | `0.7551` |
+| `halluc_closedbook` | `0.8555` |
+| `prompt_safety` | `0.6377` |
+| `answer_safety` | `0.7953` |
+| `jailbreak` | `0.9864` |
+| `rag_jailbreak` | `0.5768` |
+| `profanity` | `0.7` |
+| `out_of_scope` | `0.9534` |
+| `prompt_complexity` | `0.5` |
+
+**The live value is always in the response:** every axis object carries the `threshold` it was compared against
+on that request (`geodesia.axes.<axis>.threshold`, after any Application policy or `threshold_overrides`). Read it
+from there rather than hard-coding a number. Two things follow from how the thresholds are produced:
+
+- **`prompt_safety` and `jailbreak` share one false-positive budget**, because the gateway blocks when *either*
+  fires. The budget is measured on a **multilingual** benign pool of real chat traffic. This matters: a threshold
+  calibrated on an English-only benign pool once produced a **13 % false-positive rate on Italian traffic**. If
+  your traffic is dominated by a language that is not represented in your calibration pool, re-calibrate — do not
+  just nudge the number.
 - **Thresholds do not transfer across checkpoints.** A new detector build means re-running the calibration and updating the served config. An Application created before a change keeps the thresholds stored in its own policy.
 
 The empirical way to set a threshold for *your* traffic is [Policy Lens](../studio/policy-lens.md), which re-decides your own stored requests under a candidate threshold and tells you exactly which ones would move.
@@ -400,7 +421,7 @@ This grouping matters for enforcement: `block_input` only applies to the input p
 
 | Axis | Requires logprobs | Requires context | Requires a declared scope |
 |---|---|---|---|
-| `halluc_context` | No | Yes (scores 0 without context) | No |
+| `halluc_context` | No | Yes (`available: false`, `score: null` without context) | No |
 | `halluc_closedbook` | **Yes** | No (disabled when context is present) | No |
 | `prompt_safety` | No | No | No |
 | `answer_safety` | No | No | No |

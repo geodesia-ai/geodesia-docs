@@ -477,7 +477,7 @@ Every response carries a `geodesia{}` block — your richest telemetry source. S
 
 | Source | What you get | How |
 |---|---|---|
-| **`geodesia{}` payload** | Per-call axis scores, brake decision, dominant axis, latency | Parse from each API response (see [Response Format](../reference/response-format.md)) |
+| **`geodesia{}` payload** | Per-call `decision`, `reason` (stage and deciding axis), per-axis scores | Parse from each API response (see [Response Format](../reference/response-format.md)) |
 | **`/health`** | Liveness, upstream, log-prob mode, active axes | Poll on an interval; alert on `ok=false` or `axes` drop |
 | **Compliance dashboard** | Aggregated pass / block / flag counts, per-axis rates | `GET :8199/v1/glad/dashboard` |
 | **Audit chain** | Tamper-evident per-call ledger | `GET /v1/glad/chain/status` · `GET /v1/glad/chain/verify` |

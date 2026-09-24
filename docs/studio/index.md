@@ -46,7 +46,7 @@ Create an Application, give it a key, and it is live on the data plane — three
                 headers={"Authorization": f"Bearer {key}"},
                 json={"model": "llama3.1:8b", "stream": False,
                       "messages": [{"role": "user", "content": "Hi"}]}).json()
-    print(r["glad_decision"])
+    print(r["geodesia"]["decision"])   # "allowed" | "flagged" | "blocked"
     ```
 
 === "TypeScript"
@@ -153,7 +153,7 @@ G1-Hummingbird scores every request across **nine** independent axes — in a si
 `rag_jailbreak` is the context-injection firewall: it catches adversarial instructions smuggled in through retrieved documents or tool outputs. The three operational axes are not guardrails — `profanity` moderates tone, `out_of_scope` refuses questions outside the Application's declared purpose (and so never pays for the upstream call), and `prompt_complexity` decides which model answers.
 
 !!! tip "Per-axis defaults"
-    Studio ships the serving calibration of the 9-axis head: `prompt_safety` 0.9215, `jailbreak` 0.9997, `rag_jailbreak` 0.2501, `halluc_context` 0.6475, `halluc_closedbook` 0.58, `answer_safety` 0.7295, `profanity` 0.90, `out_of_scope` 0.90, `prompt_complexity` 0.50. The prompt guardrails default to `block`, the answer axes to `annotate`, the operational axes to `annotate`, and `prompt_complexity` to `off`. Missing axes are always backfilled so the axis contract holds downstream. Tune yours on real traffic with [Policy Lens](policy-lens.md).
+    New Applications take the deployment's serving calibration, which is per deployment. For scale, the demo calibration (September 2026) is `prompt_safety` 0.6377, `jailbreak` 0.9864, `rag_jailbreak` 0.5768, `halluc_context` 0.7551, `answer_safety` 0.7953, `profanity` 0.7, `out_of_scope` 0.9534, `prompt_complexity` 0.5; `halluc_closedbook` has no stored default (a conformal τ per model and language decides it; demo 0.8555). The live value is always the `threshold` each axis reports in the response. The prompt guardrails default to `block`, the answer axes to `annotate`, the operational axes to `annotate`, and `prompt_complexity` to `off`. Missing axes are always backfilled so the axis contract holds downstream. Tune yours on real traffic with [Policy Lens](policy-lens.md).
 
 For the full behaviour of each axis, see [Detection Axes](../g1-proxy/detection-axes.md).
 

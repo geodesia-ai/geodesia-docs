@@ -28,19 +28,22 @@ Send only the axes you are changing — the update is a merge and the response e
 
 ## The calibrated defaults
 
-These are the serving-calibrated values for the 9-axis head. They are a **starting point produced by a specific calibration on a specific checkpoint**, not universal constants.
+Thresholds are **calibrated per deployment** (per detector checkpoint, and per model and domain where that
+applies). The values below are the **demo calibration, September 2026** — what the public demo served at that
+date. They are a sense of scale, not universal constants. **The live value is always in the response**: each axis
+object reports the `threshold` it was compared against on that request.
 
-| Axis | Default | Enforcement | How it was set |
+| Axis | Demo calibration, September 2026 | Default enforcement | How it is set |
 |---|---|---|---|
-| `prompt_safety` | `0.9215` | `block` | Joint 2 % false-positive budget with `jailbreak`, on a **multilingual** benign pool |
-| `jailbreak` | `0.9997` | `block` | Same joint budget; the axis is extremely confident on real attacks, so the operating point sits far out on the tail |
-| `rag_jailbreak` | `0.2501` | `block` | Aggressive by design — benign retrieved context almost never contains imperatives aimed at the model |
-| `halluc_context` | `0.6475` | `annotate` | Dev split |
-| `halluc_closedbook` | `0.58` | `annotate` | Advisory — the SLEDGE conformal calibration actually decides this axis at serving time |
-| `answer_safety` | `0.7295` | `annotate` | Dev split |
-| `profanity` | `0.90` | `annotate` | Conservative: only fires when the detector is very sure |
-| `out_of_scope` | `0.90` | `annotate` | Conservative: refusing a customer is expensive |
-| `prompt_complexity` | `0.50` | `off` | The **training boundary** of a binary classifier — not a false-positive budget |
+| `prompt_safety` | `0.6377` | `block` | Shared false-positive budget with `jailbreak` (the gateway blocks when either fires), on a **multilingual** benign pool |
+| `jailbreak` | `0.9864` | `block` | Same shared budget; the axis is very confident on real attacks, so the operating point sits far out on the tail |
+| `rag_jailbreak` | `0.5768` | `block` | Benign retrieved context almost never contains imperatives aimed at the model |
+| `halluc_context` | `0.7551` | `annotate` | Dev split |
+| `halluc_closedbook` | `0.8555` | `annotate` | Advisory — no fixed default: a conformal τ per model **and** per language decides this axis at serving time |
+| `answer_safety` | `0.7953` | `annotate` | Dev split |
+| `profanity` | `0.7` | `annotate` | Favours sensitivity on an annotation-only axis |
+| `out_of_scope` | `0.9534` | `annotate` | Conservative: refusing a customer is expensive |
+| `prompt_complexity` | `0.5` | `off` | The **training boundary** of a binary classifier — not a false-positive budget |
 
 !!! danger "Two things these numbers depend on"
     **The checkpoint.** Thresholds do not transfer across detector builds. A new build means re-running the calibration; an Application created earlier keeps the thresholds stored in its own policy.
@@ -85,9 +88,13 @@ Set enforcement to `annotate` (or run the request with `mode: "passthrough"`), l
 For each axis, the decision is:
 
 ```
-score >= threshold  →  flagged
-score <  threshold  →  pass
+score >  threshold  →  flagged
+score <= threshold  →  not flagged
 ```
+
+The comparison is strict: a score exactly equal to the threshold does not flag. An axis that could not be measured
+reports `available: false` and `score: null` and is never flagged — see the
+[axis object](response-format.md#axis-object).
 
 Scores are always in the range [0, 1]: **0** = the detector is confident the content is safe/grounded/in-scope; **1** = confident it is not.
 

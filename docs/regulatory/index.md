@@ -106,13 +106,13 @@ California's **Artificial Intelligence Transparency Act** (effective January 1, 
 - Provide a publicly accessible AI detection tool
 - Suspend service within 72 hours on government request
 
-Geodesia G-1 satisfies all three requirements. See the [Watermark](../compliance/watermark.md) and [Kill Switch](../compliance/kill-switch.md) pages.
+Geodesia G-1 provides the building blocks for all three: a latent watermark logged for every returned answer, a verification endpoint (`POST /v1/glad/watermark/verify`) the deployer can expose, and a kill switch. See the [Watermark](../compliance/watermark.md) and [Kill Switch](../compliance/kill-switch.md) pages.
 
 ---
 
 ### Italy 132/2025
 
-Italy's **Decree-Law 132/2025** on artificial intelligence introduces requirements for AI content disclosure, mandatory labeling of AI-generated images/audio/video, and sectoral restrictions. Geodesia G-1's manifest watermark and disclosure field satisfy the content marking requirements.
+Italy's **Decree-Law 132/2025** on artificial intelligence introduces requirements for AI content disclosure, mandatory labeling of AI-generated images/audio/video, and sectoral restrictions. Geodesia G-1 supports the content marking requirements with a latent watermark and a manifest label recorded for every returned answer; the visible disclosure to end users is shown in the deployer's own interface.
 
 ---
 

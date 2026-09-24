@@ -74,7 +74,7 @@ The [Deployer Manual](../compliance/reports.md#deployer-transparency-manual) (`P
 |---|---|
 | Clear instructions for use | `POST /v1/glad/deployer-manual` |
 | Capabilities and limitations | Deployer manual — limitations section |
-| AI-generated content disclosure | [Watermark](../compliance/watermark.md) — manifest + latent |
+| AI-generated content disclosure | [Watermark](../compliance/watermark.md) — latent watermark + logged manifest label |
 | Provider identity | `GET /v1/glad/provider-identity` |
 
 ---
@@ -116,9 +116,11 @@ No restrictions from Geodesia G-1's side. The system supports regulatory sandbox
 > AI-generated content must be disclosed.
 
 Geodesia G-1 satisfies this with:
-- **Manifest watermark** — `geodesia.watermark.disclosure` in every response
-- **Latent watermark** — HMAC-SHA256 token verifiable at `POST /v1/glad/watermark/verify`
-- **Configurable disclosure text** — set `watermark.disclosure_text` in config.yaml
+- **Latent watermark** — an HMAC-SHA256 record logged for every answer the gateway returns, verifiable at `POST /v1/glad/watermark/verify` (by text, or by `call_id` + `watermark_id`)
+- **Manifest label** — each watermark record carries the `AI-GENERATED CONTENT` label and the applicable laws
+
+The chat API response itself carries no watermark or disclosure field. Informing end users that they are
+interacting with AI, or that content is AI-generated, is done in the deployer's own interface.
 
 ---
 
