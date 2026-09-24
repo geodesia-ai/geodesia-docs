@@ -26,8 +26,13 @@ upstream gives you.
 | Detector | Blocks | Features | What the extra blocks add |
 |---|---|---|---|
 | **classic (fork)** | `fork` | 55 | *Semantic forking* — which words the model was weighing among the alternatives it already returned |
+| **SLEDGE-logprobs** | `fork,nli` | 64 | + an NLI judge on the alternatives. Everything that can be computed from the **answer's** logprobs alone |
 | **SLEDGE-Next** | `fork,prem,nli` | 71 | + premise surprise + an NLI judge on the alternatives |
 | **SLEDGE-Next v2** | `fork,prem2,nli` | 71 | same, with the **v2** premise block |
+
+!!! note "Versions"
+    SLEDGE-logprobs ships with the first release after 0.4.2. Up to 0.4.2, an upstream without
+    `prompt_logprobs` gets **classic (fork)** as its default.
 
 **The `fork` block** reads information the gateway already pays for and nobody used: the top-20
 alternatives come back as (string, logprob) pairs, and the strings were being thrown away. Reading them
@@ -65,13 +70,21 @@ server that does not know the field simply ignores it — no error, just nothing
 **G-1 picks the default from what it detects:**
 
 * `prompt_logprobs` **available** → **SLEDGE-Next v2**, because the premise block can be computed;
-* **not available** → **classic (fork)**, because those 7 features would sit at zero. A detector with
-  dead blocks inside is not more capable, only wider.
+* **not available** → **SLEDGE-logprobs**: the `fork` and `nli` blocks, fitted **without** the premise
+  columns. This is the default for OpenAI, Ollama and most hosted APIs.
+
+When the probe finds no `prompt_logprobs`, this default wins even over the detector currently served.
+The reason is that a SLEDGE-Next artifact served against such an upstream runs with its premise columns
+at zero. Those columns then contribute nothing, so nothing crashes and the threshold still holds its
+false-positive budget. But every other weight was fitted next to a live premise block, so the ranking is
+worse than a detector fitted on the blocks it can actually see. Until the probe has run, the served
+detector decides.
 
 !!! tip "Serving the same model on vLLM is the whole fix"
     If you need v2 and your upstream is Ollama or OpenAI, serve the model with **vLLM**. The gateway
     detects `prompt_logprobs` at start-up and moves the default to SLEDGE-Next v2 on its own — nothing
-    to configure. `GW_SLEDGE_BLOCKS` overrides the choice if you want to force it.
+    to configure. `GW_SLEDGE_BLOCKS` overrides the choice if you want to force it, for example
+    `GW_SLEDGE_BLOCKS=fork,nli` for SLEDGE-logprobs.
 
 ---
 
@@ -115,6 +128,12 @@ against the same detector head downloads it instead of paying for its own genera
 On start-up the gateway looks the model up and downloads only if something is there — and refuses an
 artifact whose signature does not verify, or that was calibrated against a **different detector head**.
 A `.pkl` is executable code; it never reaches disk on a bad signature.
+
+A catalog artifact replaces a local one only when its generation ranks higher, and the rank depends on
+the upstream. When `prompt_logprobs` is available the order is classic < SLEDGE-logprobs < SLEDGE-Next <
+SLEDGE-Next v2. When it is not, the two SLEDGE-Next generations drop below SLEDGE-logprobs, so a
+SLEDGE-Next v2 in the catalog never replaces a SLEDGE-logprobs artifact on such an upstream. A generation
+the gateway does not recognise is never downloaded and never overwritten.
 
 ---
 

@@ -207,7 +207,7 @@ Routing **never fails a request**. If the axis is unavailable — an older check
 
 ## Token saving — spend less without changing what the model reads
 
-`token_saving` is a platform-wide switch, **off by default**, available in builds after 0.4.2. Turning it on never changes a byte of the
+`token_saving` is a platform-wide switch, **off by default**, available from 0.4.2. Turning it on never changes a byte of the
 messages the upstream model receives, and never changes the text your client gets back. It does not
 compress, prune, summarise or reorder anything: every one of those techniques changes the answer.
 
