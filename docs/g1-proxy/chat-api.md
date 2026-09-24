@@ -515,6 +515,7 @@ The proxy adds a single top-level key, `geodesia` (schema version `1.0`), to the
 | `thinking` | thinking level ≥ 1 | `{level, tiers_used, escalated}` — the level this turn actually ran at and the detector tiers that contributed. See [Thinking Levels](thinking-levels.md). |
 | `pii` | PII guard on | `{enabled, input: {count, by_type}, output: {count, by_type}}` — counts only. |
 | `routing` | complexity routing on | `{enabled, used_complex_model, axis, score, threshold, model}` — see [Token & Cost Control](cost-control.md). |
+| `token_saving` | `token_saving` switch on | `{enabled, cached_prompt_tokens?, prompt_tokens?, cache_write_prompt_tokens?, prompt_cache_key?, upstream_closed_early?, closed_reason?}` — see [Token & Cost Control](cost-control.md#token-saving-spend-less-without-changing-what-the-model-reads). |
 | `rag` | RAG active | `{collection_id, sources, source_count, verification}`. |
 | `context_judge` | claim judge on | Per-claim grounding verdicts (advisory, uncalibrated): `{available, calibrated, score, threshold, flagged, verdict_counts, claims, …}`. See [Context judge](../reference/response-format.md#context-judge). |
 | `certificate` | `GW_CERTIFICATE=on` | Signed decision certificate (`geodesia-cert-3`) built from this response's axes. Its `verdict` is the policy verdict, independent of `mode`: a passthrough turn can carry `decision: "flagged"` with `certificate.verdict: "blocked"`. See [Certificate](../reference/response-format.md#certificate). |

@@ -64,7 +64,7 @@ The config is written to `GW_CONFIG_FILE` (default `runs/gateway_config.json`) a
 }
 ```
 
-Only the fields listed in the gateway source as "persistable" are saved: upstream settings, inbound host/port, CI injection, blocking flags, thresholds, numeric solver, and sidecar config. Internal state (loaded model, probed capabilities) is not persisted.
+Only the fields listed in the gateway source as "persistable" are saved: upstream settings, inbound host/port, CI injection, blocking flags, thresholds, numeric solver, sidecar config, PII guard and `token_saving`. Internal state (loaded model, probed capabilities) is not persisted.
 
 ---
 
@@ -166,3 +166,15 @@ The text-based detection model cannot do arithmetic. If your use case involves L
 | `numeric_solver` | `GW_NUMERIC_SOLVER` | `none` | Numeric verification mode. Options: `none` (disabled), `pot` (lightweight program-of-thought), `strong` (Qwen2.5-Coder-7B judge, AUROC 0.76 on FinQA — loads a 7B model), `api` (delegates to an external API). |
 | `numeric_solver_model` | `GW_NUMERIC_MODEL` | `Qwen/Qwen2.5-Coder-7B-Instruct` | Model used when `numeric_solver` is `strong`. Any HuggingFace model ID that can perform code reasoning. |
 | `numeric_solver_quant` | `GW_NUMERIC_QUANT` | `""` | Quantization for the numeric solver model. Set to `4bit` to reduce VRAM usage (e.g., to 5–6 GB). Leave empty for bf16 full precision. |
+
+### Token saving
+
+| Field | Env var | Default | Description |
+|---|---|---|---|
+| `token_saving` | `GW_TOKEN_SAVING` | `false` | Cuts upstream spend without changing the messages the model reads. It forwards or derives `prompt_cache_key` on an `openai` upstream, closes the upstream stream as soon as Geodesia halts a generation, and reports cached prompt tokens in `geodesia.token_saving`. Persisted. See [Token & Cost Control](cost-control.md#token-saving-spend-less-without-changing-what-the-model-reads). |
+
+```bash
+curl -s -X POST http://localhost:8800/v1/glad/gateway/config \
+  -H "Content-Type: application/json" \
+  -d '{"token_saving": true}'
+```

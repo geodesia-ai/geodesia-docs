@@ -162,6 +162,7 @@ With `"mode": "passthrough"` the real answer is returned and the violation is re
 | `context_judge` | object | claim judge on | Per-claim grounding verdicts (advisory, uncalibrated). See [Context judge](#context-judge). |
 | `certificate` | object | certificates on | Signed verdict certificate. See [Certificate](#certificate). |
 | `reasoning_budget` | object | reasoning upstream | `max_tokens` raised so a reasoning model can still answer. |
+| `token_saving` | object | `token_saving` switch on | `{enabled, cached_prompt_tokens?, prompt_tokens?, cache_write_prompt_tokens?, prompt_cache_key?, upstream_closed_early?, closed_reason?}`. `cached_prompt_tokens` is what the provider served from its prompt cache, present only when the provider reports it. `prompt_cache_key` is `client` or `gateway` (who set it), never the value. See [Token & Cost Control](../g1-proxy/cost-control.md#token-saving-spend-less-without-changing-what-the-model-reads). |
 | `quota` | object | quota exceeded | Plan or budget limit that rejected the request. |
 | `tool_guard` | object | tool guard blocked | MCP/tool-call findings that blocked the request. |
 | `research` | object | `research` events | One web-search progress event. |

@@ -4,6 +4,8 @@ Two of the nine [detection axes](detection-axes.md) answer a commercial question
 one. **`out_of_scope`** refuses off-topic traffic *before* the upstream call, so those tokens are never
 billed. **`prompt_complexity`** routes easy prompts to a cheap model and hard ones to a capable one.
 Both come from the pass you are already paying for — no extra latency, no extra model call.
+A third lever, the **[`token_saving`](#token-saving-spend-less-without-changing-what-the-model-reads)**
+switch, cuts upstream spend without changing what the model reads.
 
 ---
 
@@ -200,6 +202,85 @@ Routing **never fails a request**. If the axis is unavailable — an older check
 
 !!! warning "`prompt_complexity` is not a guardrail"
     Its enforcement mode is `off` and must stay that way. It is a routing boundary, not a risk score — promoting it to `block` would refuse every hard question your users ask.
+
+---
+
+## Token saving — spend less without changing what the model reads
+
+`token_saving` is a platform-wide switch, **off by default**, available in builds after 0.4.2. Turning it on never changes a byte of the
+messages the upstream model receives, and never changes the text your client gets back. It does not
+compress, prune, summarise or reorder anything: every one of those techniques changes the answer.
+
+### Turning it on
+
+```bash
+curl -s -X POST http://localhost:8800/v1/glad/gateway/config \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $GW_API_TOKEN" \
+  -d '{"token_saving": true}'
+```
+
+The change applies to the next request and is saved to `GW_CONFIG_FILE`, so it survives a restart. Send
+`{"token_saving": false}` to turn it off again. The `Authorization` header is needed only when the gateway
+runs with `GW_API_TOKEN` set. Two other ways to set it:
+
+- `GW_TOKEN_SAVING=1` at boot;
+- the **Token saving** checkbox in G-1 Studio under **Settings → Gateway**.
+
+Check the current value:
+
+```bash
+curl -s http://localhost:8800/v1/glad/gateway/config | jq .token_saving
+```
+
+### What it does
+
+| Upstream | Effect |
+|---|---|
+| `openai` | Forwards the client's `prompt_cache_key` and `prompt_cache_retention`. Without the switch the strict OpenAI parameter whitelist drops both. When the client sends no key, the gateway derives a stable one from the Application, the model and the part of the prompt that never changes (tools plus system messages). The key only chooses the machine: requests that share a prefix reach the one that already holds it in cache. |
+| `bedrock` | When Geodesia halts a streamed answer, the connection to Bedrock is closed at once. |
+| `vllm`, `sglang`, `trtllm`, `openai`, `ollama` over `/v1` | When Geodesia halts a streamed answer, the upstream stream is closed explicitly and the event is logged. |
+| all | The final `geodesia` object gains a `token_saving` section (below). |
+
+Two things the switch deliberately leaves out:
+
+- **Azure OpenAI.** It does not document `prompt_cache_key`, and its strict schema rejects unknown fields with a `400`.
+- **Bedrock `cachePoint` markers.** Bedrock bills a cache write at 1.25× the input price, so a prefix that is never read again would cost more, not less.
+
+### Reading the result
+
+```json
+"geodesia": {
+  "decision": "allowed",
+  "token_saving": {
+    "enabled": true,
+    "prompt_tokens": 1500,
+    "cached_prompt_tokens": 1280,
+    "prompt_cache_key": "gateway"
+  }
+}
+```
+
+| Field | When present | Meaning |
+|---|---|---|
+| `enabled` | always | The switch was on for this turn. |
+| `cached_prompt_tokens` | the provider reports it | Prompt tokens served from the provider's prompt cache: OpenAI, vLLM with `--enable-prompt-tokens-details`, Bedrock. The gateway never estimates this value. |
+| `prompt_tokens` | with `cached_prompt_tokens` | Total prompt tokens, so you can compute the hit rate. |
+| `cache_write_prompt_tokens` | Bedrock reports it | Tokens written to the cache on this turn. |
+| `prompt_cache_key` | `openai` upstream | `client` (you sent it) or `gateway` (derived). The key value itself is never returned. |
+| `upstream_closed_early`, `closed_reason` | a mid-stream halt | The upstream was cut off. The reason is `energy barrier` or `system prompt leak`. |
+
+With the switch off the section is absent and the response is byte-identical to earlier releases.
+
+### What it is worth, measured
+
+We measured it with two real gateways, one with the switch on and one with it off, in front of one
+OpenAI-compatible upstream that logs exactly when its connection drops:
+
+- **Identical traffic.** The upstream received the same messages from both gateways. The two payloads differed only by `prompt_cache_key`, and the clients received the same text.
+- **Bedrock is where the saving is real.** Without the switch, a halted stream left the SDK worker reading until its 256-event queue was full, then hanging with the connection open. With a simulated stream at 10 ms per event, the worker read 260 events and never closed without the switch, and read 4 events then closed with it.
+- **Over HTTP the early close did not save tokens.** Python already drops the connection when the handler returns. After a halt the upstream generated the same number of tokens with and without the switch: 12 on a system-prompt leak, 73 on an energy barrier. The switch makes that close deterministic and visible in the log.
+- **The OpenAI hit-rate gain from `prompt_cache_key` depends on your traffic** and was not measured against the live API. Read `cached_prompt_tokens / prompt_tokens` before and after turning the switch on.
 
 ---
 

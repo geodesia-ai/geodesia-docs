@@ -80,6 +80,7 @@ Set these variables when starting the gateway (`python -m uvicorn geodesia_gatew
 | `GW_ADDITIONAL_INLINE` | `0` | `1` also emits the additional axes inside `geodesia.axes` (they still appear in `geodesia.additional_axes`) — a bridge for a client that reads only `axes`. |
 | `GB_EXTRA_AXES` | *(per checkpoint)* | Axes the served head adds on top of the base six, as `name:region,…` (`region ∈ ans\|prompt\|context`). The 9-axis head ships `profanity:prompt,out_of_scope:prompt,prompt_complexity:prompt`. Read by the detector, the gateway, the policy schema and the feedback store from this single source. |
 | `GW_SYSTEM_AS_CONTEXT` | `0` | `1` treats system messages as grounding context for `halluc_context`. Off by default: a system prompt is an instruction, not evidence — it feeds `out_of_scope` instead. Enable only if your deployment ships its knowledge base inside the system message. |
+| `GW_TOKEN_SAVING` | `0` | `1` turns on the `token_saving` switch at boot: saves upstream tokens without changing what the model reads. Also settable live with `POST /v1/glad/gateway/config` `{"token_saving": true}`. See [Token & Cost Control](../g1-proxy/cost-control.md#token-saving-spend-less-without-changing-what-the-model-reads). |
 
 ### Detection Thresholds (Gateway)
 

@@ -111,6 +111,13 @@ every request. Turn it off only if you supply your own system prompt. **Applies 
 Off / PoT / strong / API modes for numeric-reasoning verification. **Applies live** (the model loads lazily
 on the first numeric request; a strong solver may pull a 7B model on first use).
 
+### Token saving
+
+Off by default. When on, the gateway cuts upstream spend without changing what the model reads. It forwards
+or derives `prompt_cache_key` on an OpenAI upstream, closes the upstream stream as soon as a generation is
+halted, and reports cached prompt tokens in `geodesia.token_saving`. **Applies live on Save** and is
+persisted. Details and measurements: [Token & Cost Control](../g1-proxy/cost-control.md#token-saving-spend-less-without-changing-what-the-model-reads).
+
 ### Thinking Levels
 
 A per-request depth dial (`thinking_level` `0`–`3`, `3` = MAX). Which levels this deployment can serve is set
