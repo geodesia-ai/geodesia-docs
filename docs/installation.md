@@ -399,7 +399,7 @@ and `details.method` as hallucination evidence.
 
 **Decision:** `geodesia.decision` is `allowed`, `flagged` (a violation was detected but the answer was
 delivered, e.g. in `passthrough` mode) or `blocked` (withheld). "Was this turn a violation?" is
-`decision != "allowed"`.
+`decision in ("flagged", "blocked")`.
 
 **Detect a block** with `geodesia.decision=="blocked"` (the answer also has
 `choices[0].finish_reason=="content_filter"`). `geodesia.reason.axis` says which axis caused it and

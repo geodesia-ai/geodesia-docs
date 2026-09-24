@@ -88,6 +88,38 @@ schema version changes only when the shape of the `geodesia` object changes.
   (default), `raw_score`, `head_score`, `linear_probe_z` and `logit`. See
   [Explaining a served verdict](../g1-proxy/causal-xai.md#explaining-a-served-verdict-mupax-advanced).
 
+### Realtime tier scores in streaming
+
+- The stream opens at once and every detector tier's scores are sent as soon as that tier has scored:
+  `input_scan` for the prompt (Geodesia-G, then G+H, then G+H+A), `progress` for the answer, each with
+  `thinking.tiers_used`. The first scores no longer wait for the slowest tier or for the model.
+- In `blocking` mode the stream now opens before the prompt verdict is complete (the model is still called only
+  after it).
+
+### Feedback memory per Application
+
+- The episodic memory is **per Application**: each Application's corrections are consulted only for that
+  Application (previously one memory served every Application that had feedback learning on).
+- The feedback API resolves the Application from the **API key** (`Authorization: Bearer g1k_…`): rows of other
+  Applications are invisible (`404`), naming another Application is refused (`403`), no key is `401`. Operators
+  (gateway token) may name any Application or act across all of them.
+- `scores` accepts the schema-1.0 `geodesia` object or its `axes`.
+- When a thinking level is requested but Geodesia-H is unavailable, the verdict now declares
+  `thinking: {level, tiers_used: ["geodesia_g"]}` instead of looking like level 0.
+
+### Scoring bypass and explainability routing
+
+- `scan: false` now reports `decision: "not_scanned"` (no verdict, no `axes`) instead of `allowed`.
+- With `GW_API_TOKEN` set on the gateway, `scan: false` is accepted only from a caller presenting that token
+  (`403` otherwise). Requests relayed by G1-Studio carry it.
+- `/v1/completions` honours `constitutional_ai` and `scan` like `/v1/chat/completions`.
+- G1-Studio forwards `/v1/glad/causal-explainability/analyze` and `/v1/glad/causal-explainability/verdict/*` to
+  the gateway (they previously reached the control plane, which has no detector, and answered
+  `400 No model path configured`).
+- The watermark HMAC key is no longer derived from the database path: it comes from `GLAD_WATERMARK_SECRET` or a
+  random key created once next to the database (`watermark.key`, mode 0600). Watermarks issued earlier still
+  verify when the identifier is in the watermark log.
+
 ### Security fix
 
 - **System-prompt leak axis.** When the `sysprompt_leak` axis detects that an answer reproduces the protected

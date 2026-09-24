@@ -149,7 +149,7 @@ With `"mode": "passthrough"` the real answer is returned and the violation is re
 |---|---|---|---|
 | `schema_version` | string | always | Version of this schema (`"1.0"`). Always the first key. |
 | `event` | string | always | What this object reports: `final`, `input_scan`, `progress` or `research`. See [Streaming](#streaming). |
-| `decision` | string | `final` only | `allowed`, `flagged` or `blocked`. See [Decision](#decision). |
+| `decision` | string | `final` only | `allowed`, `flagged`, `blocked` or `not_scanned`. See [Decision](#decision). |
 | `mode` | string | `final` only | Enforcement mode applied to this request: `blocking` or `passthrough`. |
 | `reason` | object \| null | `final` only | Why the decision is not `allowed`; `null` when it is. See [Reason](#reason). |
 | `axes` | object | when scored | Primary detection axes, keyed by axis name. See [Axis object](#axis-object). |
@@ -176,8 +176,9 @@ Optional sections are **omitted** when they do not apply; they are never sent as
 | `allowed` | yes | No enforcing axis flagged. |
 | `flagged` | yes | A policy violation was detected but the content was delivered: the request ran in `passthrough` mode, or (streaming) the violation was found only after the answer had been streamed. |
 | `blocked` | no | Content was withheld. `finish_reason` is `content_filter` and the message carries a `[Geodesia blocked — …]` notice. |
+| `not_scanned` | yes | Scoring was switched off for this request (`scan: false`, or input and output validation disabled in the deployment). There is no verdict: `reason` is `null` and no `axes` are reported. |
 
-A client that only needs "was this turn a violation?" can test `decision != "allowed"`.
+A client that only needs "was this turn a violation?" can test `decision in ("flagged", "blocked")`.
 
 ## Reason
 
@@ -354,14 +355,18 @@ With `"stream": true` the response is a sequence of SSE chunks. Each chunk that 
 
 | `event` | When | Contains |
 |---|---|---|
-| `input_scan` | As soon as the prompt is scored (before or while the answer streams) | `axes` / `additional_axes` for the prompt axes. No decision. |
+| `input_scan` | As soon as a detector tier has scored the prompt — once per tier (before or while the answer streams) | `axes` / `additional_axes` for the prompt axes, `thinking.tiers_used` so far. No decision. |
 | `research` | Web search only, before the answer | `research`: one progress event (`search_started`, `page_found`, `page_read`, `page_blocked`, `page_skipped`, `search_done`, `search_error`). `page_read` / `page_blocked` carry `axes: {<axis>: {score, threshold, flagged}}`; `page_blocked` also `reason` and `axis` (the deciding axis). |
-| `progress` | Periodic re-scoring during generation | `axes` with the current scores. No decision. |
+| `progress` | Periodic re-scoring during generation, and once per tier while the finished answer is scored | `axes` with the current scores (`thinking.tiers_used` on per-tier events). No decision. |
 | `final` | Last chunk (with `finish_reason`) | The complete verdict, same shape as the non-streaming object. |
 
 Rules for clients:
 
-- Take the verdict **only** from the `final` event. `input_scan` and `progress` are informational.
+
+**Realtime tier scores.** At thinking level ≥ 1 the prompt is scored by several detector tiers in sequence (Geodesia-G, then Geodesia-H, then Geodesia-A). The stream opens immediately and sends one `input_scan` per tier as soon as that tier has scored — Geodesia-G typically within tens of milliseconds, before the slower tiers and before the model's first token. Each `input_scan` carries `thinking: {level, tiers_used}` and **replaces** the previous one; the last one lists every tier that contributed. The same happens on the answer: one `progress` event per tier before `final`. In `blocking` mode the model is called only after the complete prompt verdict; in `passthrough` mode answer tokens and tier scores interleave.
+
+- Take the verdict **only** from the `final` event. `input_scan` and `progress` are informational; a later one
+  supersedes an earlier one.
 - If the answer is halted mid-stream, the `final` event has `decision: "blocked"`, `reason.stage: "output"` and the
   chunk's `finish_reason` is `content_filter`.
 - A violation found after the answer was fully streamed is reported as `decision: "flagged"` (the text was already
@@ -395,7 +400,7 @@ Geodesia-specific request fields (all optional, never forwarded to the upstream 
 | `context` | string | Grounding document for `halluc_context` (also injected into the upstream prompt). |
 | `rag` | object | `{ "collection_id": "…" }` — retrieve context from a knowledge base. |
 | `pii_guard` | boolean | Turn the PII guard on/off for this request. |
-| `scan` | boolean | `false` bypasses all scoring for this request (internal tools only). |
+| `scan` | boolean | `false` bypasses all scoring and blocking for this request; the response carries `decision: "not_scanned"`. When the gateway has `GW_API_TOKEN` set, only a caller presenting that token may do this (others get `403`); requests relayed by G1-Studio carry it. Never let application code set it from user input. |
 | `axes` | array \| string | Restrict the reported axes. Enforcing axes are always scored. |
 | `threshold_overrides` | object | Per-axis thresholds, e.g. `{ "jailbreak": 0.9 }`. |
 | `domain` | string | Closed-book calibration domain (`general`, `legal`, …). |

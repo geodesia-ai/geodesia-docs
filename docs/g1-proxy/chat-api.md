@@ -165,7 +165,7 @@ An axis that could not be measured on this turn reports `available: false` and `
 }
 ```
 
-(Other axes omitted for brevity; a real response lists every axis the deployment serves.) In `passthrough` mode the same request returns the real answer with `decision: "flagged"` and the same `reason`. A client that only needs "was this turn a violation?" can test `decision != "allowed"`.
+(Other axes omitted for brevity; a real response lists every axis the deployment serves.) In `passthrough` mode the same request returns the real answer with `decision: "flagged"` and the same `reason`. A client that only needs "was this turn a violation?" can test `decision in ("flagged", "blocked")`.
 
 !!! warning "`out_of_scope` stays silent without a declared scope"
     "Off topic" is undefined until something says what the topic *is*. Send the Application's purpose as a `system` message, or set `policy.scope` once per Application, or that axis will score near zero on everything — see [Detection Axes](detection-axes.md#out_of_scope-off-topic-out-of-scope).
@@ -206,7 +206,7 @@ Recognised by the proxy and **never** forwarded to the upstream.
 | `pass_extra` | `integer` | `1` | Extra answer samples for closed-book uncertainty. Only applied when the upstream exposes log-probabilities and the turn has no explicit context. Each extra sample costs another generation. |
 | `self_consistency` | `boolean` | `false` | Shorthand for `pass_extra > 1`. |
 | `self_consistency_samples` | `integer` | — | How many extra samples when `self_consistency` is on. |
-| `scan` | `boolean` | `true` | Set to `false` to **bypass detection entirely** for this request — pure pass-through to the upstream, no scoring, no blocking. |
+| `scan` | `boolean` | `true` | Set to `false` to **bypass detection entirely** for this request — pure pass-through to the upstream, no scoring, no blocking; the response carries `decision: "not_scanned"`. With `GW_API_TOKEN` set on the gateway, only a caller presenting that token may do it (`403` otherwise). |
 | `pii_guard` | `boolean` | *(config)* | Per-request override of PII redaction. When the guard is on, the response carries `geodesia.pii` (counts per entity type, never the values). |
 | `enable_judge_for_context_hallucination` | `boolean` | `false` | Run the per-claim context judge on this turn; the result appears as `geodesia.context_judge` (advisory, uncalibrated). Costs extra GPU seconds. |
 | `constitutional_ai` | `boolean` | *(config)* | Per-request override of the constitutional system prompt. Wins over the deployment config and the Application policy. |
@@ -218,7 +218,7 @@ Recognised by the proxy and **never** forwarded to the upstream.
     The `glad_mode`, `glad_thinking_level`, `glad_scan`, `glad_pii_guard`, `glad_axes` and `glad_enable_judge_for_context_hallucination` aliases are no longer recognised. Use the unprefixed names above. See [Migrating from the pre-1.0 payload](../reference/response-format.md#migrating-from-the-pre-10-payload).
 
 !!! danger "`scan: false` turns the guardrail off"
-    It is there for health checks and for replaying traffic you have already scored. A request served with `scan: false` is not screened, not scored and not blocked — and the response carries no verdict. Do not let application code set it from user input.
+    It is there for health checks, for replaying traffic you have already scored and for generating explanations of a block (the explanation quotes the blocked words and would otherwise be blocked again). A request served with `scan: false` is not screened, not scored and not blocked, and reports `decision: "not_scanned"`. Set `GW_API_TOKEN` so that only operator-side callers can use it, and never let application code set it from user input.
 
 ### How an Application is resolved
 
@@ -297,10 +297,13 @@ Every chunk that carries Geodesia information has a `geodesia` object whose `eve
 
 | `event` | When | Contains |
 |---|---|---|
-| `input_scan` | First, on an empty-delta chunk, as soon as the prompt is scored | `axes` / `additional_axes` for the prompt axes (`prompt_safety`, `jailbreak`, …) — so you can show safety status before the first answer token. No decision. |
+| `input_scan` | On empty-delta chunks, once per detector tier as soon as it has scored the prompt (Geodesia-G first, then H, then A) | `axes` / `additional_axes` for the prompt axes (`prompt_safety`, `jailbreak`, …) and `thinking.tiers_used` so far — so you can show safety status before the first answer token. Each one replaces the previous. No decision. |
 | `research` | Web search only, before the answer | `research`: one progress event. See [Live Web Search](web-search.md). |
-| `progress` | Periodic re-scoring during generation | `axes` with the current scores. No decision. |
+| `progress` | Periodic re-scoring during generation, and once per tier while the finished answer is scored | `axes` with the current scores. No decision. |
 | `final` | Last chunk, the one with `finish_reason` | The complete verdict — same shape as the non-streaming `geodesia` object. |
+
+
+**Realtime tier scores.** At thinking level ≥ 1 the prompt is scored by several detector tiers in sequence (Geodesia-G, then Geodesia-H, then Geodesia-A). The stream opens immediately and sends one `input_scan` per tier as soon as that tier has scored — Geodesia-G typically within tens of milliseconds, before the slower tiers and before the model's first token. Each `input_scan` carries `thinking: {level, tiers_used}` and **replaces** the previous one; the last one lists every tier that contributed. The same happens on the answer: one `progress` event per tier before `final`. In `blocking` mode the model is called only after the complete prompt verdict; in `passthrough` mode answer tokens and tier scores interleave.
 
 Take the verdict **only** from the `final` event; `input_scan` and `progress` are informational. A violation found after the answer has already been fully streamed is reported as `decision: "flagged"`, because the text was already delivered.
 

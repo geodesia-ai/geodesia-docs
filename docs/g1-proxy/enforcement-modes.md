@@ -125,11 +125,11 @@ Passthrough is useful when:
 
 Key distinction: `decision` is `"flagged"` (an enforcing axis fired, but the content was delivered) and `mode` is
 `"passthrough"`. In blocking mode the same turn would report `"blocked"` and withhold the answer. To ask "was this
-turn a violation?" regardless of mode, test `geodesia.decision != "allowed"`:
+turn a violation?" regardless of mode, test `geodesia.decision in ("flagged", "blocked")`:
 
 ```python
 g = resp["geodesia"]
-if g["decision"] != "allowed":
+if g["decision"] in ("flagged", "blocked"):
     print("violation on", g["reason"]["stage"], "axis", g["reason"]["axis"])
 ```
 

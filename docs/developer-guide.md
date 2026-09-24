@@ -143,7 +143,7 @@ holds the verdict and the per-axis detector output (schema 1.0). The full field 
 
 `decision` has three values: `allowed` (no enforcing axis flagged), `flagged` (a violation was detected but the
 content was delivered, e.g. in `passthrough` mode) and `blocked` (the content was withheld). To ask "was this
-turn a violation?", test `decision != "allowed"`.
+turn a violation?", test `decision in ("flagged", "blocked")`.
 
 ### The 9 axes (`geodesia.axes` + `geodesia.additional_axes`)
 

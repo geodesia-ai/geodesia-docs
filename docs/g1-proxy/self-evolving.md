@@ -81,7 +81,34 @@ can audit or revoke the whole set in one move.
 
 ## REST API
 
-All routes are mounted under **`/v1/glad/feedback`** on **G1-Proxy** — reached as `/gw/v1/glad/feedback/…` through the unified port. The Application is resolved from `application_id` in the body/query or the `X-Geodesia-App` header (default `default`).
+All routes are mounted under **`/v1/glad/feedback`** on **G1-Proxy** and **G1-Proxy Light** — reached as `/gw/v1/glad/feedback/…` through the unified port.
+
+**One memory per Application.** Every flag, every approval and the episodic memory built from them belong to one Application, and a correction made for one Application never changes the verdicts of another.
+
+**The API key decides the Application.** Send the Application's key — `Authorization: Bearer g1k_live_…`, the same key you use for chat. The flag is stored under that Application; list, stats, export, review and delete only see that Application's rows (another Application's row answers `404`); naming a different Application answers `403`; a request with no key answers `401`. An **operator** — a caller holding the gateway token `GW_API_TOKEN` (G1-Studio injects it when it relays), or any caller when the gateway has no token configured — may instead name the Application with `X-Geodesia-App` / `application_id`, or omit it to act across all Applications (the curator queue). Changing the idle-judge configuration and `retrain` with `mode: "weights"` (new weights affect every Application) are operator-only.
+
+### Mark a false positive and approve it in one call
+
+With `GW_FEEDBACK_AUTOAPPROVE=on` on the gateway, a flag that names its axis goes **straight into the Application's memory** — `status: "approved"` in the response. Take the axis from the served verdict (`geodesia.reason.axis`) and the region from `geodesia.reason.stage` (`input` → `prompt`, `output` → `answer`):
+
+```bash
+curl -s http://localhost:8080/gw/v1/glad/feedback \
+  -H "Authorization: Bearer g1k_live_…" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "region":  "prompt",
+    "problem": "wrongly_blocked",
+    "axis":    "jailbreak",
+    "verdict": "false_positive",
+    "prompt":  "how do I kill a stuck process on linux",
+    "message_id": "chatcmpl-geodesia-1790241680395",
+    "scores":  { "axes": { "jailbreak": { "score": 0.99 } } }
+  }'
+# → {"feedback_id": "fb_…", "status": "approved", "axis": "jailbreak", "verdict": "false_positive",
+#    "application_id": "<the key's Application>", …}
+```
+
+Without auto-approval the row is `pending`: approve it with [`/review`](#review-a-flag-curator). The correction is used at scoring time only when the Application has **Learn from feedback** on (policy `feedback_learning: true`) or the gateway runs with `GW_FEEDBACK_BANK=on`; `GET /v1/glad/feedback/bank/status` reports the Application's approved count.
 
 ### Create a flag
 
@@ -92,7 +119,7 @@ All routes are mounted under **`/v1/glad/feedback`** on **G1-Proxy** — reached
     ```bash
     curl -s http://localhost:8080/gw/v1/glad/feedback \
       -H "Content-Type: application/json" \
-      -H "X-Geodesia-App: acme" \
+      -H "Authorization: Bearer g1k_live_…" \
       -d '{
         "region":     "answer",
         "problem":    "fabricated",
@@ -110,7 +137,7 @@ All routes are mounted under **`/v1/glad/feedback`** on **G1-Proxy** — reached
     import httpx
 
     c = httpx.Client(base_url="http://localhost:8080/gw",
-                     headers={"X-Geodesia-App": "acme"}, timeout=30)
+                     headers={"Authorization": "Bearer g1k_live_…"}, timeout=30)
 
     # Read the vocabulary instead of hard-coding it — axes can be added per deployment.
     schema = c.get("/v1/glad/feedback/schema").json()
@@ -130,7 +157,7 @@ All routes are mounted under **`/v1/glad/feedback`** on **G1-Proxy** — reached
 === "TypeScript"
 
     ```ts
-    const H = { "Content-Type": "application/json", "X-Geodesia-App": "acme" }
+    const H = { "Content-Type": "application/json", "Authorization": "Bearer g1k_live_…" }
     const base = "http://localhost:8080/gw"
 
     const schema = await fetch(`${base}/v1/glad/feedback/schema`, { headers: H }).then(r => r.json())
@@ -164,8 +191,8 @@ All routes are mounted under **`/v1/glad/feedback`** on **G1-Proxy** — reached
 | `note` | `string` | — | Free text for the curator. |
 | `prompt` / `context` / `answer` | `string` | — | The turn itself. Supply them so the correction can be replayed and, later, trained on. |
 | `message_id` / `session_id` | `string` | — | Link back to the served turn. |
-| `application_id` | `string` | — | Same as the `X-Geodesia-App` header. |
-| `scores` | `object` | — | The detection payload the turn was served with, so the curator sees what the detector thought at the time. |
+| `application_id` | `string` | — | Operators only (callers without an application key). With a key it must match the key's Application, or the request is refused (`403`). |
+| `scores` | `object` | — | The turn's `geodesia` object or its `axes` (schema 1.0), so the curator sees what the detector thought and an unnamed axis can be resolved. |
 
 !!! tip "Read `/schema`, don't hard-code axes"
     `GET /v1/glad/feedback/schema` returns `{axes, prompt_axes, answer_axes, problems, problem_to_axis, verdicts, regions}`. A deployment can ship extra axes; a client that reads the schema keeps working, one with a hard-coded list quietly drops them.
@@ -178,6 +205,7 @@ All routes are mounted under **`/v1/glad/feedback`** on **G1-Proxy** — reached
 
     ```bash
     curl -s http://localhost:8080/gw/v1/glad/feedback/fb_9c1f2a7b4e0d6a18/review \
+      -H "Authorization: Bearer g1k_live_…" \
       -H "Content-Type: application/json" \
       -d '{
         "status":   "approved",
@@ -286,12 +314,12 @@ All routes are mounted under **`/v1/glad/feedback`** on **G1-Proxy** — reached
 |---|---|---|
 | `GET` | `/v1/glad/feedback/schema` | Axis vocabulary + plain-language `problem → axis` map. |
 | `POST` | `/v1/glad/feedback` | Create a flag. |
-| `GET` | `/v1/glad/feedback` | List / filter the queue: `status`, `application_id`, `axis`, `region`, `limit` (≤ 1000), `offset`. |
+| `GET` | `/v1/glad/feedback` | List / filter the queue: `status`, `axis`, `region`, `limit` (≤ 1000), `offset`; `application_id` for operators. Scoped to the key's Application. |
 | `GET` | `/v1/glad/feedback/stats` | Pending / approved / rejected / total counts. |
 | `POST` | `/v1/glad/feedback/{id}/review` | Curator action. |
 | `DELETE` | `/v1/glad/feedback/{id}` | Drop a row. |
 | `GET` | `/v1/glad/feedback/export` | The decided corpus as JSONL. Defaults to `status=approved`. |
-| `GET` | `/v1/glad/feedback/bank/status` | Exemplar-bank version + approved count. |
+| `GET` | `/v1/glad/feedback/bank/status` | The Application's memory: `application_id`, `bank_version`, approved count. |
 | `POST` | `/v1/glad/feedback/retrain` | `{mode: "memory" \| "weights", application_id?}`. |
 | `GET` | `/v1/glad/feedback/retrain/status?job_id=…` | Job state + log tail. |
 | `GET` | `/v1/glad/feedback/retrain/jobs` | All re-train jobs. |
@@ -418,6 +446,8 @@ The review form also accepts a **benign twin** — a superficially similar but h
 ## 3. The fast loop — episodic memory
 
 The approved corpus becomes a live, **non-parametric memory** consulted at scoring time. It is **opt-in and off by default**: with it disabled, no bank is built or consulted and detection is **byte-identical**.
+
+Each Application has **its own memory**, built only from its own approved rows: a request is scored against the memory of the Application its API key (or `X-Geodesia-App` from an operator) resolves to.
 
 At scoring time the detector embeds the current input onto its manifold and compares it with the stored exemplars for the axes of that region:
 
