@@ -17,6 +17,19 @@
 
 The platform is now **Application-oriented** — with **G-1 Studio**, one shared LLM and G1-Hummingbird detector can serve many isolated Applications, each with its own policy, thresholds, RAG collection, compliance posture, and cost center.
 
+!!! tip "What's new in 1.0 (current release: 1.0.10)"
+    - **[G1 Eval](g1-proxy/eval.md)** — score a prompt, context and answer you already have, with no LLM call
+      (`POST /g1/eval`), plus OpenRouter-compatible façades, a local call log and an Eval page in the UI.
+    - **Grounding you can read** — `halluc_context` by a dedicated grounding reader, explained down to the clause
+      and the word ([Causal Explainability](g1-proxy/causal-xai.md)).
+    - **Reference check** — opt-in verification of every link, DOI and citation in an answer
+      ([Response Format](reference/response-format.md#reference-check)).
+    - **Thinking levels 0–3 everywhere**, including the single-container [G1-Proxy Light](g1-proxy/light.md);
+      sliding windows on every tier for long texts; a conversation window against multi-turn attacks.
+    - **System-prompt protection** that lets documents be quoted but keeps instructions and secrets in, also in
+      streaming.
+    - Full list in the [Release Notes](reference/release-notes.md).
+
 You do not need to retrain your model. You do not need to change your application code. You plug Geodesia G-1 in, and your LLM immediately gains:
 
 - **Hallucination detection** — independent, separately calibrated signals that tell you whether the model's answer is grounded in the provided context or is a fabrication.

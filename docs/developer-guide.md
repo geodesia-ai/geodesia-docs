@@ -117,7 +117,7 @@ it is not a hard auth wall unless you put one in front (nginx/Cloudflare).
 ## 4. Read the (non-streaming) response
 
 The body is a normal OpenAI `chat.completion` **plus** exactly one extra top-level key, `geodesia`, which
-holds the verdict and the per-axis detector output (schema 1.0). The full field reference is in
+holds the verdict and the per-axis detector output (schema 1.1). The full field reference is in
 [Response Format](reference/response-format.md).
 
 ```json
@@ -128,7 +128,7 @@ holds the verdict and the per-axis detector output (schema 1.0). The full field 
   "usage": { "prompt_tokens": 1826, "completion_tokens": 23, "total_tokens": 1849 },
 
   "geodesia": {
-    "schema_version": "1.0",
+    "schema_version": "1.1",
     "event": "final",
     "decision": "allowed",          // "allowed" | "flagged" | "blocked"  ← the headline verdict
     "mode": "blocking",             // "blocking" = it may withhold; "passthrough" = report only
@@ -201,18 +201,16 @@ that decided. Classifier axes (`prompt_complexity`) also carry a `label` (`simpl
   `token_surprisal[]` — per-token generator surprisal `{index, text, surprisal, start, end}`. Use these to
   highlight which answer tokens look fabricated.
 
-### If an input guard recovered an attack
+### If the decode guard recovered an attack
 
-When the dilution guard (`GW_DILUTION_GUARD=shadow|enforce`) or the decode guard recovers a camouflaged,
-diluted or encoded attack that slipped the pooled head, the affected prompt axis reports it in `details`:
+When the decode guard recovers an encoded or obfuscated attack that slipped the pooled head, the affected prompt axis reports it in `details`:
 
 ```json
 "jailbreak": { "score": 0.919, "threshold": 0.9864, "flagged": true, "available": true, "role": "enforce",
-               "details": { "pooled_score": 0.114, "recovered_by": "dilution_guard" } }
+               "details": { "pooled_score": 0.114, "recovered_by": "decode_guard" } }
 ```
 
-`pooled_score` is the whole-prompt score before the guard; `recovered_by` is `dilution_guard` or
-`decode_guard`.
+`pooled_score` is the whole-prompt score before the guard; `recovered_by` is `decode_guard`.
 
 ---
 
@@ -231,7 +229,7 @@ curl -s http://127.0.0.1:8800/v1/chat/completions \
   "choices": [{ "message": { "role": "assistant", "content": "[Geodesia blocked — jailbreak (input)]" },
                 "finish_reason": "content_filter" }],   // ← the tell: content_filter
   "geodesia": {
-    "schema_version": "1.0",
+    "schema_version": "1.1",
     "event": "final",
     "decision": "blocked",
     "mode": "blocking",

@@ -45,6 +45,25 @@ All four accept the same [Geodesia extension fields](chat-api.md#geodesia-extens
 
 ---
 
+## G1 Eval (evaluation only)
+
+Score a prompt, a context and an answer you already have. **No LLM call**: the same pipeline as `/v1/chat/completions` runs on the `default` Application with your `answer` in place of the LLM's reply. Full guide: [G1 Eval](eval.md).
+
+| Method | Path | | What it does |
+|---|---|---|---|
+| `POST` | `/g1/eval` | | Body `{prompt?, context?, answer?, answer_2?, thinking_level?, verify_references?, reference_relevance_threshold?, session_id?}`. The axes follow the fields you fill. Returns `{schema_version: "g1-eval-1.0", product, decision, flagged_axes, advisory_flags, inputs, thinking_level, axes, context_axes?, reference_check?, latency_ms}`. `422 nothing_to_evaluate` without `prompt` or `answer`. |
+| `GET` | `/g1/eval/stats` | 🔑 | Statistics of the local call log. `?since=` (UTC, e.g. `2026-11-01`). |
+| `GET` | `/g1/eval/export` | 🔑 | The call log as NDJSON. `?since=&limit=`. |
+| `GET` | `/g1/v1/models` | | Model card of the evaluator (`geodesia/g1-eval`). |
+| `POST` | `/g1/v1/chat/completions` | 🗝 | OpenAI-compatible façade: `messages` mapped onto prompt / context / answer, the evaluation JSON in `choices[0].message.content`. Supports `stream`. |
+| `POST` | `/g1/v1/systemone` | 🗝 | Decisions API: one `noul` question per axis, `noul` re-centred so that `0.5` is the axis threshold. |
+| `POST` | `/g1/api/alpha/decisions` | 🗝 | Same Decisions contract on the alpha path. |
+
+🔑 = `Authorization: Bearer <GW_EVAL_EXPORT_TOKEN>` (or `X-Export-Token`); `403 export_disabled` while that variable is unset, `401` on a wrong token. This is its own token — not `GW_API_TOKEN`, not the licence token.
+🗝 = `Authorization: Bearer <key>` from `GW_EVAL_API_KEYS` when that variable is set; open otherwise. Above `GW_EVAL_MAX_CONCURRENCY` concurrent evaluations these answer an immediate `429`.
+
+---
+
 ## Status & health
 
 | Method | Path | Returns |
@@ -143,6 +162,7 @@ See [Audio Input](audio-input.md).
 
 | Method | Path | | What it does |
 |---|---|---|---|
+| `POST` | `/v1/glad/causal-explainability/halluc-clauses` | 🔒 | `halluc_context` explained **by clause**: body `{context, answer, prompt?}` → `{row_score, row_flagged, threshold, regime, clauses: [{text, start, end, score, flagged, evidence}], n_clauses}`. Each clause is scored against the same threshold as the row, with the closest context sentence as `evidence`. `422` without both context and answer. See [G1 Eval](eval.md#in-the-ui). |
 | `POST` | `/v1/glad/causal-explainability/analyze` | 🔒 | Black-box token attribution over the detector — no upstream-model internals, no gradients. Body: `{prompt, response\|full_response, context?, method?, axis?}`. `422` when neither prompt nor context is given, or when `response` is missing for any method other than `dca_dual`. |
 | `GET` | `/v1/glad/causal-explainability/verdict/oracles` | 🔒 | Models whose verdict can be explained (`g1` plus any guard declared server-side) and the supported `unit_schemes`. |
 | `POST` | `/v1/glad/causal-explainability/verdict/jobs` | 🔒 | **MuPAX Advanced** — start an asynchronous explanation of the *whole* G1 verdict (decision, reason and every axis) by replaying it at level 0. Returns `202` with the job. See [Explaining a served verdict](causal-xai.md#explaining-a-served-verdict-mupax-advanced). |
@@ -157,6 +177,8 @@ See [Audio Input](audio-input.md).
 | `mupax_causal` | Monte-Carlo MuPAX. Accepts `mupax_samples`. | up to several minutes |
 
 Pass `axis` to pin the heatmap to one axis; omit it and the attributor picks the dominant flagged axis itself. Full treatment: [Causal Explainability](causal-xai.md).
+
+With `axis: "halluc_context"` and both a context and an answer, `dca`, `gradient_causal`, `occlusion` and `mupax_causal` explain the grounding verdict **from clause to word**: the grounding reader marks the unsupported clauses, then removes one word at a time inside them to weigh each word, and `causal_edges` link those words to the closest context sentence (`xai.method: "spark_clause_word"`). `GW_XAI_HALLUC_SPARK=0` turns this off and restores the previous attribution (the LLM judge, when enabled).
 
 ---
 

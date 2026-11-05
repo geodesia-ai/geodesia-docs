@@ -13,8 +13,9 @@ the same LLM share one automatically.
 ## The one prerequisite
 
 The upstream must return **per-token logprobs** on the OpenAI-compatible endpoint. Studio shows this as
-**closed-book available** next to the connection test. Without it the axis runs text-head-only and says
-so — it does not silently pretend.
+**closed-book available** next to the connection test. Without them the axis reports `available: false`
+("upstream does not expose per-token logprobs") — it does not silently pretend. Two routes still measure it
+without logprobs; see [Without generator logprobs](#without-generator-logprobs).
 
 ---
 
@@ -31,8 +32,9 @@ upstream gives you.
 | **SLEDGE-Next v2** | `fork,prem2,nli` | 71 | same, with the **v2** premise block |
 
 !!! note "Versions"
-    SLEDGE-logprobs ships with the first release after 0.4.2. Up to 0.4.2, an upstream without
-    `prompt_logprobs` gets **classic (fork)** as its default.
+    SLEDGE-logprobs ships since 0.4.3 (up to 0.4.2 an upstream without `prompt_logprobs` got **classic
+    (fork)**). Since 1.0.3.1 the premise blocks also work on Ollama, by forcing (below). Since 1.0.8 the
+    default is **SLEDGE-Next**; SLEDGE-Next v2 stays selectable.
 
 **The `fork` block** reads information the gateway already pays for and nobody used: the top-20
 alternatives come back as (string, logprob) pairs, and the strings were being thrown away. Reading them
@@ -67,11 +69,18 @@ So an upstream can show **closed-book available** and still have no `prompt_logp
 contradiction: the first badge is about the answer, the second capability is about the question. A
 server that does not know the field simply ignores it — no error, just nothing in the response.
 
+**Premise by forcing (Ollama).** Ollama does not return `prompt_logprobs`, but it can score a given text:
+the gateway reads the question token by token through the raw generate endpoint with `top_logprobs`
+(teacher forcing — one short call per question token). At start-up it probes whether the upstream supports
+this, and records it next to the capability (`premise_fallback: "teacher-forced"`). When it works, the premise
+blocks are real on Ollama too.
+
 **G-1 picks the default from what it detects:**
 
-* `prompt_logprobs` **available** → **SLEDGE-Next v2**, because the premise block can be computed;
-* **not available** → **SLEDGE-logprobs**: the `fork` and `nli` blocks, fitted **without** the premise
-  columns. This is the default for OpenAI, Ollama and most hosted APIs.
+* `prompt_logprobs` **available**, or the premise readable **by forcing** → **SLEDGE-Next** (`fork,prem,nli`).
+  SLEDGE-Next v2 (`fork,prem2,nli`) is offered next to it in the calibration panel;
+* **neither** → **SLEDGE-logprobs**: the `fork` and `nli` blocks, fitted **without** the premise columns. This
+  is the default for OpenAI and most hosted APIs.
 
 When the probe finds no `prompt_logprobs`, this default wins even over the detector currently served.
 The reason is that a SLEDGE-Next artifact served against such an upstream runs with its premise columns
@@ -80,17 +89,23 @@ false-positive budget. But every other weight was fitted next to a live premise 
 worse than a detector fitted on the blocks it can actually see. Until the probe has run, the served
 detector decides.
 
-!!! tip "Serving the same model on vLLM is the whole fix"
-    If you need v2 and your upstream is Ollama or OpenAI, serve the model with **vLLM**. The gateway
-    detects `prompt_logprobs` at start-up and moves the default to SLEDGE-Next v2 on its own — nothing
-    to configure. `GW_SLEDGE_BLOCKS` overrides the choice if you want to force it, for example
-    `GW_SLEDGE_BLOCKS=fork,nli` for SLEDGE-logprobs.
+!!! tip "Forcing a generation"
+    `GW_SLEDGE_BLOCKS` overrides the choice, for example `GW_SLEDGE_BLOCKS=fork,prem2,nli` for SLEDGE-Next v2
+    or `GW_SLEDGE_BLOCKS=fork,nli` for SLEDGE-logprobs. `GW_SLEDGE_UI_BLOCKS` changes only what the calibration
+    panel proposes. If your upstream is a hosted API with neither capability, serving the same model with
+    **vLLM** (or Ollama) makes the premise blocks available — the gateway detects it at start-up, nothing to
+    configure.
 
 ---
 
 ## Running a calibration
 
 Studio → the application → **SLEDGE closed-book calibration**.
+
+The model is queried with **reasoning switched off** (`reasoning_effort: "none"` and
+`chat_template_kwargs.enable_thinking: false`; a provider that rejects one of the two parameters is retried
+without it). A thinking model otherwise spends its tokens reasoning and the calibration corpus fills with
+truncated answers. `CBSG_THINKING=on` restores the old behaviour.
 
 **Fast** is the mode you want. It reuses a baked base detector and refits only the conformal threshold,
 in minutes. **Deep** retrains the detector itself and needs roughly four times the generated corpus.
@@ -125,6 +140,19 @@ threshold nobody could trust.
 A calibrated head is offered to a **public, signed catalog**, so the next deployment of the same model
 against the same detector head downloads it instead of paying for its own generations.
 
+**Browsing it.** The calibration panel lists what the catalog holds **for the detector head this deployment
+serves** — model, generation, blocks, mode, measured false-positive rate, publication date — marks the entry
+that matches the served model and the ones already installed, and installs an entry with one click, without
+calibrating. The same is available on the API:
+
+| Method | Path | What it does |
+|---|---|---|
+| `GET` | `/v1/glad/sledge/catalog` | `{enabled, url, head_sha, served_model, entries[{model, generation, blocks, mode, published_at, measured_fpr, n_faithful, matches_served_model, installed}]}` |
+| `POST` | `/v1/glad/sledge/catalog/install` | Body `{model}`. Downloads and verifies the artifact, registers it, and reports whether it is now active for the served model. `404` if the model is not published for this head, `409` if the catalog is disabled, `502` if the signature, head or download fails. |
+
+Installed artifacts are written next to the served registry (on G1-Proxy Light, the data volume), so they
+survive an image update.
+
 On start-up the gateway looks the model up and downloads only if something is there — and refuses an
 artifact whose signature does not verify, or that was calibrated against a **different detector head**.
 A `.pkl` is executable code; it never reaches disk on a bad signature.
@@ -134,6 +162,32 @@ the upstream. When `prompt_logprobs` is available the order is classic < SLEDGE-
 SLEDGE-Next v2. When it is not, the two SLEDGE-Next generations drop below SLEDGE-logprobs, so a
 SLEDGE-Next v2 in the catalog never replaces a SLEDGE-logprobs artifact on such an upstream. A generation
 the gateway does not recognise is never downloaded and never overwritten.
+
+---
+
+## Without generator logprobs
+
+Many hosted APIs return no logprobs at all. Two routes still put a number on `halluc_closedbook`:
+
+**Reference check** (chat API, MCP, G1 Eval). With `verify_references: true`, the links, DOIs, arXiv and PubMed
+ids and citations in the answer are verified on open sources. A reference that does not exist, points to another
+work or is not pertinent makes the axis available and flags it (`details.method: "reference_check"`). See
+[Reference check](../reference/response-format.md#reference-check).
+
+**A second answer** ([G1 Eval](eval.md)). Send `answer_2` — a second, independent answer of the same model to the
+same question — next to `answer`, with no context. The axis is then measured from two readings:
+
+- **consistency between the two answers**: a multilingual NLI model checks, clause by clause, whether each answer
+  entails the other, where they contradict each other, and which figures and names appear in one only. A model
+  that knows the fact says the same thing twice; a model that invents usually does not;
+- **borrowed logprobs**: the grounding model already loaded for `halluc_context` re-reads the question and the
+  answer and supplies the per-token probabilities the upstream did not, on which the same SLEDGE feature
+  functions are computed.
+
+A logistic head over both readings, with a conformal threshold, gives the score; `details.clauses` lists the
+clauses that contradict the other answer most. It ships with one calibration (named in
+`details.calibrated_on`) and needs no per-model SLEDGE artifact. The NLI model loads on the first request that
+carries `answer_2`.
 
 ---
 

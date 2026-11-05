@@ -153,6 +153,7 @@ nav:
     - Upstream Backends: g1-proxy/backends.md
     - Framework Compatibility: g1-proxy/compatibility.md
     - Chat API: g1-proxy/chat-api.md
+    - G1 Eval: g1-proxy/eval.md
     - Audio Input (Realtime Voice): g1-proxy/audio-input.md
     - Enforcement Modes: g1-proxy/enforcement-modes.md
     - Detection Axes: g1-proxy/detection-axes.md

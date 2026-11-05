@@ -1,9 +1,18 @@
 # Licensing & Entitlements
 
 Everything is unlocked enough to evaluate end to end; the rest sits behind a **vendor-signed licence**.
-There is no licence server to call and nothing phones home — the Ed25519 signature on the licence *is*
-the authorization, verified locally. Two endpoints apply and clear it; one reports the plan and today's
-usage.
+The running product never calls a licence server — the Ed25519 signature on the licence *is* the
+authorization, verified locally. Two endpoints apply and clear it; one reports the plan and today's usage.
+
+!!! info "Licence tokens (`glc_…`)"
+    A licence can also be delivered as a **token** (`glc_` followed by 24 characters). `install.sh` exchanges it
+    **once, at install time**, with the licence server at `https://license.geodesia.ai` for the signed key bound
+    to it (`GLAD_LICENSE_TOKEN=glc_… ./install.sh light`); from then on the engine verifies the signed key
+    offline, as for any other licence. A token the server rejects stops the install. On an air-gapped host, use
+    the signed `GEO1.` key directly. See [Installer → Licensing](../installer.md#licensing-second-argument).
+
+    The token identifies the licence; it is **not** an API credential. Do not send it as an `Authorization`
+    bearer: API calls use Application keys (`g1k_…`), and the G1 Eval export uses `GW_EVAL_EXPORT_TOKEN`.
 
 ---
 
@@ -245,7 +254,7 @@ Lifting the cap is a licensing change (a license with a higher or unlimited `max
 
 ## How licenses are issued
 
-Licenses are issued by the **vendor** and signed with an Ed25519 **private** key that **never ships** with the product — only the matching public key is baked into the build. The vendor signs a license with `distrib/common/sign_license.py`, which emits both the `license.json` document and a base64 paste-able key. Because verification is purely cryptographic and offline, a customer can be upgraded simply by being handed a new signed license file — no server, no reinstall, no network.
+Licenses are issued by the **vendor** and signed with an Ed25519 **private** key that **never ships** with the product — only the matching public key is baked into the build. The vendor signs a license with `distrib/common/sign_license.py`, which emits both the `license.json` document and a base64 paste-able key. Because verification is purely cryptographic and offline, a customer can be upgraded simply by being handed a new signed license file (or a new licence token, resolved by the installer) — the running product needs no server and no network for it.
 
 !!! info "See also"
     - [Applications](applications.md) — the per-app config, keys, and the `max_applications` cap.

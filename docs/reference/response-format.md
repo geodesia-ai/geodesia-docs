@@ -1,4 +1,4 @@
-# Response Format Reference — `geodesia` object, schema 1.0
+# Response Format Reference — `geodesia` object, schema 1.1
 
 Every chat response from **G1-Proxy** and **G1-Proxy Light** is a standard OpenAI (or Ollama) response with
 exactly **one** extra top-level key: `geodesia`. Nothing else is added. Everything Geodesia measured and decided
@@ -12,6 +12,9 @@ This page is the authoritative reference for the object. It applies to:
 | `POST /v1/completions` | OpenAI legacy text completion |
 | `POST /api/chat` | Ollama chat (JSON / NDJSON) |
 | `POST /v1/glad/evaluate` | OpenAI chat completion |
+
+[G1 Eval](../g1-proxy/eval.md) (`POST /g1/eval`) evaluates text you supply without calling a model and returns its
+own evaluation-only JSON; its axis objects have the same shape as the ones described here.
 
 !!! info "Versioning"
     `schema_version` is the version of this **API schema**, not of the product. It is always the first key of the
@@ -36,14 +39,14 @@ This page is the authoritative reference for the object. It applies to:
   }],
   "usage": { "prompt_tokens": 1826, "completion_tokens": 23, "total_tokens": 1849 },
   "geodesia": {
-    "schema_version": "1.0",
+    "schema_version": "1.1",
     "event": "final",
     "decision": "allowed",
     "mode": "blocking",
     "reason": null,
     "axes": {
       "halluc_context": {
-        "score": null, "threshold": 0.7551, "flagged": false, "available": false,
+        "score": null, "threshold": 0.8164, "flagged": false, "available": false,
         "role": "enforce", "unavailable_reason": "no context supplied"
       },
       "halluc_closedbook": {
@@ -60,22 +63,19 @@ This page is the authoritative reference for the object. It applies to:
           "uncertain_span": { "text": "anything else", "start": 19, "end": 21, "surprisal": 1.093 }
         }
       },
-      "prompt_safety": { "score": 0.0076, "threshold": 0.6377, "flagged": false, "available": true, "role": "enforce" },
-      "answer_safety": { "score": 0.021, "threshold": 0.7953, "flagged": false, "available": true, "role": "enforce" },
-      "jailbreak": {
-        "score": 0.3333, "threshold": 0.9864, "flagged": false, "available": true, "role": "enforce",
-        "details": { "head_score": 0.00059, "linear_probe_z": -9.6043 }
-      },
+      "prompt_safety": { "score": 0.0076, "threshold": 0.1927, "flagged": false, "available": true, "role": "enforce" },
+      "answer_safety": { "score": 0.021, "threshold": 0.1318, "flagged": false, "available": true, "role": "enforce" },
+      "jailbreak": { "score": 0.0123, "threshold": 0.0987, "flagged": false, "available": true, "role": "enforce" },
       "rag_jailbreak": {
-        "score": null, "threshold": 0.5768, "flagged": false, "available": false,
+        "score": null, "threshold": 0.5286, "flagged": false, "available": false,
         "role": "advisory", "unavailable_reason": "no context supplied"
       }
     },
     "additional_axes": {
-      "profanity": { "score": 0.026, "threshold": 0.7, "flagged": false, "available": true, "role": "advisory" },
-      "out_of_scope": { "score": 0.0678, "threshold": 0.9534, "flagged": false, "available": true, "role": "advisory" },
+      "profanity": { "score": 0.0009, "threshold": 0.0066, "flagged": false, "available": true, "role": "advisory" },
+      "out_of_scope": { "score": 0.0012, "threshold": 0.0101, "flagged": false, "available": true, "role": "advisory" },
       "prompt_complexity": {
-        "score": 0.0155, "threshold": 0.5, "flagged": false, "available": true,
+        "score": 0.0155, "threshold": 0.4842, "flagged": false, "available": true,
         "role": "classifier", "label": "simple"
       }
     },
@@ -108,17 +108,14 @@ The answer is withheld: `finish_reason` is `content_filter` and the message carr
     "finish_reason": "content_filter"
   }],
   "geodesia": {
-    "schema_version": "1.0",
+    "schema_version": "1.1",
     "event": "final",
     "decision": "blocked",
     "mode": "blocking",
     "reason": { "stage": "input", "axis": "jailbreak", "detail": null },
     "axes": {
-      "prompt_safety": { "score": 0.9143, "threshold": 0.6377, "flagged": true, "available": true, "role": "enforce" },
-      "jailbreak": {
-        "score": 0.9981, "threshold": 0.9864, "flagged": true, "available": true, "role": "enforce",
-        "details": { "head_score": 0.993179, "linear_probe_z": 4.8373 }
-      }
+      "prompt_safety": { "score": 0.9143, "threshold": 0.1927, "flagged": true, "available": true, "role": "enforce" },
+      "jailbreak": { "score": 0.9981, "threshold": 0.0987, "flagged": true, "available": true, "role": "enforce" }
     }
   }
 }
@@ -132,7 +129,7 @@ With `"mode": "passthrough"` the real answer is returned and the violation is re
 
 ```json
 "geodesia": {
-  "schema_version": "1.0",
+  "schema_version": "1.1",
   "event": "final",
   "decision": "flagged",
   "mode": "passthrough",
@@ -147,8 +144,8 @@ With `"mode": "passthrough"` the real answer is returned and the violation is re
 
 | Field | Type | Present | Description |
 |---|---|---|---|
-| `schema_version` | string | always | Version of this schema (`"1.0"`). Always the first key. |
-| `event` | string | always | What this object reports: `final`, `input_scan`, `progress` or `research`. See [Streaming](#streaming). |
+| `schema_version` | string | always | Version of this schema (`"1.1"`). Always the first key. 1.1 added the opt-in [reference check](#reference-check). |
+| `event` | string | always | What this object reports: `final`, `input_scan`, `progress`, `research` or `reference_check`. See [Streaming](#streaming). |
 | `decision` | string | `final` only | `allowed`, `flagged`, `blocked` or `not_scanned`. See [Decision](#decision). |
 | `mode` | string | `final` only | Enforcement mode applied to this request: `blocking` or `passthrough`. |
 | `reason` | object \| null | `final` only | Why the decision is not `allowed`; `null` when it is. See [Reason](#reason). |
@@ -166,6 +163,7 @@ With `"mode": "passthrough"` the real answer is returned and the violation is re
 | `quota` | object | quota exceeded | Plan or budget limit that rejected the request. |
 | `tool_guard` | object | tool guard blocked | MCP/tool-call findings that blocked the request. |
 | `research` | object | `research` events | One web-search progress event. |
+| `reference_check` | object | `reference_check` events | One reference-check progress event. See [Reference check](#reference-check). |
 
 Optional sections are **omitted** when they do not apply; they are never sent as empty placeholders.
 
@@ -220,7 +218,7 @@ Every entry of `axes` and `additional_axes` has the same shape.
 | `halluc_closedbook` | axes | advisory | answer + generator logprobs | Likely fabricated fact without context. Needs an upstream that exposes logprobs. |
 | `rag_jailbreak` | axes | advisory | context | Prompt injection hidden in retrieved/supplied context. |
 | `halluc_context_joint` | axes | advisory | answer + context | Joint claim–evidence verifier (when deployed). |
-| `sysprompt_leak` | axes | enforce | answer | Verbatim or fragmentary reproduction of the protected system prompt/tool descriptions. Present when system-prompt protection is on. |
+| `sysprompt_leak` | axes | enforce | answer | Verbatim or fragmentary reproduction of the protected instructions (system prompt, tool descriptions) or of a code they declare secret. Present when system-prompt protection is on. See [System-prompt protection](../g1-proxy/detection-axes.md#system-prompt-protection). |
 | `profanity` | additional_axes | advisory | prompt | Profane language. |
 | `out_of_scope` | additional_axes | advisory | prompt + declared scope | Request outside the application's declared scope. |
 | `prompt_complexity` | additional_axes | classifier | prompt | `simple` / `complex`; drives Model A/B routing. |
@@ -235,16 +233,28 @@ Every entry of `axes` and `additional_axes` has the same shape.
 | `abstained` | `halluc_closedbook` | The model declined to answer. |
 | `token_surprisal` | `halluc_closedbook` | Per-token surprisal: `[{index, text, surprisal, start, end}]` (`start`/`end` are token offsets). Only on the final event. |
 | `uncertain_span` | `halluc_closedbook` | The most uncertain span: `{text, start, end, surprisal}`. |
+| `references` | `halluc_closedbook` | Reference check result (`verify_references: true`). See [Reference check](#reference-check). |
+| `flag_source` | `halluc_closedbook` | `reference_check` when the axis is flagged because of a hallucinated reference. |
+| `reference_score` | `halluc_closedbook` | Score from the reference check (above the threshold); `score` is the higher of this and the closed-book measure (`raw_score`). |
 | `context_support` | `halluc_context` | Lexical support of the answer by the context, in [0, 1]. |
-| `suppressed_by` | hallucination axes | Why a flag was withdrawn, e.g. `context_support`, `rag_claim_verification`, `benign_tech_command`. |
-| `head_score` | `jailbreak` | Score of the base detector head before the linear-probe combination. |
-| `linear_probe_z` | `jailbreak` | Logit of the linear intent probe combined with the head. |
-| `pooled_score` | prompt axes | Score before an input guard recovered a diluted or encoded attack. |
-| `recovered_by` | prompt axes | `dilution_guard` or `decode_guard`: the guard that recovered the attack. |
+| `reader` | `halluc_context` | Identifier of the grounding model that read the answer against the context (with a `+…` suffix when, on a long document, it was fused with the detector's claim-by-window head). |
+| `reader_mode` | `halluc_context` | `single` (short context, read in one pass) or `multiview` (long context, read claim by claim over the most relevant passages). See [Detection Axes](../g1-proxy/detection-axes.md#halluc_context-context-faithfulness). |
+| `calibrated` | `halluc_context` | `true` when a threshold applies (the reader's own per-regime threshold, or the one the user chose). |
+| `reader_latency_ms` | `halluc_context`, `out_of_scope` | Time the reader took on this turn. |
+| `reader_memory_retries` | `halluc_context` | Present when GPU memory ran out and the reader redid a batch in smaller pieces (same score, more time). |
+| `reader_error` | `halluc_context`, `out_of_scope` | Why the reader could not run; the axis is then `available: false` (never a silent fallback). |
+| `suppressed_by` | hallucination axes, prompt axes | Why a flag was withdrawn, e.g. `rag_claim_verification`, `benign_tech_command`. |
+| `framed_harm_score` / `framed_harm_threshold` | `prompt_safety` | Present when the optional framed-harm reader is enabled: its score and threshold. It can only add a flag to `prompt_safety`. |
+| `fused_with_scope_reader` | `out_of_scope` | `true` when `enforce_out_of_scope` is on and the axis was decided by fusing the detector head with the scope reader. |
+| `reader_score` | `out_of_scope` | The scope reader's probability that the message is outside the declared scope. |
+| `head_score` / `head_threshold` / `head_flagged` | `out_of_scope` | The detector head's own reading, before the fusion. |
+| `fusion_version` | `out_of_scope` | Version of the fusion calibration used. |
+| `pooled_score` | prompt axes | Score before an input guard recovered an encoded attack. |
+| `recovered_by` | prompt axes | `decode_guard`: the guard that recovered an encoded (Base64, hex, ROT13 …) attack. |
 | `flag_kept_from_level_0` | any | At thinking level ≥ 1 the fused score alone would not flag; the flag comes from the level-0 verdict (fusion can only add flags, never remove them). |
 | `verification_status` | `halluc_context_joint` | Verifier status. |
 | `leak_source` | `sysprompt_leak` | Which protected field leaked, e.g. `messages.system`, `tools.<name>.description`. |
-| `leak_kind` | `sysprompt_leak` | `whole_field`, `verbatim` or `fragments`. |
+| `leak_kind` | `sysprompt_leak` | `whole_field`, `verbatim`, `fragments` or `secret` (a code the system prompt declares confidential). |
 | `leak_coverage` | `sysprompt_leak` | Fraction of the protected field reproduced. |
 | `shadow_mode` | `sysprompt_leak` | `true` when the leak is only reported, not enforced. |
 
@@ -272,11 +282,22 @@ A single grounding number fusing `halluc_context` and `halluc_closedbook` on eac
 Present when the request ran at thinking level ≥ 1.
 
 ```json
-"thinking": { "level": 2, "tiers_used": ["geodesia_g", "geodesia_h"], "escalated": true }
+"thinking": {
+  "level": 2,
+  "tiers_used": ["geodesia_g", "geodesia_h"],
+  "tier_status": { "geodesia_h": { "status": "ok" } },
+  "complete": true
+}
 ```
 
-`tiers_used` lists the detector tiers that **actually** contributed (`geodesia_g`, `geodesia_h`, `geodesia_a`,
-`native`); it can be fewer than requested. `escalated` appears at level 1 only (cascade).
+| Field | Meaning |
+|---|---|
+| `level` | The level this turn ran at. |
+| `tiers_used` | The detector tiers that **actually** contributed (`geodesia_g`, `geodesia_h`, `geodesia_a`, `native`); it can be fewer than requested. |
+| `escalated` | Level 1 only: `true` when Geodesia-H was consulted. |
+| `tier_status` | For every higher tier the level asked for, why it did or did not contribute: `ok`, `pending` (still scoring, streaming only), `starting`, `not_needed`, `not_woken`, `bank_missing`, `not_installed`, `failed_to_start`, `runtime_error`, `not_consulted`, `no_axes` or `no_contribution`. Only the code is reported; details stay in the gateway log. |
+| `user_thresholds` | Present when the Application or the request chose a threshold for an axis that the levels fuse: the shift applied to the fused decision, `{axis: {logit_shift}}`. |
+| `complete` | `false` on a partial frame (streaming), while a requested tier has not answered yet: those scores are not the level's verdict. |
 
 ## PII
 
@@ -317,6 +338,105 @@ Present when `enable_judge_for_context_hallucination` is on. Advisory and uncali
 `verdict` per claim is `supported`, `contradicted`, `unsupported`, `no_claim` or `unjudged`. When the judge cannot
 run, `available` is `false`, `score` is `null` and `reason` explains why.
 
+## Reference check
+
+Opt-in with `"verify_references": true` (off by default, because the references extracted from the answer are
+sent to outside services). Every link, DOI, arXiv id, PubMed id and citation in the answer is looked up on open
+sources — doi.org, Crossref, DataCite, OpenAlex, Semantic Scholar, arXiv, PubMed, Europe PMC, OpenLibrary — and,
+only when the deployment configures one, a web search provider (`GW_WEB_SEARCH_PROVIDER`). When the source has an
+abstract or page text, a local classifier reads whether the source supports the sentence that cites it
+(threshold `pertinence_threshold`; per request `reference_relevance_threshold`, 0–1).
+
+Every reference that exists is also checked against the **text**: a reference that the answer does not cite
+for a sentence of its own (a bare reference-list entry, a "further reading" link) must still be about something
+the answer talks about (`pertinence_basis: "text"`, judged against the answer's closest sentence,
+`closest_text`). A source known only by its title is read with a topic question (`source_read: "title"`).
+
+A reference that does not exist, points to a different work, does not support its sentence, or is about nothing the
+text talks about sets
+`axes.halluc_closedbook.flagged: true` with `details.flag_source: "reference_check"`, and raises the axis `score`
+above its `threshold`: one hallucinated reference is enough. The score becomes
+`threshold + (1 − threshold) × max(0.5, share of hallucinated references)` — halfway between the threshold and 1
+for a single one, 1 when all are — and never goes below the closed-book measure, which stays in `raw_score`
+(`details.reference_score` is the reference-based value). When the upstream exposes no logprobs the axis, otherwise
+not measured, becomes available with `details.method: "reference_check"`.
+
+**With a context** (`context`, RAG or tool results) two more things happen, on the **answer** only (the context
+itself is never verified):
+
+- every reference in the answer is checked, including one it repeats from the context or the prompt;
+- the answer's **additional information** is found and validated online: sentences carrying a specific detail
+  (a figure, a measure, a year, a name) that the context does not support are looked up on open sources
+  (Wikipedia, Europe PMC for clinical claims, and the web search provider when one is configured). They appear
+  as items with `kind: "claim"`, `extra` (the details the context does not contain) and a `status`: `verified`,
+  `contradicted` (the sources say otherwise), `not_found` (no open source reports the detail) or `unverifiable`.
+
+A hallucinated reference raises `axes.halluc_context` above its threshold by the same rule (details `flag_source`,
+`reference_score`, `raw_score`). **Claims are information only**: by default no claim status raises an axis,
+because flagging a true statement is worse than missing a false one. A deployment can make `contradicted` claims
+raise `halluc_context` with `GW_CLAIM_FLAG=contradicted`. `halluc_context` is raised only when it was measured on
+the turn. Known limit: a false figure that appears in the sources with another meaning (a drug "approved in 2015" —
+for a new indication) reads as confirmed.
+
+The check only reports: it never blocks the answer and never changes `decision`.
+
+```json
+"references": {
+  "available": true, "flagged": true, "checked": 3, "seconds": 6.4, "pertinence_engine": "local_classifier",
+  "counts": { "verified": 1, "not_pertinent": 1, "not_found": 1 },
+  "items": [
+    { "kind": "doi", "reference": "10.1038/nature14539", "start": 112, "end": 131,
+      "cited_for": "Deep learning was reviewed by LeCun, Bengio and Hinton in Nature.",
+      "status": "verified", "reason": null, "pertinence": 0.84, "pertinence_threshold": 0.08,
+      "resolved": { "title": "Deep learning", "year": 2015, "url": "https://doi.org/10.1038/nature14539" } },
+    { "kind": "doi", "reference": "10.1038/nature14539", "start": 240, "end": 259,
+      "cited_for": "Protein structure prediction reached atomic accuracy with AlphaFold.",
+      "status": "not_pertinent", "reason": "the source exists but does not support the sentence citing it",
+      "pertinence": 0.03, "pertinence_threshold": 0.08,
+      "resolved": { "title": "Deep learning", "year": 2015, "url": "https://doi.org/10.1038/nature14539" } },
+    { "kind": "arxiv", "reference": "arXiv:2403.99999", "start": 330, "end": 346,
+      "cited_for": "A follow-up study showed quantum attention layers double translation quality.",
+      "status": "not_found", "reason": "arXiv has no paper with this identifier",
+      "pertinence": null, "resolved": null }
+  ]
+}
+```
+
+| `kind` | Checked against |
+|---|---|
+| `doi` | Crossref, then the doi.org registry and DataCite |
+| `arxiv` | arXiv API |
+| `pmid` | PubMed |
+| `url` | The page itself (public addresses only; redirects are re-checked) |
+| `citation` | A reference-list entry with a title: OpenAlex, Crossref, Semantic Scholar, OpenLibrary |
+| `inline_citation` | An author–year citation such as `(Smith et al., 2020)`: that author's works around that year |
+
+| `status` | Meaning | Flags the axis |
+|---|---|---|
+| `verified` | Exists; supports its sentence, or no sentence/abstract to judge it against (`reason` says which) | no |
+| `not_found` | No such DOI / arXiv id / PMID / page (404, unknown domain) / title in the indexes | yes |
+| `metadata_mismatch` | The identifier exists but names a different work (title, year or authors differ) | yes |
+| `not_pertinent` | Exists but does not support the sentence citing it, or — with no sentence of its own — is about nothing the text talks about (`pertinence` < `pertinence_threshold`) | yes |
+| `contradicted` | `kind: "claim"` only: open sources state a different figure or fact | no by default (`halluc_context` with `GW_CLAIM_FLAG=contradicted`) |
+| `unverifiable` | A source did not answer (timeout, rate limit, 403). Never evidence either way | no |
+
+`cited_for` is `null` for a reference-list entry that no `[n]` marker in the text points to and that carries no
+description; such a reference is judged against the text as a whole (`pertinence_basis: "text"`). A list entry
+written over several lines (title, authors, identifier, a line saying what the work does) is read as one reference:
+its identifier is checked against its title, authors and year, and its description line is what it is cited for
+(`pertinence_basis: "description"`, a topic check). Every reference in the answer is checked, including
+one the answer repeats from the prompt or the context.
+`pertinence_engine: null` means the deployment checks existence only.
+
+**Known limit.** Pertinence catches a source that is about something else. It does not reliably catch the right
+source used for a wrong statement about it, especially outside English.
+
+**Streaming.** While the check runs, `reference_check` events report its progress before the `final` event:
+`started` (`total`, `references[{index, kind, reference}]`), one `resolved` per reference
+(`index`, `status`: `found` / `not_found` / `unverifiable`, `reason`, `title`, `seconds`), `pertinence`
+(`pairs`), then `done` (`seconds`, `flagged`, `counts`). The verdicts to rely on are the ones in the `final`
+event.
+
 ## Certificate
 
 Present when certificates are enabled (`GW_CERTIFICATE=on`). A self-contained, optionally HMAC-signed record of the
@@ -356,6 +476,7 @@ With `"stream": true` the response is a sequence of SSE chunks. Each chunk that 
 | `event` | When | Contains |
 |---|---|---|
 | `input_scan` | As soon as a detector tier has scored the prompt — once per tier (before or while the answer streams) | `axes` / `additional_axes` for the prompt axes, `thinking.tiers_used` so far. No decision. |
+| `reference_check` | `verify_references: true` only, after the answer and before `final` | `reference_check`: one progress event (`started`, `resolved`, `pertinence`, `done`). See [Reference check](#reference-check). |
 | `research` | Web search only, before the answer | `research`: one progress event (`search_started`, `page_found`, `page_read`, `page_blocked`, `page_skipped`, `search_done`, `search_error`). `page_read` / `page_blocked` carry `axes: {<axis>: {score, threshold, flagged}}`; `page_blocked` also `reason` and `axis` (the deciding axis). |
 | `progress` | Periodic re-scoring during generation, and once per tier while the finished answer is scored | `axes` with the current scores (`thinking.tiers_used` on per-tier events). No decision. |
 | `final` | Last chunk (with `finish_reason`) | The complete verdict, same shape as the non-streaming object. |
@@ -372,16 +493,22 @@ Rules for clients:
 - A violation found after the answer was fully streamed is reported as `decision: "flagged"` (the text was already
   delivered).
 - A request with `web_search: true` is always answered as a stream (`research` events first), whatever `stream` says.
+- When the protected system prompt declares a secret code (see [System-prompt protection](../g1-proxy/detection-axes.md#system-prompt-protection)),
+  the last few characters of the stream that could be the beginning of that code are held back until the next
+  chunk shows they are not. A code split across tokens is therefore stopped before any part of it reaches the
+  client; ordinary text is delayed by at most a few characters.
+- `halluc_context` is read once, on the complete answer: `progress` events report it as `available: false`
+  ("read by the grounding model on the complete answer") and only the `final` event carries its score.
 - A quota refusal (`reason.stage: "quota"`) ends with `finish_reason: "stop"`; content and tool-guard blocks end with
   `content_filter`. Every block is delivered in the format the client asked for (SSE / NDJSON when streaming).
 
 ```text
 data: {"id":"chatcmpl-geodesia-…","object":"chat.completion.chunk","choices":[{"index":0,"delta":{},"finish_reason":null}],
-       "geodesia":{"schema_version":"1.0","event":"input_scan","axes":{"prompt_safety":{…},"jailbreak":{…}}}}
+       "geodesia":{"schema_version":"1.1","event":"input_scan","axes":{"prompt_safety":{…},"jailbreak":{…}}}}
 data: {"id":"chatcmpl-geodesia-…","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"content":"Waves"},"finish_reason":null}]}
 …
 data: {"id":"chatcmpl-geodesia-…","object":"chat.completion.chunk","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],
-       "geodesia":{"schema_version":"1.0","event":"final","decision":"allowed","mode":"blocking","reason":null,"axes":{…}}}
+       "geodesia":{"schema_version":"1.1","event":"final","decision":"allowed","mode":"blocking","reason":null,"axes":{…}}}
 data: [DONE]
 ```
 
@@ -401,11 +528,14 @@ Geodesia-specific request fields (all optional, never forwarded to the upstream 
 | `rag` | object | `{ "collection_id": "…" }` — retrieve context from a knowledge base. |
 | `pii_guard` | boolean | Turn the PII guard on/off for this request. |
 | `scan` | boolean | `false` bypasses all scoring and blocking for this request; the response carries `decision: "not_scanned"`. When the gateway has `GW_API_TOKEN` set, only a caller presenting that token may do this (others get `403`); requests relayed by G1-Studio carry it. Never let application code set it from user input. |
-| `axes` | array \| string | Restrict the reported axes. Enforcing axes are always scored. |
+| `axes` | array \| string | Compute **only** these axes. Every other axis is reported `available: false` (`"axis not requested"`) and cannot hold the request — including an enforcing one you left out. Omit the field to compute everything. A deployment can restore the pre-1.0.3 behaviour (deciding axes always computed) with `GW_AXES_FORCE_DECIDING=1`. |
 | `threshold_overrides` | object | Per-axis thresholds, e.g. `{ "jailbreak": 0.9 }`. |
 | `domain` | string | Closed-book calibration domain (`general`, `legal`, …). |
 | `web_search` | boolean | Live web search with per-page screening. |
 | `enable_judge_for_context_hallucination` | boolean | Per-claim judge (`context_judge`). |
+| `reference_relevance_threshold` | number | 0–1. Pertinence threshold of the reference check for this request (server default `0.08`). |
+| `enforce_out_of_scope` | boolean | Decide `out_of_scope` by fusing the detector head with the scope reader (see [Detection Axes](../g1-proxy/detection-axes.md#out_of_scope-off-topic-out-of-scope)). `true` takes effect only when the reader was started with the server (`GW_ENFORCE_OUT_OF_SCOPE=1`); otherwise the axis says so in `details.reader_error`. `false` uses the head alone. |
+| `verify_references` | boolean | Default `false`. Check the answer's links and scientific references on open sources and their pertinence; result in `axes.halluc_closedbook.details.references`. Shown only, never blocks. |
 | `application_id` / `session_id` | string | Application routing and conversation grouping. |
 
 ---
@@ -425,7 +555,7 @@ compatibility layer.
 | axis `p_detector` / `flag` / `verdict` | `score` / `flagged` / `label` |
 | axis `p_model`, `p_detector_raw` | `raw_score` |
 | axis `active` | `available` |
-| axis `p_pozzi`, `lin_z` | `details.head_score`, `details.linear_probe_z` |
+| axis `p_pozzi`, `lin_z` | removed (the served detector no longer exposes them) |
 | axis `combinato`, `guardia_*`, `p_v5`/`p_v6`/`p_v7`, `sledge_*`, `prem_*`, `tier` | removed (internal) |
 | `closedbook_method`, `lsc_span`, `token_surprisal[].i/.s` | `details.method`, `details.uncertain_span`, `details.token_surprisal[].index/.surprisal` |
 | `geodesia.dominant_axis`, `geodesia.brake`, `geodesia.input` | removed (use `decision` and `reason`) |

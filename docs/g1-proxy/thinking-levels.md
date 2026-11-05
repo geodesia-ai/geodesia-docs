@@ -1,6 +1,6 @@
 # Thinking Levels
 
-**Thinking level** is a per-request dial that trades a little latency for a stricter, more careful verdict from **G1-Hummingbird**. It is a single integer on the request body — `thinking_level` — and it changes *how hard the detector thinks* about the turn, not *what* it reports: the response shape, the axis names and the thresholds are identical at every level.
+**Thinking level** is a per-request dial that trades a little latency for a stricter, more careful verdict from **G1-Hummingbird**. It is a single integer on the request body — `thinking_level` — and it changes *how many detector tiers* judge the turn, not *what* is reported: the response shape and the axis names are identical at every level. What changes is who decides `prompt_safety` and `jailbreak` (see [What changes at levels 1–3](#what-changes-at-levels-1-3)).
 
 Level `2` (**Extra High Thinking**) is the default since 2026-09-18: it is what you get if you never send the field at all. Send `0` (**Low Latency**) explicitly when you need the fastest verdict and accept a weaker one on borderline traffic.
 
@@ -68,16 +68,21 @@ The usual OpenAI-shaped response, with the `geodesia` object carrying one extra 
 ```json
 {
   "geodesia": {
-    "schema_version": "1.0",
+    "schema_version": "1.1",
     "event": "final",
     "decision": "allowed",
     "mode": "blocking",
     "reason": null,
     "axes": {
-      "prompt_safety": { "score": 0.02, "threshold": 0.6377, "flagged": false, "available": true, "role": "enforce" },
-      "halluc_context": { "score": 0.41, "threshold": 0.7551, "flagged": false, "available": true, "role": "enforce" }
+      "prompt_safety": { "score": 0.02, "threshold": 0.5, "flagged": false, "available": true, "role": "enforce" },
+      "halluc_context": { "score": 0.41, "threshold": 0.8164, "flagged": false, "available": true, "role": "enforce" }
     },
-    "thinking": { "level": 3, "tiers_used": ["geodesia_a", "geodesia_g", "geodesia_h"] }
+    "thinking": {
+      "level": 3,
+      "tiers_used": ["geodesia_a", "geodesia_g", "geodesia_h"],
+      "tier_status": { "geodesia_h": { "status": "ok" }, "geodesia_a": { "status": "ok" } },
+      "complete": true
+    }
   }
 }
 ```
@@ -87,12 +92,35 @@ The usual OpenAI-shaped response, with the `geodesia` object carrying one extra 
 | `thinking` | only when a level ≥ 1 was requested *and* this deployment could serve it | **Absent** means the turn was served on the standard (level-0) path — either you asked for level 0, or the deployment cannot serve levels above 0. |
 | `thinking.level` | with `thinking` | The level this turn actually ran at. |
 | `thinking.tiers_used` | with `thinking` | The detector tiers that **actually** contributed: `geodesia_g` (the always-on detector), `geodesia_h` (levels 1–2 pack), `geodesia_a` (level-3 pack), `native`. It can list fewer tiers than the level implies — e.g. a level-3 turn with no `geodesia_a` ran at level-2 depth. |
-| `thinking.escalated` | level 1 only | `true` when the turn was uncertain enough to do the extra work; `false` when the standard path was confident and the extra work was skipped. |
+| `thinking.escalated` | level 1 only | `true` when Geodesia-H was consulted; `false` when a gray-band calibration is installed and Geodesia-G was confident enough to skip it. |
+| `thinking.tier_status` | with `thinking` | For each higher tier the level asked for, why it did or did not contribute: `ok`, `pending`, `starting`, `not_needed`, `not_woken`, `bank_missing`, `not_installed`, `failed_to_start`, `runtime_error`, `not_consulted`, `no_axes`, `no_contribution`. |
+| `thinking.user_thresholds` | a threshold was chosen | The shift your chosen threshold applied to the fused decision (see below). |
+| `thinking.complete` | with `thinking` | `false` on a partial streaming frame, while a requested tier has not answered yet. |
 
 Nothing else about the payload changes. A fused axis still reports one `score`, one `threshold` and one `flagged` — the level affects how that number was reached, not how you read it.
 
-!!! note "Fusion can only add a flag, never remove one"
-    At level ≥ 1 the axis `score` shown is the fused score. If the fused score alone would *not* cross the threshold but the level-0 verdict did, the axis stays `flagged: true` and carries `details.flag_kept_from_level_0: true`. Paying for a higher level can never release a turn that level 0 would have caught. See [`details` fields](../reference/response-format.md#details-fields).
+---
+
+## What changes at levels 1–3 { #what-changes-at-levels-1-3 }
+
+**`prompt_safety` and `jailbreak` — one fused decision.** At levels 1–3 the prompt is judged by the tiers of the level together, and their verdict **replaces** the level-0 one for these two axes:
+
+| Level | Who decides `prompt_safety` / `jailbreak` |
+|---|---|
+| `0` | Geodesia-G: the prompt is flagged when either axis crosses its own threshold. |
+| `1` | Geodesia-H, with its own calibrated thresholds (same rule). |
+| `2` | Geodesia-G and Geodesia-H fused: for each tier, the margin of the riskier of the two axes over that tier's threshold; the turn is flagged when the **mean of the margins** crosses the level-2 threshold. |
+| `3` | Geodesia-G, Geodesia-H and Geodesia-A fused the same way, with the level-3 threshold. |
+
+The axis that decided carries the fused score, rescaled so that the decision point is **`threshold: 0.5`**; the other one is reported just below it. Because two or three detectors vote, a higher level can also *clear* a prompt that Geodesia-G alone would have flagged: that is the point of asking more tiers, and it is why the thresholds of each level are calibrated on their own.
+
+**The other detector axes — any tier can add a flag.** `answer_safety`, `rag_jailbreak`, `profanity` and `out_of_scope` are judged by every tier of the level against that tier's own threshold, and the axis is flagged when **at least one** tier crosses. The shown score is the highest margin, rescaled to `threshold: 0.5`. If the fused reading would not flag but the level-0 verdict did, the axis stays `flagged: true` with `details.flag_kept_from_level_0: true`: for these axes a higher level never removes a flag. (Geodesia-A does not take part in `rag_jailbreak`; `GB_LIVELLI_ESCLUDI` controls such exclusions.)
+
+**Grounding is the same at every level.** `halluc_context` is read by the grounding model and `halluc_closedbook` by SLEDGE, identically at every level; the tiers do not fuse them.
+
+**Your threshold still applies.** A threshold chosen on the Application (or with `threshold_overrides`) for a fused axis is translated into a shift of the decision, relative to Geodesia-G's default, and applied to every tier. The shift is reported in `thinking.user_thresholds`.
+
+**Long inputs.** Every tier reads long prompts and documents in [sliding windows](detection-axes.md#long-inputs-sliding-windows), the same way Geodesia-G does.
 
 ---
 
@@ -101,19 +129,19 @@ Nothing else about the payload changes. A fused axis still reports one `score`, 
 | Level | Name | Extra work | When to use it |
 |---|---|---|---|
 | `0` | **Low Latency** | none | Lowest latency: Geodesia-G only. Trades accuracy for speed on borderline traffic; ask for it explicitly. |
-| `1` | **High Thinking** | only on turns the detector is *unsure* about | Broad quality lift for near-zero average cost. Confident calls behave exactly like level 0. |
-| `2` | **Extra High Thinking** *(default)* | on every turn | High-stakes traffic where you would rather pay the latency on every request than miss a borderline call. |
-| `3` | **Max Thinking** | on every turn, maximum depth | The strictest verdict the product produces. Legal, medical, financial, agentic tool-use — anywhere a miss is expensive. |
+| `1` | **High Thinking** | Geodesia-H | A second detector's opinion, with its own thresholds, at the cost of one tier. |
+| `2` | **Extra High Thinking** *(default)* | Geodesia-G + Geodesia-H, fused | High-stakes traffic where you would rather pay the latency on every request than miss a borderline call. |
+| `3` | **Max Thinking** | Geodesia-G + Geodesia-H + Geodesia-A, fused | The strictest verdict the product produces. Legal, medical, financial, agentic tool-use — anywhere a miss is expensive. |
 
-### Why level 1 is nearly free
+### Level 1 and the gray band
 
-Level 1 only does the extra work when at least one axis lands inside a *gray band* around its own calibrated threshold — a direct measure of "this call is genuinely uncertain". Requests the detector is already confident about (in either direction) are served on the level-0 path, so level 1's **average** latency sits far closer to level 0's than to level 2's. Whether escalation happened for a given turn is reported back as `thinking.escalated`.
+A deployment can ship a **gray-band** calibration for level 1. With it, Geodesia-H is consulted only when at least one axis of Geodesia-G lands close to its threshold, and confident turns are served on the level-0 path — level 1's average latency then sits close to level 0's. Without it (the default in release 1.0.10) level 1 always consults Geodesia-H. `thinking.escalated` tells you which happened on each turn.
 
-Levels 2 and 3 escalate unconditionally, so the extra work is always paid there and `thinking.escalated` is not reported.
+Levels 2 and 3 always consult their tiers, so `thinking.escalated` is not reported there.
 
 ### Level 3 is additive
 
-Level 3 does not *replace* level 2 — it adds depth on top of it. If the level-3 capability cannot answer for a given turn (pack absent, worker unavailable, an axis it has no opinion on), that turn is still served at the deepest stage that *did* answer, and `thinking.tiers_used` says which tiers that was. A level-3 request never degrades below what a level-2 request would have produced.
+Level 3 does not *replace* level 2 — it adds Geodesia-A on top of it. If Geodesia-A cannot answer for a given turn (pack absent, worker unavailable, an axis it has no opinion on), that turn is decided at level 2 with Geodesia-G and Geodesia-H, and `thinking.tiers_used` / `thinking.tier_status` say so. In streaming, the level-2 verdict is sent as a `progress` event before Geodesia-A answers.
 
 ---
 
@@ -126,16 +154,16 @@ Two things have to line up — a deployment-level capability, and a per-request 
 
 ```bash
 # proxy started with levels 1-3 available
-GW_GLADH_CKPT=/app/runs/glad_bert/glad_bert_gladh_v1_psjbasft_live.pt \
-GW_GLADA_CKPT=/app/runs/glad_bert/glad_a_agentdog_v1.pt \
-GW_FUSION_BANK=/app/runs/glad_bert/fusion_bank_thinking_v3_gladh_v1.json \
+GW_GLADH_CKPT=/app/runs/glad_bert/<geodesia-h pack>.pt \
+GW_GLADA_CKPT=/app/runs/glad_bert/<geodesia-a pack>.pt \
+GB_CALIB_DIR=/app/runs/glad_bert \
   python -m glad_minimal.gateway.geodesia_gateway --host 0.0.0.0 --port 8800
 ```
 
 !!! info "Graceful degradation, never a hard error"
     If a requested level is not available on this deployment — pack missing, path unreadable, calibration artifact absent — the turn is served at the deepest level that *is* available, in the worst case level 0. A client asking for level 3 against a level-0 deployment gets a correct answer, not a 4xx. The way to tell from the client side is `geodesia.thinking`: if it is **absent** the turn ran on the standard path, whatever you asked for; if it is present, `thinking.tiers_used` lists the tiers that actually contributed.
 
-The GPU deployment (`docker-compose.gpu.yml`, and the `--gpu` installer profile) ships with these variables **already set**, so levels 1–3 are available out of the box there. The request default is level `2` unless the client asks for another level.
+The GPU deployment (`docker-compose.gpu.yml`, the `--gpu` installer profile) and [G1-Proxy Light](light.md) ship with these variables **already set**, so levels 1–3 are available out of the box. The request default is level `2` unless the client asks for another level.
 
 ---
 
@@ -147,7 +175,9 @@ The GPU deployment (`docker-compose.gpu.yml`, and the `--gpu` installer profile)
 | `GW_GLADA_CKPT` | *(unset)* | Capability pack that unlocks thinking level **3 (MAX)**. Unset → level 3 falls back to the highest available level. |
 | `GW_GLADH_DEVICE` | `auto` | Device for the level-1/2 pack. `auto` picks CUDA when visible, else CPU. |
 | `GW_GLADA_DEVICE` | `auto` | Device for the level-3 pack. |
-| `GW_FUSION_BANK` | `runs/glad_bert/fusion_bank_thinking_v3_gladh_v1.json` | Calibration artifact that keeps the higher levels on the *same* probability scale as level 0 — which is why thresholds do not have to be re-tuned per level. Missing/unreadable → the higher levels fall back to level 0. |
+| `GB_CALIB_DIR` | `runs/glad_bert` | Directory holding each tier's thresholds (`axis_calib.json`, `axis_calib_glad_h.json`, `axis_calib_glad_a.json`), the level-2 and level-3 fusion files (`fusione_L2.json`, `fusione_L3.json`) and, optionally, the level-1 gray band (`cascata_L1.json`). Missing files → the higher levels are served by Geodesia-G and say so (`tier_status: bank_missing`). |
+| `GB_TIER_START_TIMEOUT` | `180` (`900` in the shipped images) | Seconds a higher tier may take to start before it is declared `failed_to_start`. Geodesia-A is a large model: a short timeout used to make level 3 fall back to level 2. |
+| `GB_LIVELLI_ESCLUDI` | `glad_a:rag_jailbreak` | Tier/axis pairs left out of the per-tier maximum (`tier:axis,tier:axis`; `""` includes all). |
 
 ### Request field
 

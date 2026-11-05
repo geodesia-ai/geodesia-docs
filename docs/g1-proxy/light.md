@@ -16,16 +16,29 @@ light profile does differently lives behind **one switch** — `GW_LIGHT=1`, imp
 
 ## What it keeps
 
+Since 0.4.4 the light profile carries **every detection capability G1-Proxy serves**, thinking level 3 included.
+It leaves out only three components, listed in the next table.
+
 | | |
 |---|---|
-| detection axes | **all nine**, same weights, same thresholds |
-| thinking levels | **0 · 1 · 2** (Geodesia-G + the Geodesia-H cascade) |
+| detection axes | **all nine**, same weights, same thresholds, plus the dedicated `prompt_safety` reading for framed harm |
+| thinking levels | **0 · 1 · 2 · 3** (Geodesia-G, Geodesia-H, Geodesia-A), default **2** |
+| `halluc_context` | the same grounding reader as G1-Proxy, including the long-document read |
 | `halluc_closedbook` + SLEDGE | yes — including **recalibration on the model you actually serve** |
+| reference check (`verify_references`) | yes — open sources plus the local reference-pertinence classifier |
+| [G1 Eval](eval.md) (`/g1/eval`) | yes — the endpoint, the OpenRouter-compatible façades, the call log and the **Eval** page in the UI |
 | MCP guard (`glad.*` tools) | yes |
-| Causal explainability (MuPAX / DCA) | yes |
+| Causal explainability (MuPAX / DCA, clause and word level for `halluc_context`) | yes |
 | chat transcript export (JSONL) | yes — the route is there; see the note on the Oversight screen below |
 | configuration UI | **served by the proxy itself**, on the same port |
 | Applications | **one** — the single Application is seeded at boot |
+
+!!! warning "Level 3 needs a 24 GB GPU"
+    Geodesia-A adds about 9 GB of GPU memory when level 3 is actually used. On a 16 GB GPU levels 0–2 run, and
+    the Geodesia-A tier does not start: it is reported as failed for lack of memory, retried after an hour
+    (`GW_TIER_OOM_RETRY_S`), and a level-3 request is served at level 2. The response says so in
+    `geodesia.thinking.tiers_used` — the request never fails, and never pretends. To leave level 3 out on
+    purpose, set `GW_GLADA_CKPT=` (empty) in the container environment.
 
 ## What it does not have
 
@@ -34,10 +47,9 @@ whether you can turn it on.
 
 | missing | why | can I enable it? |
 |---|---|---|
-| **Geodesia-A / thinking level 3** | the checkpoint is 16 GB; it is exactly what this profile exists to leave out | no — use G1-Proxy |
-| **Knowledge Base (RAG)** | no embedder, no reranker, no vector store in the image | no |
-| **Audio input** | the ASR model is not shipped | no |
-| **Idle judge / feedback queue** | no `llama.cpp` binary and no GGUF in the image | **yes** — mount a binary and a model and set `GW_IDLE_JUDGE=1`; the capability endpoint then reports it as available |
+| **Knowledge Base (RAG)** | no embedder, no reranker, no vector store in the image; the `/v1/glad/rag/*` routes are not served | no — use G1-Proxy |
+| **Audio input** | the speech-recognition model is not shipped | no — use G1-Proxy |
+| **Idle judge / feedback queue** | no `llama.cpp` binary and no judge model (GGUF) in the image | **yes** — mount a binary and a model and set `GW_IDLE_JUDGE=1`; the capability endpoint then reports it as available |
 | **Dashboard, Kill Switch, Audit, Legal, FRIA, Reports, Human Oversight** | these read the G-1 Studio control-plane backend, which is a different container | no — install G-1 Studio |
 | **Compliance report generation** | `reportlab` / `matplotlib` are not installed | no |
 | **Multiple Applications** | the light profile is single-Application by design | no |
@@ -55,19 +67,22 @@ The list above is what the image ships with. What **your** deployment can do is 
 is read from the artifacts on disk, never declared by hand:
 
 ```bash
-curl -s http://localhost:8080/v1/glad/capabilities | jq '{tiers, max_thinking_level, features, hidden: .ui.hidden_views}'
+curl -s http://localhost:8800/v1/glad/capabilities | jq '{tiers, tiers_live, max_thinking_level, features, hidden: .ui.hidden_views}'
 ```
 
 ```json
 {
-  "tiers": { "glad_g": true, "glad_h": true, "glad_a": false },
-  "max_thinking_level": 2,
-  "features": { "mcp": true, "xai": true, "closedbook": true, "recalibrate": true,
+  "tiers": { "glad_g": true, "glad_h": true, "glad_a": true },
+  "max_thinking_level": 3,
+  "features": { "mcp": true, "mupax": true, "xai": true, "closedbook": true, "recalibrate": true,
                 "rag": false, "audio": false, "idle_judge": false, "multi_application": false },
   "hidden": ["dashboard", "kill-switch", "knowledge", "reports", "fria", "audit", "legal",
              "feedback", "oversight", "license-tokens", "documentation", "agent-flow"]
 }
 ```
+
+`tiers` says what the image carries; `tiers_live` says what is running right now (`ready`, `starting`,
+`failed`, `stopped` or `not_installed`) — a Geodesia-A that did not fit in GPU memory shows up there.
 
 The `tiers` keys of this admin endpoint (`glad_g`, `glad_h`, `glad_a`) are the internal identifiers of
 Geodesia-G, Geodesia-H and Geodesia-A. In a chat response the same tiers appear in `geodesia.thinking.tiers_used`
@@ -85,8 +100,9 @@ is the lower of the two.
 |---|---|
 | one machine, one click, no second container | **G1-Proxy Light** |
 | compliance surfaces (audit trail, FRIA, reports, oversight queue) | G1-Proxy **+** G-1 Studio |
-| thinking level 3 (Geodesia-A) | G1-Proxy |
-| document grounding (RAG) or audio input | G1-Proxy |
+| thinking level 3 (Geodesia-A) | either — the light needs a 24 GB GPU for it |
+| score texts you already have, without an LLM ([G1 Eval](eval.md)) | either |
+| a knowledge base (RAG) or audio input | G1-Proxy |
 | many Applications with separate policies and keys | G1-Proxy **+** G-1 Studio |
 
 The installer takes the choice as a flag — see [Installer](../installer.md), profile `light`.
