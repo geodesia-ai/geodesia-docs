@@ -15,7 +15,7 @@ section and keeps working. This page describes the 2.0 line only.
 
 | Service | Image | What it serves | GPU memory (FP8, measured) |
 |---|---|---|---|
-| `vllm-d3` | `glad-vllm` | **G1-Safety** — safety reader (level 1, and level 2 together with G84), custom policy | 6.5 GiB |
+| `vllm-g1-safety` | `glad-vllm` | **G1-Safety** — safety reader (level 1, and level 2 together with G84), custom policy | 6.5 GiB |
 | `vllm-g84` | `glad-vllm` | **G84** (Geodesia-G) — fast safety reader (level 0) | 1.6 GiB |
 | `vllm-g1v` | `glad-vllm` | **G1V** — hallucination verdict, sentences and words | 6.5 GiB |
 | `vllm-g1v-query` | `glad-vllm` | G1V read as a generator — the **search queries** of `/g1/sufficiency` | 6.5 GiB |
@@ -31,7 +31,7 @@ gateway image is about 0.5 GB (code, the configuration UI and 83 MB of tokenizer
 ```mermaid
 flowchart LR
   C[Your application] -->|HTTP /g1/*| GW[gateway<br/>g1-proxy-light or g1-proxy]
-  GW -->|/classify| D3[vllm-d3<br/>G1-Safety · FP8]
+  GW -->|/classify| D3[vllm-g1-safety<br/>G1-Safety · FP8]
   GW -->|/pooling| G84[vllm-g84<br/>G84]
   GW -->|/pooling| G1V[vllm-g1v<br/>G1V · FP8 + LoRA answer_span]
   GW -->|/v1/completions| Q[vllm-g1v-query<br/>G1V generator · LoRA gen]
