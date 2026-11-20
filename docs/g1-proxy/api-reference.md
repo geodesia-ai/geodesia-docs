@@ -1,5 +1,8 @@
 # G1-Proxy — Complete API Map
 
+!!! info "2.0 line"
+    New in **2.0**: the `/g1/*` routes below the table in [2.0 routes](#20-routes).
+
 Every HTTP surface **G1-Proxy** exposes, in one table. G1-Proxy is the **data plane**: chat, detection, RAG, web search, audio, feedback and everything that has to happen while a request is in flight. Anything about governance, applications, cost or compliance reporting lives on the other service — see the [G-1 Studio API map](../studio/api-reference.md).
 
 !!! info "Where to send the request"
@@ -227,3 +230,19 @@ Frequently looked for here, actually on [G-1 Studio](../studio/api-reference.md)
 | Model catalogue and switching | `/v1/glad/models/available`, `/v1/glad/models/switch` |
 | Stored chat history | `/v1/glad/chat-sessions`, `/v1/glad/chat-messages` |
 | Export every stored chat (JSONL) | `/v1/glad/chat-export` — one JSON object per line, ordered by (session, time), **scoped to the Application**. Streamed, so the response does not grow in memory. If the read breaks halfway the last line says so (`{"_error": …}`) instead of leaving a truncated file that opens fine and looks complete. |
+
+## 2.0 routes
+
+Served directly by the gateway port (`8800` by default), no `/gw` prefix. Authentication: `Authorization: Bearer g1k_live_…`.
+
+| Method | Path | What it does | Page |
+|---|---|---|---|
+| `POST` | `/g1/safety-fast` | safety of a prompt and/or an answer with G84 | [Safety API](safety-api.md) |
+| `POST` | `/g1/safety` | safety with G84 + d3 and an optional custom policy | [Safety API](safety-api.md) |
+| `GET` | `/g1/safety/health` | G84 and d3 servers | [Safety API](safety-api.md) |
+| `POST` | `/g1/hallucination-context` | answer supported by the context? sentences, words | [Hallucination API](hallucination-api.md) |
+| `POST` | `/g1/sufficiency` | is the context enough? missing claims and RAG queries | [Hallucination API](hallucination-api.md) |
+| `POST` | `/g1/hallucination-closedbook` | 2–8 answers, no documents | [Hallucination API](hallucination-api.md) |
+| `GET` | `/g1/hallucination/health` | G1V servers | [Hallucination API](hallucination-api.md) |
+| `POST` | `/g1/eval` | general evaluation (all axes the fields allow) | [G1 Eval](eval.md) |
+| `POST` | `/g1/v1/chat/completions`, `GET /g1/v1/models`, `POST /g1/v1/systemone`, `POST /g1/api/alpha/decisions` | OpenRouter-compatible façades | [G1 Eval](eval.md) |

@@ -1,5 +1,8 @@
 # G1-Proxy Light — one container, and what it leaves out
 
+!!! info "2.0 line"
+    In **2.0** the light profile is the same gateway (`g1-proxy-light`) in front of four vLLM containers; the table below describes the 1.x light profile. **Minimum GPU in 2.0: 24 GB**, everything in FP8, levels 0–2. See [the vLLM stack](vllm-stack.md).
+
 **G1-Proxy Light** is the same engine as G1-Proxy, packaged as **one container that also serves its own
 configuration UI**. It exists for places where an install must be a single click and a single image: a
 cloud catalog listing, an evaluation on one machine, an appliance.
@@ -113,3 +116,14 @@ The light profile is **one deployable**, so it reports **one version**: engine a
 image and cannot be updated separately. The Studio split reports three (control plane, UI bundle, proxy)
 because those are three images, and they have been out of step with each other before — which is exactly
 why they are shown apart.
+
+## 2.0 light
+
+| | 2.0 light |
+|---|---|
+| packaging | gateway image `g1-proxy-light` (about 0.5 GB, no PyTorch) + `glad-vllm` (vLLM and the model weights, about 33 GB) — installed together by `install.sh` |
+| GPU | **24 GB minimum** (stack measured at 21.5 GiB, FP8) |
+| levels | 0 · 1 · 2 (no level 3, no Geodesia-H/-A) |
+| endpoints | `/g1/safety-fast`, `/g1/safety`, `/g1/eval` (+ OpenRouter façade), `/g1/hallucination-context`, `/g1/sufficiency`, `/g1/hallucination-closedbook` |
+| UI | Eval and the new **Hallucination** page, on the same port |
+| not in 2.0 yet | knowledge base (RAG), reference check, speech recognition, the 9B judge |

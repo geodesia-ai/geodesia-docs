@@ -17,6 +17,15 @@
 
 The platform is now **Application-oriented** — with **G-1 Studio**, one shared LLM and G1-Hummingbird detector can serve many isolated Applications, each with its own policy, thresholds, RAG collection, compliance posture, and cost center.
 
+!!! tip "New: Geodesia G-1 2.0"
+    - **Everything on vLLM, in FP8, models inside one image** — a 24 GB GPU runs the whole stack
+      ([the vLLM stack](g1-proxy/vllm-stack.md)); `install.sh` installs it in one command ([installer](installer.md#installsh-20)).
+    - **[Safety API](g1-proxy/safety-api.md)** — `/g1/safety-fast` and `/g1/safety`, with a custom security policy.
+    - **[Hallucination API](g1-proxy/hallucination-api.md)** — `/g1/hallucination-context` (sentences and words),
+      `/g1/sufficiency` (is the context enough? queries for your RAG) and `/g1/hallucination-closedbook`.
+    - A new **Hallucination** page in the UI, an **Eval** page with several answers, and an installable
+      [agent skill](agent-setup/g1-api/SKILL.md). See the [release notes](reference/release-notes.md).
+
 !!! tip "What's new in 1.0 (current release: 1.0.10)"
     - **[G1 Eval](g1-proxy/eval.md)** — score a prompt, context and answer you already have, with no LLM call
       (`POST /g1/eval`), plus OpenRouter-compatible façades, a local call log and an Eval page in the UI.

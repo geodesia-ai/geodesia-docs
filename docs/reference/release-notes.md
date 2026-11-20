@@ -6,6 +6,43 @@ schema version changes only when the shape of the `geodesia` object changes.
 
 ---
 
+## 2.0.0 — 2026-11-20 (g1-proxy, g1-proxy-light)
+
+A new architecture and three new groups of endpoints. The 1.x line is unchanged and keeps its documentation.
+
+### Architecture
+
+- **Every model runs on vLLM, in FP8.** There is no PyTorch server any more: the gateway is a small image without torch that talks HTTP to four vLLM containers (d3, G84, G1V and the G1V query generator). One image, `glad-vllm`, carries
+  the models **inside it**: nothing is mounted or downloaded at start-up. Minimum GPU: **24 GB** (21.5 GiB measured). See [the vLLM stack](../g1-proxy/vllm-stack.md).
+- **Thinking levels 0–2**: level 0 = G84, level 1 = d3, level 2 = G84 + d3 fused (default). **Level 3 is gone**, and so are the Geodesia-H and Geodesia-A tiers. A request with `thinking_level: 3` is served at level 2. See [Thinking Levels](../g1-proxy/thinking-levels.md#20-levels).
+- **`install.sh` 2.0**: one command pulls the two images, resolves the `glc_` license token, checks the GPU, writes the compose file and starts the stack; `update`, `status`, `down`. See [`install.sh` 2.0](../installer.md#installsh-20).
+
+### New endpoints
+
+- **`POST /g1/safety-fast`** (G84) and **`POST /g1/safety`** (G84 + d3, with an optional **custom security policy** that d3 alone decides). See [Safety API](../g1-proxy/safety-api.md).
+- **`POST /g1/hallucination-context`**: is the answer supported by the context? Flagged sentences typed `unsupported` or `contradicted`, and with `token_level` the responsible words.
+- **`POST /g1/sufficiency`**: is the context enough to answer? The missing claims and **search queries for your RAG**; you choose how many with `k_queries` (default 10).
+- **`POST /g1/hallucination-closedbook`**: 2 to 8 answers, no documents; the first is judged against the others. Validation figures and an explicit warning are part of the response.
+  See [Hallucination API](../g1-proxy/hallucination-api.md).
+- **Authentication** of the `/g1/*` routes with the Application key `g1k_live_…` (mandatory with `GW_REQUIRE_APP_KEY=1`); `503 model_unavailable` instead of a silent "allow" when a model server is down.
+
+### Changed
+
+- **`/g1/eval`** reads `halluc_context` and `halluc_closedbook` with G1V and accepts `answers` (several answers for closed-book). See [G1 Eval](../g1-proxy/eval.md#20-changes).
+- **Explanations** (causal explainability) follow the model that decided: G84 at level 0, d3 at level 1, the fusion at level 2.
+- **Studio / light UI**: the new **Hallucination** page (Grounded · Sufficiency · Closed-book) and the updated **Eval** page. See [Studio UI reference](../studio/ui-reference.md#hallucination).
+- **Thresholds** are those calibrated with the 2.0 models; the operating point is conservative (about 2–5% false positives), so recall is lower than in 1.x. See [Detection Thresholds](../reference/thresholds.md#20-thresholds).
+- **Agent skill** `geodesia-g1-api`: installable instructions for AI agents (asks for the key and the URL, decides where a check belongs, examples with real outputs). See [Agent Skill — 2.0 API](../agent-setup/g1-api/SKILL.md).
+
+### Not in 2.0.0
+
+- The knowledge base (RAG), the reference check and the other accessories of the 1.x proxy are **not ported to vLLM yet**; `g1-proxy` 2.0 is the light engine with the full profile.
+- `rag_jailbreak` is off; the safety routes do not read documents (`400 context_not_supported`).
+- Closed-book is a weak signal (held-out AUROC 0.66–0.75): do not use it to block.
+- The insufficiency probability of `/g1/sufficiency` is not calibrated.
+
+---
+
 ## 1.0.10 — 2026-10-30 (g1-proxy, g1-proxy-light, g1-studio)
 
 ### Detection — higher recall on explicit harmful requests

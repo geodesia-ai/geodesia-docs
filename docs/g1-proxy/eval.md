@@ -1,5 +1,8 @@
 # G1 Eval — score texts you already have
 
+!!! info "2.0 line"
+    In **2.0** Eval reads `halluc_context` and `halluc_closedbook` with G1V and accepts several answers — see [2.0 changes](#20-changes) at the end of the page.
+
 **G1 Eval** evaluates a prompt, a context and an answer that you **already have**. Nothing is sent to an LLM:
 there is no upstream call and no pass-through. You get back one JSON object with a score, a threshold and a
 verdict for every axis the texts make measurable.
@@ -422,3 +425,14 @@ sqlite3 g1_eval.sqlite3 "SELECT ts, decision, flagged_axes FROM eval_calls ORDER
 - [Thinking Levels](thinking-levels.md) — what levels 0–3 run.
 - [Response Format](../reference/response-format.md) — the per-axis object and the reference check.
 - [Causal Explainability](causal-xai.md) — explanations of a verdict, down to the word.
+
+## 2.0 changes
+
+- **Levels 0–2.** `thinking_level` 0 = G84, 1 = d3, 2 = fusion (default). `3` is accepted and served at level 2. See [Thinking Levels](thinking-levels.md#20-levels).
+- **`halluc_context` is read by G1V** (the same reader as [`/g1/hallucination-context`](hallucination-api.md#hallucination-context)): with a `context` and an `answer`, the axis carries the flagged sentences in
+  `axes.halluc_context.details.sentences` (`text`, `type` = `unsupported` / `contradicted`, `probability`). If the G1V server is down the axis is `available: false` with the reason — never a made-up score.
+- **Closed-book with several answers.** Send `answers` (a list: the answer to judge **first**, then one to seven independent answers to the same prompt). `halluc_closedbook` is measured by G1V
+  (see [closed-book](hallucination-api.md#closed-book)) and `axes.halluc_closedbook.details.answers` lists the probability of every answer. `answer` + `answer_2` is the same with two answers.
+  The axis is **advisory** — a weaker signal (AUROC about 0.70), not a block.
+- **The Eval page** has a list of "other answers" (add / remove) and shows the flagged sentences and the closed-book table next to the axes. The level selector is L0 · L1 · L2.
+- `rag_jailbreak` is off in 2.0 (`available: false`); a supplied `context` is still scanned with the prompt axes (`context_axes`).

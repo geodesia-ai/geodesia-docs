@@ -1,5 +1,8 @@
 # Thinking Levels
 
+!!! info "2.0 line"
+    This page describes the 1.x levels (0–3 with Geodesia-G, -H and -A). In the **2.0 line** there are three levels — see [2.0 levels](#20-levels) at the end of the page and the [vLLM stack](vllm-stack.md).
+
 **Thinking level** is a per-request dial that trades a little latency for a stricter, more careful verdict from **G1-Hummingbird**. It is a single integer on the request body — `thinking_level` — and it changes *how many detector tiers* judge the turn, not *what* is reported: the response shape and the axis names are identical at every level. What changes is who decides `prompt_safety` and `jailbreak` (see [What changes at levels 1–3](#what-changes-at-levels-1-3)).
 
 Level `2` (**Extra High Thinking**) is the default since 2026-09-18: it is what you get if you never send the field at all. Send `0` (**Low Latency**) explicitly when you need the fastest verdict and accept a weaker one on borderline traffic.
@@ -195,3 +198,16 @@ The GPU deployment (`docker-compose.gpu.yml`, the `--gpu` installer profile) and
 - **Per route, not per user.** The level is a property of *what the call does*, not of who made it. A support-chat endpoint at `0`, a contract-analysis endpoint at `3`.
 - **Measure before you raise it globally.** Send a sample of your real traffic at level `1` and at level `2` and compare `geodesia.axes` against the level-0 baseline. [Policy Lens](../studio/policy-lens.md) does exactly this comparison over stored traffic.
 - **Do not use it as a threshold substitute.** If a whole axis is too loose or too tight for your domain, move the threshold ([Detection Thresholds](../reference/thresholds.md)); the thinking level changes confidence, not policy.
+
+## 2.0 levels
+
+In the 2.0 line the models run on vLLM in FP8 ([the stack](vllm-stack.md)) and **level 3 does not exist** (a request with `thinking_level: 3` is accepted and served at level 2). There is no Geodesia-H or Geodesia-A tier.
+
+| Level | Models | Used by | Decision |
+|---|---|---|---|
+| **0** | G84 (Geodesia-G) | `/g1/safety-fast`; `/g1/eval` with `thinking_level: 0` | G84 score above its threshold (1.8545) |
+| **1** | d3 | `/g1/eval` with `thinking_level: 1`; `/g1/safety` with a custom policy (prompt) | d3 score above its threshold (0.4248) |
+| **2** (default) | G84 + d3 fused | `/g1/safety`; `/g1/eval` | fused score `(1 − w)·aG·zG + w·aD·logit(d3)` above 0.2195 (`G84+d3_l0.0_b-w0.8`, w = 0.8) |
+
+Hallucination (`halluc_context`, `halluc_closedbook`) is read by **G1V** at every level; see the [Hallucination API](hallucination-api.md).
+The thresholds are in [Detection Thresholds](../reference/thresholds.md#20-thresholds).

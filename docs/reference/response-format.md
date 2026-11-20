@@ -1,5 +1,8 @@
 # Response Format Reference — `geodesia` object, schema 1.1
 
+!!! info "2.0 line"
+    The `/g1/*` routes of the 2.0 line return their own objects (`schema_version: "2.0"`), documented in [Safety API](../g1-proxy/safety-api.md) and [Hallucination API](../g1-proxy/hallucination-api.md); `/g1/eval` keeps `g1-eval-1.0`.
+
 Every chat response from **G1-Proxy** and **G1-Proxy Light** is a standard OpenAI (or Ollama) response with
 exactly **one** extra top-level key: `geodesia`. Nothing else is added. Everything Geodesia measured and decided
 for the turn lives inside that object.

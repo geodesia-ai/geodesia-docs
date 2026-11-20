@@ -1,5 +1,8 @@
 # Threshold Tuning Guide
 
+!!! info "2.0 line"
+    The thresholds of the **2.0** models are listed in [2.0 thresholds](#20-thresholds) at the end of the page.
+
 A threshold turns a probability into a decision, which makes it the single most consequential number in
 the deployment — and the one most often set by intuition. This page says where each threshold lives, what
 the calibrated defaults are and what they were measured against, and how to move one without guessing.
@@ -185,3 +188,49 @@ Reviewed borderline calls become corrections, corrections feed the [self-evolvin
 - [Policy Lens](../studio/policy-lens.md) — the counterfactual simulator these thresholds deserve
 - [Token & Cost Control](../g1-proxy/cost-control.md) — the two axes where the threshold is a spending decision
 - [Self-Evolving Security](../g1-proxy/self-evolving.md) — correcting individual cases instead of moving the line
+
+## 2.0 thresholds
+
+Thresholds shipped with the 2.0 models. They are **fixed by the calibration**, not tuned per Application: the 2.0 routes do not take `threshold_overrides`
+(the hallucination endpoints accept a `threshold` and a `profile`). Always read the boolean the service returns.
+
+### Safety
+
+| Reading | Threshold | Comparison |
+|---|---|---|
+| prompt, level 0 / `/g1/safety-fast` (G84) | 1.8545 | score > threshold |
+| prompt, level 1 / custom policy (d3 alone) | 0.4248 | score > threshold |
+| prompt, level 2 / `/g1/safety` (fusion `G84+d3_l0.0_b-w0.8`, w = 0.8) | 0.2195 | fused score > threshold |
+| answer with its prompt (`cp`), d3 | 0.6241 | score ≥ threshold |
+| answer alone (`sr`), d3 | 0.3224 | score ≥ threshold |
+| answer with its prompt, G84 (`/g1/safety-fast`) | −0.3700 | score > threshold |
+| answer alone, G84 | −1.0287 | score > threshold |
+| `profanity`, `prompt_complexity` (G84) | 4.9534, 0.1117 | **informative only, never decide** |
+
+The decision thresholds come from a Neyman–Pearson rule (a fixed false-positive budget on the calibration half of each pool, verified on the other half).
+
+### Hallucination (G1V)
+
+| Reading | Threshold |
+|---|---|
+| grounded, context up to 7,000 characters | 0.5195 (profile `balanced`) |
+| grounded, longer context | 0.2735 (profile `balanced`) |
+| closed-book, 2 answers | 0.9923 |
+| closed-book, 3–4 answers | 0.9888 |
+| closed-book, 5 or more answers | 0.9859 |
+
+`low_false_positives` and `high_recall` move the grounded thresholds to fewer or more detections.
+
+### Measured behaviour of the served 2.0.0 stack
+
+Prompt safety on three public benches, positive = unsafe, level 2 (fusion), measured through the served API:
+
+| Bench | Recall | False-positive rate |
+|---|---|---|
+| WildGuardTest (1,699) | 78.9% | 3.1% |
+| ToxicChat (5,083) | 54.4% | 1.6% |
+| XSTest (450) | 90.5% | 1.6% |
+
+On Geodesia's own benches (8,298 attacks incl. multi-turn jailbreaks, 7,955 benign conversations) level 2 reaches **recall 66.2% at 4.6% false positives** (precision 93.8%); level 0 (`/g1/safety-fast`)
+reaches recall 45.3% at 3.1%. The 2.0 operating point is deliberately **conservative**: false positives are low and recall is lower than in 1.x, whose thresholds sat at about 5–9%
+false positives. On the three public benches the ranking quality of the models (AUROC) is equal to or better than in 1.x; if your application prefers more detections, evaluate a lower threshold on your own data before changing it.

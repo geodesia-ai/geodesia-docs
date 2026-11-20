@@ -314,3 +314,15 @@ Route `/_g1-license-vault` — unlisted, not in the sidebar. Requires `GLAD_LICE
 | **Issue token** | `POST /v1/glad/license-tokens` 🔐 |
 
 Listing and revoking are API-only — `GET /v1/glad/license-tokens` and `POST /v1/glad/license-tokens/{token_id}/revoke`, both 🔐. This page only issues.
+
+## Hallucination
+
+Route `/hallucination` (2.0 line). One page, three tabs, each calling one endpoint of the [Hallucination API](../g1-proxy/hallucination-api.md). Nothing is sent to an LLM. **Load example** fills the active tab.
+
+| Tab | Inputs | What it shows | Calls |
+|---|---|---|---|
+| **Grounded** | prompt (optional), context (several documents separated by a line of `---`), answer, *word level*, profile | verdict and probability against the threshold; the answer with the flagged sentences marked **not supported** (yellow) or **contradicted** (red); with *word level* the words shaded by their weight inside the sentence; the list of flagged sentences | `POST /g1/hallucination-context` |
+| **Sufficiency** | prompt (required), context, answer, *queries* (1–50, default 10), profile | *Context is sufficient / NOT sufficient*, the insufficiency probability (marked *not calibrated*), the claims the context does not support, and the **queries for your RAG** with *copy* and *copy all* | `POST /g1/sufficiency` |
+| **Closed-book** | prompt (optional), 2 to 8 answers (add / remove) — the first is the one judged | the verdict for answer 1, a bar against the threshold, the probability of every answer, and the measured validation figures with the warning that closed-book is a signal, not a block | `POST /g1/hallucination-closedbook` |
+
+The **Eval** page (`/eval`) in 2.0 has levels L0 · L1 · L2, a list of *other answers* for closed-book and shows the flagged sentences and the closed-book table next to the axes — see [G1 Eval](../g1-proxy/eval.md#20-changes).

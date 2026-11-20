@@ -294,3 +294,33 @@ When the same setting is available in multiple places, this is the resolution or
 3. **Database threshold prefs** — set via `POST /v1/glad/threshold-prefs`
 4. **config.yaml** value
 5. **Compiled default**
+
+## 2.0 stack
+
+Variables of the 2.0 line (vLLM containers and gateway). `install.sh` writes them into `.env`; change them there and run `docker compose up -d`.
+
+**Compose (`.env`)**
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `GPU_ID` | required | index or UUID of the NVIDIA GPU |
+| `VLLM_IMAGE`, `GATEWAY_IMAGE` | `glad-vllm:2.0.0`, `g1-proxy-light:2.0.0` | images |
+| `GW_PORT_PUBLIC`, `GW_BIND` | `8800`, `0.0.0.0` | published port and bind address |
+| `RESTART_POLICY` | `unless-stopped` | restart policy of every container |
+| `D3_UTIL`, `G84_UTIL`, `G1V_UTIL`, `QUERY_UTIL` | `0.30`, `0.10`, `0.33`, `0.33` | fraction of GPU memory each vLLM server may take at start (a check, not a reservation) |
+| `D3_KV`, `G1V_KV`, `QUERY_KV` | 256 MiB, 512 MiB, 768 MiB | explicit KV-cache size in bytes (the query server needs about 0.56 GiB for 16,384 tokens) |
+| `D3_MAX_SEQS`, `G1V_MAX_SEQS`, `QUERY_MAX_SEQS` | `16`, `4`, `4` | concurrent requests (the models are hybrid: every concurrent sequence costs memory in the CUDA graphs) |
+
+**Gateway**
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `GW_VLLM_G84_URL`, `GW_VLLM_D3_URL`, `GW_VLLM_G1V_URL`, `GW_VLLM_G1V_QUERY_URL` | set by the compose file | URLs of the four vLLM servers |
+| `GW_VLLM_G84_DIR`, `GW_VLLM_D3_DIR`, `GW_VLLM_G1V_DIR`, `GW_VLLM_G1V_QUERY_DIR` | `/models/…` | where the gateway reads the tokenizers (inside its image) |
+| `GW_VLLM_TIMEOUT_S` | `120` | timeout of a call to a vLLM server |
+| `GW_REQUIRE_APP_KEY` | `0` | `1`: the `/g1/*` routes require an Application key `g1k_live_…` |
+| `GW_EVAL_API_KEYS` | empty | keys accepted by the OpenRouter façade `/g1/v1/*` |
+| `GW_ADMIN_TOKEN` | empty | operator token (never the Application key) |
+| `GLAD_LICENSE`, `GLAD_LICENSE_TOKEN` | empty | signed license (base64) and `glc_…` token |
+| `GLAD_FREE_MAX_CHATS_PER_DAY`, `GLAD_FREE_MAX_MODELS`, `GLAD_FREE_MAX_APPLICATIONS` | empty | free-plan caps |
+| `UPSTREAM_TYPE`, `UPSTREAM_URL`, `UPSTREAM_MODEL` | `openai`, empty, empty | the LLM behind the chat routes |

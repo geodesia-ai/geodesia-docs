@@ -1,5 +1,8 @@
 # Causal Explainability
 
+!!! info "2.0 line"
+    In **2.0** the explanation is computed on the **model that decided**: level 0 explains G84, level 1 explains d3, level 2 explains the fusion. See [2.0 note](#20-note).
+
 A score says *"71% hallucinated"*. An auditor asks *"why"*, and a number cannot answer. This endpoint
 returns the specific tokens that **caused** the verdict, and proves it by removing them and re-measuring
 — no gradients, no sampling, no LLM writing a story about the decision. Same input, same build, same
@@ -576,3 +579,8 @@ The same attribution powers the per-message deep dive in [Policy Lens](../studio
 
 !!! note "Causal XAI is off by default in chat"
     Automatic per-message attribution is opt-in, to avoid unexpected latency on every turn. Enable it in Settings, or call the endpoint on demand for the messages you care about.
+
+## 2.0 note
+
+The attribution (MuPAX / DCA) follows the model used for the decision: the reply says which model it explained (`explained_models`) and the response carries the `thinking_level` that was replayed. In a request at level 1 the d3 reader is explained; at level 2 the fused score is attributed.
+The clause and word explanation of `halluc_context` is now given by the G1V reader ([sentences and words](hallucination-api.md#words)); the `halluc-clauses` route of the 1.x line answers `501` for `halluc_context` in 2.0.

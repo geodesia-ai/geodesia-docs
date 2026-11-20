@@ -149,6 +149,9 @@ nav:
     - Introduction: g1-proxy/index.md
     - G1-Proxy Light (and what it leaves out): g1-proxy/light.md
     - Complete API Map: g1-proxy/api-reference.md
+    - 2.0 Architecture (vLLM stack): g1-proxy/vllm-stack.md
+    - Safety API (2.0): g1-proxy/safety-api.md
+    - Hallucination API (2.0): g1-proxy/hallucination-api.md
     - Configuration: g1-proxy/configuration.md
     - Upstream Backends: g1-proxy/backends.md
     - Framework Compatibility: g1-proxy/compatibility.md
@@ -169,6 +172,7 @@ nav:
     - Causal Explainability: g1-proxy/causal-xai.md
   - Agent Setup:
     - Agent Skill (SKILL.md): agent-setup/SKILL.md
+    - Agent Skill — 2.0 API (SKILL.md): agent-setup/g1-api/SKILL.md
   - MCP Security:
     - Overview: mcp/index.md
     - Guard Server: mcp/guard-server.md

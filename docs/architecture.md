@@ -1,5 +1,8 @@
 # Architecture
 
+!!! info "2.0 line"
+    In 2.0 the models are not loaded by the gateway: they are served by four vLLM containers in FP8. See [the vLLM stack](g1-proxy/vllm-stack.md).
+
 Geodesia G-1 is composed of two independent services that work together: the **Gateway** and the **Product Backend**. Both expose REST APIs; the web UI communicates with both.
 
 ![Diagram](assets/diagrams/architecture-1.svg){: .diagram }

@@ -1,5 +1,8 @@
 # The `install.sh` Installer
 
+!!! info "2.0 line"
+    This page documents the 1.x installer. The **2.0 installer** is different — one image with the models inside, four vLLM containers, a GPU with 24 GB — see [`install.sh` 2.0](#installsh-20) at the end of the page.
+
 `install.sh` is the single, self-contained, one-command installer for the full Geodesia G-1 stack
 (**g1-proxy** engine + **g1-studio** UI) or for the single-container **g1-proxy-light**. It embeds read-only
 registry credentials, pulls the self-contained images, writes the config, and starts everything. This page is
@@ -273,3 +276,52 @@ HTTP_PORT=8080 GATEWAY_PORT=8800 \
 curl -s http://localhost:8800/health
 # → open http://localhost:8080
 ```
+
+## `install.sh` 2.0
+
+```text
+./install.sh [light|proxy] [LICENSE]     install (or re-install, applying the new image / license / configuration)
+./install.sh update                      newer images from the registry, asks per component
+./install.sh status | down | -h
+```
+
+What it does, in order:
+
+1. checks Docker and Compose v2, `nvidia-smi`, the NVIDIA runtime and the **VRAM of the GPU** (at least 24 GB; `FORCE=1` overrides at your own risk). The default GPU is the one with the most memory; choose another with `GPU=<index or UUID>` (see `nvidia-smi -L`);
+2. logs in to the registry with the read-only key embedded in the script (override with `SA_JSON_B64`, `REGISTRY_TOKEN` or `GOOGLE_APPLICATION_CREDENTIALS`);
+3. resolves the **license** (below);
+4. pulls `glad-vllm` (about 33 GB: vLLM, plugins **and all model weights**) and the gateway image (`g1-proxy-light`, or `g1-proxy` for `proxy`);
+5. writes `.env` and `docker-compose.yml` in the work directory (`WORKDIR`, default `./geodesia-g1`) and starts the five containers one after the other;
+6. waits for `/g1/safety/health` (up to 40 minutes the first time, while the kernels compile) and prints the endpoints.
+
+### License
+
+Same model as 1.x. A vendor-signed license defines the plan; verification is offline.
+
+| Input | What happens |
+|---|---|
+| `GLAD_LICENSE_TOKEN=glc_…` | the installer asks `LICENSE_API_URL` (default `https://license.geodesia.ai/v1/glad/license-tokens/validate`) for the signed GEO1 bound to the token. A rejected or unreachable token **stops the install**: it never falls back to the free plan silently |
+| `LICENSE=GEO1.…` or the second argument | the signed key |
+| `LICENSE=/path/license.json` or raw JSON | accepted as well |
+| nothing | **free plan** (20 chats/day, 1 model); `CHATS_PER_DAY`, `MAX_MODELS`, `MAX_APPS` (0 or `unlimited` = no cap) or `FREE_UNLIMITED=1` adjust it |
+
+### Options (environment)
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `TAG` | `2.0.0` | image tag |
+| `REG` | `europe-west1-docker.pkg.dev/glad-manifold-v2/glad` | registry |
+| `WORKDIR` | `./geodesia-g1` | where `.env` and `docker-compose.yml` are written |
+| `GATEWAY_PORT` | `8800` | published port |
+| `GPU` | the GPU with the most memory | index or UUID |
+| `MIN_VRAM_MIB`, `FORCE` | `23000`, `0` | VRAM check |
+| `UPSTREAM_TYPE`, `UPSTREAM_URL`, `UPSTREAM_MODEL` | `openai`, empty, empty | the LLM behind the **chat** routes (not needed by `/g1/*`) |
+| `GW_ADMIN_TOKEN`, `GW_REQUIRE_APP_KEY`, `GW_EVAL_API_KEYS` | empty, `0`, empty | operator token, mandatory Application keys, keys of the OpenRouter façade |
+| `RESTART_POLICY` | `unless-stopped` | container restart policy |
+
+### Update
+
+`./install.sh update` pulls both images and compares them with what runs; for each component that changed it asks before recreating. The four vLLM
+containers share the image, so updating them recreates all four and takes the start-up time again. The Application data (`gateway-var` volume) is kept.
+
+After the install: `curl http://localhost:8800/g1/safety/health` and `/g1/hallucination/health`; open `http://<host>:8800` for the UI.

@@ -1,5 +1,8 @@
 # Installation & Configuration
 
+!!! info "2.0 line"
+    For the **2.0** stack (vLLM containers, 24 GB GPU, models inside the image) use [`install.sh` 2.0](installer.md#installsh-20) and read [the vLLM stack](g1-proxy/vllm-stack.md).
+
 One guide, all the commands: from `install.sh` to a working, configured stack, to calling an LLM with an
 API key and reading the safety verdicts.
 
