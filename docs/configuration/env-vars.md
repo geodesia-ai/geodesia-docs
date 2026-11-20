@@ -81,6 +81,11 @@ Set these variables when starting the gateway (`python -m uvicorn geodesia_gatew
 | `GB_EXTRA_AXES` | *(per checkpoint)* | Axes the served head adds on top of the base six, as `name:region,…` (`region ∈ ans\|prompt\|context`). The 9-axis head ships `profanity:prompt,out_of_scope:prompt,prompt_complexity:prompt`. Read by the detector, the gateway, the policy schema and the feedback store from this single source. |
 | `GW_SYSTEM_AS_CONTEXT` | `0` | `1` treats system messages as grounding context for `halluc_context`. Off by default: a system prompt is an instruction, not evidence — it feeds `out_of_scope` instead. Enable only if your deployment ships its knowledge base inside the system message. |
 | `GW_TOKEN_SAVING` | `0` | `1` turns on the `token_saving` switch at boot: saves upstream tokens without changing what the model reads. Also settable live with `POST /v1/glad/gateway/config` `{"token_saving": true}`. See [Token & Cost Control](../g1-proxy/cost-control.md#token-saving-spend-less-without-changing-what-the-model-reads). |
+| `GW_PROMPT_WINDOW` | `50` | How many **user turns** the input scan reads when a conversation has more than one: the last N user turns and the assistant turns between them, as one transcript. An attack spread across turns (a cipher whose key sits in an earlier turn, a crescendo) is read whole instead of as its harmless last line. `0` = read the last user message only. |
+| `GW_PROMPT_WINDOW_ASSISTANT_CHARS` | `300` | Characters kept from each assistant turn inside that window, so a long answer cannot push the user turns out of the encoder's window. `0` drops assistant turns. |
+| `GW_SLIDING_WINDOW` | `1` | Long texts are read in overlapping windows by **every** tier and thinking level (Geodesia-G, -H and -A), instead of being cut at the encoder's length. `0` = cut. |
+| `GW_SLIDING_OVERLAP` | `0.25` | Overlap between consecutive windows (fraction, 0–0.9). |
+| `GW_SLIDING_MAX_WINDOWS` | `24` | Maximum windows per text (cost cap). |
 
 ### Detection Thresholds (Gateway)
 
@@ -108,7 +113,26 @@ Black-box causal attribution over the companion detector. See [Causal Explainabi
 | `GW_XAI_DCA_RHO` | `0.90` | Sufficiency coverage a subset must reproduce to be **certified**. Raising it to force certificates produces false explanations. |
 | `GW_XAI_DCA_FLOOR` | `0.01` | Relevance noise floor in probability units — below it a unit is `irrelevant`. |
 | `GW_XAI_DCA_MINBASE` | `0.5` | Minimum axis probability for a score to count as a *decision worth explaining*. This is the **attribution floor**, deliberately distinct from the decision threshold. |
+| `GW_XAI_HALLUC_SPARK` | `1` | Explanations of `halluc_context` go from clause to word, read by the grounding reader (see [Causal Explainability](../g1-proxy/causal-xai.md)). `0` restores the previous attribution. |
 | `GW_ANALYZE_MIN_MAXLEN` | `512` | Minimum maxlen when the gateway auto-halves on OOM. |
+
+### G1 Eval
+
+Evaluation-only endpoint `/g1/eval` and its local call log. See [G1 Eval](../g1-proxy/eval.md).
+
+| Variable | Default | Description |
+|---|---|---|
+| `GW_EVAL_LOG` | `1` | Write every Eval call to a local SQLite log. `0` = no log. |
+| `GW_EVAL_LOG_DB` | `g1_eval.sqlite3` next to `GW_DB_PATH` | Path of the log (`/app/var/g1_eval.sqlite3` in the shipped images). |
+| `GW_EVAL_CAPTURE_BODY` | `1` | Also store the texts (prompt, context, answer) and the full response. `0` = statistics only. **Stored texts are customer data.** |
+| `GW_EVAL_EXPORT_TOKEN` | — | Enables `GET /g1/eval/stats` and `GET /g1/eval/export` with `Authorization: Bearer <token>`. Unset → `403 export_disabled`. Its own token: not `GW_API_TOKEN`, not the licence token. |
+| `GW_EVAL_CLIENT_SALT` | built-in | Salt of the hashed client id stored instead of the IP. |
+| `GW_EVAL_API_KEYS` | — | Comma-separated Bearer keys for the OpenRouter-compatible endpoints (`/g1/v1/*`, `/g1/api/alpha/decisions`). Unset = open. |
+| `GW_EVAL_MODEL_ID` | `geodesia/g1-eval` | Model id of those endpoints. |
+| `GW_EVAL_MAX_CONCURRENCY` | `4` | Concurrent evaluations on those endpoints; above it, an immediate `429`. |
+| `GW_EVAL_PRICE_REQUEST` / `GW_EVAL_PRICE_PROMPT` / `GW_EVAL_PRICE_COMPLETION` | `0` | USD prices published in the model card. |
+| `GW_EVAL_CONTEXT_LENGTH` | `32768` | Context length declared in the model card. |
+| `GW_EVAL_DATACENTERS` | `US` | ISO country codes declared in the model card. |
 
 ### RAG
 
@@ -177,6 +201,9 @@ Per-request depth dial (`thinking_level` `0`–`3`, `3` = MAX). **Off by default
 | `GW_GLADA_CKPT` | — | Capability pack that unlocks thinking level **3 (MAX)**. Unset → a level-3 request is served at the deepest level available. |
 | `GW_GLADA_DEVICE` | `auto` | Device for the level-3 pack. |
 | `GW_FUSION_BANK` | `runs/glad_bert/fusion_bank_thinking_v3_gladh_v1.json` | Calibration artifact that keeps every level on the same probability scale as level 0, so thresholds do not have to be re-tuned per level. Missing/unreadable → same fallback as an unset pack. |
+| `GW_DEFAULT_THINKING_LEVEL` | `2` | Level used when a request does not set `thinking_level`. If unset, `GW_MAX_THINKING_LEVEL` (the level ceiling the image declares) is used, then `2`. The shipped images set `2`. To serve without level 3, empty `GW_GLADA_CKPT` instead. |
+| `GB_TIER_START_TIMEOUT` | `180` (images: `900`) | Seconds a tier may take to start before it is declared failed. A tier that does not start makes its levels fall back to the deepest one available, and `geodesia.thinking.tiers_used` says so. |
+| `GW_TIER_OOM_RETRY_S` | `3600` | When a tier cannot start for lack of GPU memory (typically level 3 on a GPU under 24 GB), wait this long before trying again, instead of reloading it every few seconds. |
 
 ### Live Web Search
 

@@ -482,6 +482,74 @@ The `result` of a completed job includes:
 
 ---
 
+## `halluc_context` by clause and by word
+
+Token attribution answers "which words moved the score". For a grounding verdict the question an auditor asks is
+different: **which statement of the answer is not supported, and what in the document should have supported
+it?** Since 1.0.9.1 `halluc_context` is explained in the units the grounding model itself reads — the answer's
+clauses — and then down to the words.
+
+### By clause
+
+<div class="endpoint"><span class="method method-post">POST</span><span class="path">/v1/glad/causal-explainability/halluc-clauses</span></div>
+
+Body: `{context, answer, prompt?}` (`response` / `full_response` are accepted for `answer`). The answer is split
+into clauses with the same splitter the served reading uses; each clause is scored against the context exactly
+as the served reading scores it (on a long document, over the same retrieved passages, and fused with the
+detector's claim-by-window head the same way), and compared with the threshold of the document's regime.
+
+```bash
+curl -s -X POST http://localhost:8080/gw/v1/glad/causal-explainability/halluc-clauses \
+  -H "Content-Type: application/json" \
+  -d '{
+    "context": "Our return policy allows refunds within 30 days of delivery. Shipping is free above 50 EUR.",
+    "answer": "You can return items within 60 days. Shipping is free above 50 EUR."
+  }' | jq '{regime, threshold, row_score, row_flagged, clauses: [.clauses[] | {text, score, flagged, evidence: .evidence.text}]}'
+```
+
+| Field | Description |
+|---|---|
+| `regime` | `short` or `long` (context above 7,000 characters), as in the [served reading](detection-axes.md#halluc_context-context-faithfulness). |
+| `threshold` | The threshold of that regime. |
+| `row_score`, `row_flagged`, `row_rule` | The answer-level score and how the served reading derives it from the clauses (on a long document, the worst clause). |
+| `clauses[]` | One entry per clause: `text`, `start` / `end` (character offsets in the answer), `score`, `flagged`, and `evidence` — the closest sentence of the context, with its `start` / `end` offsets, so a UI can highlight both sides. Per-reader scores are included next to the fused one. |
+| `n_clauses`, `clauses_not_shown` | At most 24 clauses are explained; the rest are counted. |
+| `ms` | Time taken. |
+
+`422` when context or answer is missing; `503` when the grounding model is not loaded. The explanation runs on
+request, outside the verdict path: it never changes the served verdict.
+
+### By word, with a causal graph
+
+`POST /v1/glad/causal-explainability/analyze` pinned to `halluc_context` (`"axis": "halluc_context"`, methods
+`dca`, `mupax_causal`, `occlusion`, `gradient_causal`) uses the clause reading first, then goes down to the words:
+
+1. the clauses the grounding model flags (or, when only the answer as a whole is flagged, the worst one);
+2. inside each, the words that do not occur in the context — numbers, dates and names weigh more — are removed
+   one at a time, and the drop in the probability that the clause is unsupported is their importance
+   (`answer_tokens[].importance`);
+3. a **causal graph** links the words of the closest context sentence (`prompt_tokens`, the sources) to the answer
+   words (`causal_edges[]`, `{source_position, source_token, target_position, target_token, raw_importance}`):
+   the same word is a full edge; a figure or name the context does not contain is linked to the context's own
+   figures and names it should have matched.
+
+The block also carries `clauses`, `flagged_clauses`, `base_score`, `threshold` and `flag`, in the same slot the
+requested method's UI already reads. When the grounding model is not available, the previous LLM-judge
+explanation is used instead; `GW_XAI_HALLUC_SPARK=0` makes the judge the first choice again.
+
+### In the Web UI
+
+- **Causal Intelligence** shows a **by clause** panel above the heatmap for any turn that had a real grounding
+  context: every clause of the answer coloured supported / not supported, with the context sentence it was
+  matched to. **🔬 DEEP (MuPAX LLM)** on `halluc_context` draws the word-level causal graph.
+- **G1 Eval** shows the same by-clause panel under the axis table whenever it evaluated `halluc_context`.
+- **Eval sessions in Causal.** Evaluations run from the Eval page (or any `/g1/eval` call that sends a
+  `session_id`) appear among the conversations in Causal Intelligence — prompt-only evaluations included —
+  so an evaluated text can be explained with every method on this page. Calls without `session_id` are not
+  listed there.
+
+---
+
 ## Configuration
 
 | Variable | Default | Description |

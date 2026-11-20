@@ -94,10 +94,10 @@ tokens of the **question** — a different feature, and the one that decides whi
 |---|---|---|---|---|
 | `vllm` | vLLM serving engine | ✅ Full support | ✅ | **✅ → SLEDGE-Next v2** |
 | `internal` | vLLM managed by the gateway itself | ✅ Full support | ✅ | **✅ → SLEDGE-Next v2** |
-| `sglang` | SGLang serving framework | ✅ Full support | ✅ | ❌ → classic (fork) |
-| `trtllm` / `tensorrt-llm` | NVIDIA TensorRT-LLM | ✅ Full support | ✅ | ❌ → classic (fork) |
-| `openai` | OpenAI API or any OpenAI-compatible endpoint | ✅ When `logprobs=true` | ✅ | ❌ → classic (fork) |
-| `ollama` | Ollama (local models) | ✅ Native (≥ 0.12) | ✅ (older < 0.12: sidecar) | ❌ → classic (fork) |
+| `sglang` | SGLang serving framework | ✅ Full support | ✅ | ❌ → SLEDGE-logprobs |
+| `trtllm` / `tensorrt-llm` | NVIDIA TensorRT-LLM | ✅ Full support | ✅ | ❌ → SLEDGE-logprobs |
+| `openai` | OpenAI API or any OpenAI-compatible endpoint | ✅ When `logprobs=true` | ✅ | ❌ → SLEDGE-logprobs |
+| `ollama` | Ollama (local models) | ✅ Native (≥ 0.12) | ✅ (older < 0.12: sidecar) | ❌ → SLEDGE-logprobs |
 
 !!! info "9 vs 8 axes"
     The **closed-book fabrication** axis needs per-token log-probabilities from the upstream — a measure
@@ -109,9 +109,10 @@ tokens of the **question** — a different feature, and the one that decides whi
     It is **not** part of the OpenAI API, so Ollama and OpenAI do not return it — they ignore the field
     silently, with no error. An upstream can therefore show *closed-book available* and still have no
     `prompt_logprobs`: the first is about the **answer**, the second about the **question**. Without it
-    the premise block has nothing to read, and G-1 keeps the detector on **classic (fork)** rather than
-    shipping 7 features stuck at zero. Serving the same model on **vLLM** is the whole fix — the default
-    moves to SLEDGE-Next v2 on its own at the next start.
+    the premise block has nothing to read, and G-1 uses **SLEDGE-logprobs** (the `fork` and `nli`
+    blocks, fitted without the premise) rather than shipping 7 features stuck at zero. Serving the same
+    model on **vLLM** is the whole fix — the default moves to SLEDGE-Next v2 on its own at the next start.
+    Up to 0.4.2 the fallback is **classic (fork)**; SLEDGE-logprobs ships with the first release after it.
 
 ---
 

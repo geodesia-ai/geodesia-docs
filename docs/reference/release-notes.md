@@ -1,8 +1,202 @@
 # Release Notes
 
-Changes that affect how you integrate with Geodesia. The product version (for example `0.4.2`) and the
-[response schema version](response-format.md) (`schema_version`, for example `"1.0"`) are separate numbers: the
+Changes that affect how you integrate with Geodesia. The product version (for example `1.0.10`) and the
+[response schema version](response-format.md) (`schema_version`, for example `"1.1"`) are separate numbers: the
 schema version changes only when the shape of the `geodesia` object changes.
+
+---
+
+## 1.0.10 — 2026-10-30 (g1-proxy, g1-proxy-light, g1-studio)
+
+### Detection — higher recall on explicit harmful requests
+
+- The detection models and the thinking-level rules of the 1.0.6 line are back, with all the code of 1.0.9.1.
+  The stricter thresholds introduced in 1.0.8 kept false positives very low, but let too many short, explicit
+  harmful requests through at levels 0–2. 1.0.10 restores the higher recall on these requests.
+- Thinking levels: level 0 and level 1 decide per tier (`prompt_safety` or `jailbreak` over its threshold);
+  level 2 fuses the margins of Geodesia-G and Geodesia-H, and level 3 fuses Geodesia-G, -H and -A, calling
+  Geodesia-A on every level-3 request (in 1.0.8 – 1.0.9.1 it was called only inside an uncertainty band). See [Thinking Levels](../g1-proxy/thinking-levels.md).
+- `halluc_context` uses the reader thresholds calibrated for these models.
+- Nothing changes in the API or in the response schema.
+
+---
+
+## 1.0.9.1 — 2026-10-28 (g1-proxy, g1-proxy-light, g1-studio)
+
+### Explaining `halluc_context` — clause and word
+
+- A flagged `halluc_context` verdict can be explained down to the **clause** and the **word**: the clauses of the
+  answer that the context does not support, then the words inside them that make the difference (several at once
+  when the error needs more than one word). Each word is linked to the closest sentence of the context, so the
+  explanation shows *what* the context says instead (e.g. "March" in the answer against "September" in the
+  document). Available in the **Causal Explainability** page and in **Eval**. The LLM judge remains a fallback.
+  See [Causal Explainability](../g1-proxy/causal-xai.md).
+
+### G1 Eval
+
+- **Second answer for closed-book.** Without a context, Eval accepts an optional `answer_2`: a second,
+  independent answer to the same prompt. `halluc_closedbook` is then measured from the agreement between the two
+  answers (multilingual NLI) plus token probabilities read locally, with no call to an LLM and no upstream
+  logprobs. See [G1 Eval](../g1-proxy/eval.md).
+- `out_of_scope` and the "Verify references" option are no longer part of Eval (a context is not a declared
+  scope; the reference check stays available on `/v1`).
+- Eval sessions are listed in the Causal Explainability page, so an Eval verdict can be explained like a chat.
+
+### Closed-book calibration
+
+- The UI shows the SLEDGE catalog: calibrations already available for the selected upstream model can be applied
+  without recalibrating. See [Closed-Book Calibration](../g1-proxy/closed-book-calibration.md).
+
+### System-prompt leak (also in 1.0.8.1)
+
+- Requests for the system prompt are recognised with more verbs ("get", "fetch") and with typos
+  ("get me ssytem promt"), only when they target the assistant's own instructions — never "my" prompt or a third
+  party's.
+- Codes and values that the system prompt declares secret are protected as single tokens: a secret that leaves
+  inside a paraphrase is caught.
+- In streaming, when the system prompt holds secrets, the tail of the answer is held back and checked token by
+  token; it is delivered at the end only if it is not a leak (also on an upstream error and with PII redaction).
+
+---
+
+## 1.0.8 — 2026-10-26 (g1-proxy, g1-proxy-light, g1-studio)
+
+Point releases 1.0.8.1 – 1.0.8.5 (26–27 October) are included below.
+
+- **New detection models and thresholds.** Superseded by 1.0.10, which restores the 1.0.6 models and rules.
+- **System-prompt leak and documents.** A document placed in the system prompt or in `context` can be quoted:
+  only the instructions and the declared secrets are protected, sentence by sentence. A context that starts with
+  `SYSTEM:` is protected like a system message (1.0.8.1).
+- **No default upstream model.** The installer and the gateway no longer pick a model on your behalf: set
+  `UPSTREAM_MODEL` at install time or choose it in the UI (Settings → Gateway). Chat and closed-book calibration
+  wait for it. On Ollama the installer checks that the chosen model is installed.
+- **Closed-book calibration.** SLEDGE calibration runs with the upstream's thinking turned off. The default
+  method is **SLEDGE-Next** (`fork,prem,nli`); SLEDGE-Next v2 is still selectable. The calibration selector
+  remembers your choice.
+- **`halluc_context` visible again** on deployments where the detector graph was compiled.
+- **G1 Eval page** in the g1-proxy-light UI (`/eval`, 1.0.8.2), with the clause-level explanation of
+  `halluc_context` (1.0.8.4).
+- UI and API messages are in English.
+
+---
+
+## 1.0.6 / 1.0.7 — 2026-10-24
+
+Detection-model updates of Geodesia-G, -H and -A with recalibrated thresholds for every axis and for the
+long-document `halluc_context` reader. 1.0.7 was published for g1-proxy-light only. 1.0.4 and 1.0.5 were
+internal candidates and were never released.
+
+---
+
+## 1.0.3.1 — 2026-10-21 (g1-proxy, g1-proxy-light, g1-studio)
+
+- **Long texts on every tier.** Geodesia-H and Geodesia-A now read texts longer than their window in sliding
+  windows, like Geodesia-G (maximum per axis). A harmful request buried in the middle of a long document is
+  scored as such at every thinking level.
+- **Agentic traces.** An upstream answer that calls a tool is not checked for `halluc_context` (it is not a claim
+  about the context). In Eval and the OpenRouter façade, a turn with `tool_calls` is not taken as the answer, and
+  a conversation that ends with a tool output is a turn in progress.
+- Geodesia-A no longer contributes to `rag_jailbreak` at level 3.
+- **Closed-book on Ollama.** SLEDGE-Next v2 works on Ollama (premise by forcing). The logprob probe reports the
+  real reason when an upstream cannot be used (`model_not_found`, `auth_error`, …), and "Test capabilities" runs a
+  fresh probe.
+- The default Application's binding follows the container environment, and saving the `default` Application in
+  the UI sends only the fields that changed (it no longer rewrites the upstream).
+
+---
+
+## 1.0.3 — 2026-10-12 (g1-proxy, g1-proxy-light, g1-studio)
+
+- **New detection models** for Geodesia-G, -H and -A, with fewer false positives on borderline prompts. Level 1
+  is Geodesia-H alone (the G-then-H cascade is removed).
+- **Only the axes you choose.** With an explicit `axes` list, only those axes are computed; the others report
+  `available: false` with `unavailable_reason: "axis not requested"` and cannot hold the request. Previously the
+  deciding axes were always added back.
+- **Your thresholds apply to `halluc_context`.** A threshold set with the Settings slider, a policy or
+  `threshold_overrides` is now honoured by the `halluc_context` reader (short and long documents), also for the
+  `default` Application.
+- **Context read as sent.** Leading and trailing whitespace of `context` is no longer stripped before scoring.
+- **`enforce_out_of_scope`** (off by default): when on, `out_of_scope` is decided by a dedicated scope reader
+  fused with Geodesia-G.
+- Faster first axes: the detector graph is compiled at start-up (allow 4–5 minutes of warm-up before the first
+  request is fast).
+- Known limit: multi-turn jailbreaks are best served at thinking level 3.
+
+---
+
+## 1.0.2 — 2026-10-05 (g1-proxy, g1-proxy-light, g1-studio)
+
+First 1.0 release on the registry; it includes the 1.0.0 and 1.0.1 work.
+
+### Detection
+
+- **`halluc_context` read by a dedicated grounding model** (a fine-tuned 4B reader), fused with a claim-level
+  head on long documents (> 7,000 characters). It is the only reader of `halluc_context` and serves `/v1`, MCP and
+  G1 Eval alike. It runs in int8 on the GPU when there is one (`GW_HALLUC_2B_DEVICE=auto`), on the CPU otherwise.
+- **Conversation window by default.** The input scan reads the last 50 user turns and the assistant turns between
+  them (`GW_PROMPT_WINDOW`), so an attack spread over several turns is no longer judged on its harmless last line.
+  Also on the G1 Eval façades.
+- **`/v1` blocks by default** (`GW_BLOCK_INPUT=1`); the UI chat runs in `blocking`.
+- The dilution guard is removed; the decode guard remains (`details.recovered_by: "decode_guard"`).
+- The dedicated `prompt_safety_x` axis introduced in 0.4.4 is no longer shipped.
+- Streaming: `input_scan` declares `thinking.complete: false` until every requested tier has answered.
+
+### Operations
+
+- g1-proxy-light is sized for a 16 GB GPU: the `halluc_context` reader and Geodesia-A are served in int8.
+
+---
+
+## 0.4.5 — 2026-09-28 (g1-proxy, g1-proxy-light, g1-studio)
+
+Production release of the 0.4.4 features.
+
+- **Sealed images.** Model weights are encrypted at rest inside the images; the `halluc_context` reader and the
+  explainability replay worker now start under sealing (they did not in 0.4.4).
+- An unreachable upstream answers `502` at once; the logprob probe connects in 5 s.
+- User thresholds and the live tier status reach the final payload.
+- **Reference check:** PubMed abstracts are read by DOI; calls to NCBI are spaced.
+- **Live web search** uses a search API instead of scraping. See [Live Web Search](../g1-proxy/web-search.md).
+- `/g1/eval` reports the product version read from the version file.
+- The container health check follows the configured port.
+
+---
+
+## 0.4.4 — 2026-09-27 (g1-proxy, g1-proxy-light, g1-studio)
+
+Includes 0.4.3 (2026-09-26), which was not published as images.
+
+### G1 Eval — evaluation-only API
+
+- **`POST /g1/eval`** scores a prompt, a context and an answer you already have, with no LLM call. The axes come
+  from the fields you fill in; the pipeline is the `/v1` one (same models, thresholds and `default` Application
+  state), so the verdicts are bit-identical to a chat. The response is English JSON with
+  `product {name, version}`.
+- **OpenRouter-compatible façades:** `POST /g1/v1/chat/completions`, the Decisions API
+  (`POST /g1/v1/systemone`, `POST /g1/api/alpha/decisions`) and `GET /g1/v1/models`.
+- **Local call log** (SQLite) with `GET /g1/eval/stats` and `GET /g1/eval/export`, protected by a dedicated
+  token. See [G1 Eval](../g1-proxy/eval.md).
+
+### Reference check (0.4.3)
+
+- Opt-in `"verify_references": true`: every link, DOI, arXiv id, PubMed id and citation in the answer is looked up
+  on open sources, and a local classifier reads whether the source supports the sentence that cites it. One
+  hallucinated reference raises `halluc_closedbook` (or `halluc_context` with a context) above its threshold; the
+  check only reports, never blocks. Response schema **1.1** adds the `references` details and the
+  `reference_check` streaming event. See [Reference check](response-format.md#reference-check).
+- **Closed-book without prompt logprobs (0.4.3).** On upstreams that do not return prompt logprobs, the default
+  closed-book method is SLEDGE-logprobs (fork + NLI).
+
+### Detection and operations
+
+- `prompt_safety_x`: a dedicated framed-harm axis that can only add a `prompt_safety` flag (removed in 1.0.2).
+- **g1-proxy-light carries everything g1-proxy serves** — thinking levels 0–3, the `halluc_context` reader, the
+  reference-check classifier, SLEDGE closed-book and G1 Eval — except the 9B judge, speech recognition and RAG.
+  Level 3 was served as level 2 in earlier light images; this is fixed.
+- Geodesia-A gets up to 15 minutes to start (`GB_TIER_START_TIMEOUT=900`): on slow disks level 3 silently fell
+  back to level 2.
+- Sealed images: the Geodesia-H/A checkpoints and the SLEDGE artifacts load through the weight vault (levels 1–3
+  and closed-book were off in sealed images).
 
 ---
 

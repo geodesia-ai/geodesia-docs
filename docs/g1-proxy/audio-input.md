@@ -160,10 +160,9 @@ curl -s http://localhost:8080/gw/v1/glad/audio/status | jq
 ```mermaid
 flowchart LR
     M[🎙 Mic / WebRTC<br/>PCM 16kHz mono] --> V{{Energy VAD}}
-    V -->|speech| W[Whisper tiny<br/>sliding window]
+    V -->|speech| W[Nemotron 3.5 RNNT<br/>cache-aware streaming]
     V -->|silence ≥ 700ms| EOU[End of utterance]
-    W --> LA[LocalAgreement-2<br/>commit policy]
-    LA --> T[Committed transcript<br/>monotone-growing]
+    W --> T[Committed transcript<br/>monotone by construction]
     T -->|every N words / EOU| G[G1-Hummingbird<br/>prompt_safety · jailbreak]
     G --> D{Decision}
     D -->|pass| U[→ upstream LLM]
@@ -182,16 +181,17 @@ flowchart LR
 
 <p class="diagram-caption">The same "brake" the streaming monitor applies to a generated answer, moved to the input side: as the transcript commits new words, the input axes re-score — an early block fires before the speaker finishes.</p>
 
-### Sliding window + LocalAgreement-2
+### Cache-aware streaming (no commit delay)
 
-Whisper is a batch model — naively re-running it every chunk makes it *rewrite* the tail of the transcript constantly (flicker), which would make incremental scoring incoherent. Geodesia uses the **LocalAgreement-2** policy: a word is **committed** only once **two consecutive decodings agree** on it. That yields a **monotonically growing** transcript — the stable prefix the re-scoring needs — while the unconfirmed tail stays a draft. The audio window is trimmed behind the last commit, so the per-decode cost stays **O(window)**, not O(whole utterance).
+Earlier releases used Whisper, which is a batch model: streaming it meant re-decoding an overlapping window every chunk, and a word could only be **committed** once two consecutive decodings agreed on it (LocalAgreement-2). That agreement was a **latency floor** — every word waited a full extra chunk before the detector ever saw it.
 
-- **Committed** words → scored by G1-Hummingbird (authoritative).
-- **Draft** tail → optionally scored for an even earlier warning (opt-in, higher threshold, never a hard block).
+The engine is now a **cache-aware streaming RNNT**. Each mel frame is encoded exactly once and the encoder state carries forward, so there is no window to re-decode; and RNNT output is **frame-synchronous and monotone by construction** — it never rewrites what it emitted. The agreement buffer is therefore not optimised away, it is *unnecessary*, and the floor is gone.
+
+- **Committed** words → scored by G1-Hummingbird (authoritative). There is no draft tail any more: the model commits as it emits.
 - **End-of-utterance** (silence ≥ `vad_eou_ms`) → one final authoritative score.
 
 !!! warning "Latency is the ASR, not the detector"
-    G1-Hummingbird scores in ~30 ms; **Whisper is the cost**. `tiny` (INT8, CTranslate2 runtime) runs faster than real-time on a modern CPU; `base`/`small` lower the word-error-rate at higher latency and generally want a GPU. Time-to-block after the last risky word ≈ the LocalAgreement commit delay (two windows) + one re-score, typically **under ~1 s**.
+    G1-Hummingbird scores in ~30 ms; the ASR is the cost. Measured on an RTX A6000 (fp32, warm), the per-chunk cost is nearly **constant** across chunk sizes — 68 ms at the 80 ms tier, 76 ms at 320 ms, 91 ms at 560 ms — because at these sizes the forward is limited by kernel *launches*, not arithmetic. Consequences: half precision buys essentially nothing (so the default stays fp32), and the 80 ms tier leaves only ~12 ms of real-time margin, which a co-resident vLLM will eat. **The default is the 320 ms tier** (RTF 0.25, WER 2.0 % on LibriSpeech).
 
 ---
 
@@ -202,21 +202,22 @@ Enable it in **[G-1 Studio → Settings → Input & security layers → Audio in
 | Setting | Env | Default | Description |
 |---|---|---|---|
 | Enabled | `GW_AUDIO_ENABLED` | `0` (off) | Master switch. Off → the WS endpoint refuses connections; typed chat is unchanged. |
-| Whisper model | `GB_AUDIO_ASR_MODEL` | `tiny` | `tiny` (baked, fastest, multilingual) · `tiny.en` · `base` · `small`. |
-| Language | `GB_AUDIO_ASR_LANG` | `""` (auto) | Blank = autodetect; or pin `en`/`it`/`es`/… |
+| ASR model | `GB_AUDIO_ASR_MODEL` | `nemotron-3.5-asr-streaming-0.6b` | The one baked engine (40 language-locales). Legacy Whisper names (`tiny`, `large-v3-turbo`, …) are accepted and folded onto it, so an upgraded deployment keeps guarding. |
+| Latency tier | `GB_AUDIO_LOOKAHEAD` | `3` | Right attention context → chunk size: `0`=80 ms · `3`=320 ms · `6`=560 ms · `13`=1120 ms. Lower is faster to block, with less real-time margin. |
+| Language | `GB_AUDIO_ASR_LANG` | `""` (auto) | Blank = auto; or pin `en`/`it`/`es`/… **Note:** under `auto` the language is *not* reported during a live stream (this engine emits no per-chunk LID), so calibrate thresholds on a multilingual benign pool. |
 | Re-score every N words | `GB_AUDIO_SCORE_EVERY_WORDS` | `6` | Cadence of incremental scoring on committed words. |
 | End-of-utterance silence | `GB_AUDIO_VAD_EOU_MS` | `700` | Trailing silence (ms) that ends the utterance → final score. |
 | Hard-block on flag | `GB_AUDIO_BLOCK_ON_FLAG` | `1` | On → block; off → warn/annotate only. |
-| Draft (tail) scoring | `GB_AUDIO_DRAFT_SCORING` | `0` | Score the unconfirmed tail for an earlier warning (may over-flag). |
-| Baked model dir | `GB_AUDIO_MODEL_DIR` | `/opt/glad/models/faster-whisper-tiny` | Offline path to the baked `tiny` model (air-gapped, no download). |
+| Draft (tail) scoring | `GB_AUDIO_DRAFT_SCORING` | `0` | **Inert.** Kept so existing configs still parse: the RNNT commits as it emits, so there is no unconfirmed tail to score. |
+| Baked model dir | `GB_AUDIO_MODEL_DIR` | `/opt/glad/models/nemotron-3.5-asr-streaming-0.6b` | Offline path to the baked model (air-gapped, no download). |
 
-Switching the model to `base`/`small` in the UI ignores the baked `tiny` path and pulls that model from Hugging Face on first use (bake it too for air-gapped use).
+There is no accuracy/speed model swap any more: one multilingual engine covers every supported locale, and the accuracy/latency trade is made with `GB_AUDIO_LOOKAHEAD` instead.
 
 ---
 
 ## Deployment
 
-`faster-whisper` and the `Systran/faster-whisper-tiny` model (~75 MB, CTranslate2) are **baked into the G1-Proxy image** — the audio guard runs offline with no runtime download. For scale-out, run the audio component as a standalone service and point it at a remote scoring host:
+The `nvidia/nemotron-3.5-asr-streaming-0.6b` model (~2.4 GB, OpenMDW-1.1 — commercial use permitted) is **baked into the G1-Proxy image**, and the runtime is the `transformers` (≥ 5.13) + torch stack the detector already ships — no extra ASR dependency. The audio guard runs offline with no runtime download. For scale-out, run the audio component as a standalone service and point it at a remote scoring host:
 
 ```bash
 GEODESIA_SCORING_URL=http://scoring-host:8810 \
