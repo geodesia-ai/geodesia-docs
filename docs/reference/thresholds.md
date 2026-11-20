@@ -199,10 +199,10 @@ Thresholds shipped with the 2.0 models. They are **fixed by the calibration**, n
 | Reading | Threshold | Comparison |
 |---|---|---|
 | prompt, level 0 / `/g1/safety-fast` (G84) | 1.8545 | score > threshold |
-| prompt, level 1 / custom policy (d3 alone) | 0.4248 | score > threshold |
+| prompt, level 1 / custom policy (G1-Safety alone) | 0.4248 | score > threshold |
 | prompt, level 2 / `/g1/safety` (fusion `G84+d3_l0.0_b-w0.8`, w = 0.8) | 0.2195 | fused score > threshold |
-| answer with its prompt (`cp`), d3 | 0.6241 | score ≥ threshold |
-| answer alone (`sr`), d3 | 0.3224 | score ≥ threshold |
+| answer with its prompt (`cp`), G1-Safety | 0.6241 | score ≥ threshold |
+| answer alone (`sr`), G1-Safety | 0.3224 | score ≥ threshold |
 | answer with its prompt, G84 (`/g1/safety-fast`) | −0.3700 | score > threshold |
 | answer alone, G84 | −1.0287 | score > threshold |
 | `profanity`, `prompt_complexity` (G84) | 4.9534, 0.1117 | **informative only, never decide** |

@@ -15,7 +15,7 @@ section and keeps working. This page describes the 2.0 line only.
 
 | Service | Image | What it serves | GPU memory (FP8, measured) |
 |---|---|---|---|
-| `vllm-d3` | `glad-vllm` | **d3** — safety reader (level 1, and level 2 together with G84), custom policy | 6.5 GiB |
+| `vllm-d3` | `glad-vllm` | **G1-Safety** — safety reader (level 1, and level 2 together with G84), custom policy | 6.5 GiB |
 | `vllm-g84` | `glad-vllm` | **G84** (Geodesia-G) — fast safety reader (level 0) | 1.6 GiB |
 | `vllm-g1v` | `glad-vllm` | **G1V** — hallucination verdict, sentences and words | 6.5 GiB |
 | `vllm-g1v-query` | `glad-vllm` | G1V read as a generator — the **search queries** of `/g1/sufficiency` | 6.5 GiB |
@@ -31,14 +31,14 @@ gateway image is about 0.5 GB (code, the configuration UI and 83 MB of tokenizer
 ```mermaid
 flowchart LR
   C[Your application] -->|HTTP /g1/*| GW[gateway<br/>g1-proxy-light or g1-proxy]
-  GW -->|/classify| D3[vllm-d3<br/>d3 · FP8]
+  GW -->|/classify| D3[vllm-d3<br/>G1-Safety · FP8]
   GW -->|/pooling| G84[vllm-g84<br/>G84]
   GW -->|/pooling| G1V[vllm-g1v<br/>G1V · FP8 + LoRA answer_span]
   GW -->|/v1/completions| Q[vllm-g1v-query<br/>G1V generator · LoRA gen]
 ```
 
 !!! note "Why four vLLM servers"
-    A vLLM instance serves one pooling task. The d3 safety reader, the G84 encoder and the two G1V roles (reader and
+    A vLLM instance serves one pooling task. The G1-Safety safety reader, the G84 encoder and the two G1V roles (reader and
     query generator) are different architectures or tasks, so each gets its own instance. They start **one after the
     other**, because vLLM measures the free GPU memory at start-up.
 
@@ -47,8 +47,8 @@ flowchart LR
 | Level / endpoint | Models used |
 |---|---|
 | level 0 — `/g1/safety-fast` | G84 |
-| level 1 | d3 |
-| level 2 — `/g1/safety`, default of `/g1/eval` | G84 + d3 fused |
+| level 1 | G1-Safety |
+| level 2 — `/g1/safety`, default of `/g1/eval` | G84 + G1-Safety fused |
 | `/g1/hallucination-context`, `/g1/sufficiency` | G1V (+ G1V generator for the queries) |
 | `/g1/hallucination-closedbook` | G1V |
 
@@ -56,7 +56,7 @@ There is **no level 3** and no Geodesia-H / Geodesia-A tier in 2.0: see [Thinkin
 
 ## Precision
 
-Weights are loaded in **FP8** (weight-only FP8 with the Marlin kernels on Ampere GPUs): `fp8_per_tensor` for d3, `fp8_per_block` for G1V.
+Weights are loaded in **FP8** (weight-only FP8 with the Marlin kernels on Ampere GPUs): `fp8_per_tensor` for G1-Safety, `fp8_per_block` for G1V.
 Quality of the FP8 G1V reader against the reference runtime on the same 200 rows: **verdict 194/194 identical decisions**,
 sentences **195/200**. The word-level weights differ more (they are a relative signal, see
 [Hallucination API](hallucination-api.md#words)).
@@ -89,7 +89,7 @@ See [The install.sh installer](../installer.md#installsh-20) for every option, a
 | Route | Meaning |
 |---|---|
 | `GET /health` | the gateway is up |
-| `GET /g1/safety/health` | `{"status":"ok","servers":{"g84":true,"d3":true}}`; `503` with `"degraded"` when a model server does not answer |
+| `GET /g1/safety/health` | `{"status":"ok","servers":{"g84":true,"G1-Safety":true}}`; `503` with `"degraded"` when a model server does not answer |
 | `GET /g1/hallucination/health` | the same for the G1V servers |
 
 A model server that is down gives **`503 model_unavailable`** — never a silent "allow". Treat it as "the check did not happen".

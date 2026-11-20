@@ -82,7 +82,7 @@ Rules:
 ### 1.4 Verify before you rely on it
 
 ```bash
-# 1) the service is up (local): 200 {"status":"ok","servers":{"g84":true,"d3":true}}; 503 = a model server is down
+# 1) the service is up (local): 200 {"status":"ok","servers":{"g84":true,"G1-Safety":true}}; 503 = a model server is down
 curl -sS -i "$GEODESIA_BASE_URL/g1/safety/health"
 
 # 2) smoke test: must return 200 with "decision":"allow"
@@ -148,8 +148,8 @@ Placement rules:
 |---|---|---|
 | `/g1/safety-fast` `prompt` | logit-like score of GLAD-G | `score > threshold` (already in `blocked`) |
 | `/g1/safety-fast` `answer` | logit-like score of GLAD-G | `score > threshold` |
-| `/g1/safety` `prompt` | standard policy: fused logit score; custom policy: d3 logit score | `score > threshold` |
-| `/g1/safety` `answer` | d3 probability-like score in [0, 1] | `score >= threshold` |
+| `/g1/safety` `prompt` | standard policy: fused logit score; custom policy: G1-Safety logit score | `score > threshold` |
+| `/g1/safety` `answer` | G1-Safety probability-like score in [0, 1] | `score >= threshold` |
 | `/g1/eval` `axes.*` | probability in [0, 1] | `flagged` (per axis, `score > threshold`) |
 | `/g1/v1/systemone` | `noul` in [0, 1], **0.5 is the axis threshold** | `noul > 0.5` |
 
@@ -164,7 +164,7 @@ Placement rules:
 
 ### 4.1 `GET /g1/safety/health`
 
-No body. `200 {"status": "ok", "servers": {"g84": true, "d3": true}}`. `503 {"status": "degraded", "servers": {…false…}}` when a model server does not answer.
+No body. `200 {"status": "ok", "servers": {"g84": true, "G1-Safety": true}}`. `503 {"status": "degraded", "servers": {…false…}}` when a model server does not answer.
 Use it for readiness probes, not before every call.
 
 ### 4.2 `POST /g1/safety-fast` — one model, lowest latency
@@ -223,15 +223,15 @@ Same request as 4.2 plus:
 |---|---|---|---|
 | `policy` | string | no | the customer's security policy as plain text, up to **2,048 tokens**, never truncated. Missing → the standard calibrated policy `glad_standard_v2b` |
 
-Models: GLAD-G (G84) + d3. Rules:
-- **Standard policy**: prompt decided by the **fusion** of G84 and d3 (`rule: "G84+d3_l0.0_b-w0.8"`, thinking level 2); answer decided by d3 (`d3_risposta_cp` / `d3_risposta_sr`).
-- **Custom policy**: the prompt is decided by **d3 alone** (`rule: "d3_solo_l0.0"`) because G84 only knows the standard policy; G84 stays visible as `g84_z`. The thresholds were calibrated on the standard policy, so every section carries `calibrated: false` — **it still decides**.
+Models: GLAD-G (G84) + G1-Safety. Rules:
+- **Standard policy**: prompt decided by the **fusion** of G84 and G1-Safety (`rule: "G84+d3_l0.0_b-w0.8"`, thinking level 2); answer decided by G1-Safety (`d3_risposta_cp` / `d3_risposta_sr`).
+- **Custom policy**: the prompt is decided by **G1-Safety alone** (`rule: "d3_solo_l0.0"`) because G84 only knows the standard policy; G84 stays visible as `g84_z`. The thresholds were calibrated on the standard policy, so every section carries `calibrated: false` — **it still decides**.
 
 **Response** — as 4.2, plus:
 
 | Field | Meaning |
 |---|---|
-| `prompt.axes.prompt_safety` / `jailbreak` | `{d3_p, g84_z}`: d3 probability in [0, 1] and G84 score |
+| `prompt.axes.prompt_safety` / `jailbreak` | `{d3_p, g84_z}`: G1-Safety probability in [0, 1] and G84 score |
 | `prompt.truncated`, `answer.truncated` | `true` if the conversation had to be shortened to fit; old turns are dropped first, the policy never |
 | `policy` | `{id: "glad_standard_v2b" \| "custom", sha256_16, calibrated}`. The policy text is never returned or stored, only its fingerprint |
 | `models` | `{"g84": "G84", "d3": "d3_86_a075"}` |
@@ -283,7 +283,7 @@ One call that scores **whichever fields you fill**. It is the only route that re
 | `context` | string | no | documents/tool results. With a `prompt`, the safety axes are **also** read on the context (`context_axes`) |
 | `answer` | string | no | the answer to judge |
 | `answers` | string[] | no | **closed-book**: the answer to judge **first**, then one to seven independent answers to the same prompt. With two or more, `halluc_closedbook` is measured by G1V (same verdict as `/g1/hallucination-closedbook`, section 4.9.3). `answer` + `answer_2` is the same thing with two answers |
-| `thinking_level` | integer 0-2, default 2 | no | `0` G84 only (fastest) · `1` d3 only · `2` fusion (most accurate). `3` is accepted and treated as `2` |
+| `thinking_level` | integer 0-2, default 2 | no | `0` G84 only (fastest) · `1` G1-Safety only · `2` fusion (most accurate). `3` is accepted and treated as `2` |
 | `verify_references` | boolean | no | also run the reference check on citations in the answer (adds a `reference_check` object; `checked: 0` if there is nothing to check) |
 | `reference_relevance_threshold` | number | no | tuning of the reference check |
 | `enforce_out_of_scope` | boolean | no | accepted for compatibility; `out_of_scope` is not an evaluation axis in this service |

@@ -428,7 +428,7 @@ sqlite3 g1_eval.sqlite3 "SELECT ts, decision, flagged_axes FROM eval_calls ORDER
 
 ## 2.0 changes
 
-- **Levels 0–2.** `thinking_level` 0 = G84, 1 = d3, 2 = fusion (default). `3` is accepted and served at level 2. See [Thinking Levels](thinking-levels.md#20-levels).
+- **Levels 0–2.** `thinking_level` 0 = G84, 1 = G1-Safety, 2 = fusion (default). `3` is accepted and served at level 2. See [Thinking Levels](thinking-levels.md#20-levels).
 - **`halluc_context` is read by G1V** (the same reader as [`/g1/hallucination-context`](hallucination-api.md#hallucination-context)): with a `context` and an `answer`, the axis carries the flagged sentences in
   `axes.halluc_context.details.sentences` (`text`, `type` = `unsupported` / `contradicted`, `probability`). If the G1V server is down the axis is `available: false` with the reason — never a made-up score.
 - **Closed-book with several answers.** Send `answers` (a list: the answer to judge **first**, then one to seven independent answers to the same prompt). `halluc_closedbook` is measured by G1V

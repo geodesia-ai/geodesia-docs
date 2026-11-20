@@ -7,7 +7,7 @@ documents and hallucination axes, see [G1 Eval](eval.md); for grounded hallucina
 
 | | `POST /g1/safety-fast` | `POST /g1/safety` |
 |---|---|---|
-| Models | G84 only (level 0) | G84 + d3 (level 2) |
+| Models | G84 only (level 0) | G84 + G1-Safety (level 2) |
 | Custom policy | no (`400 policy_not_supported`) | **yes** (`policy`, up to 2,048 tokens) |
 | Typical latency (A6000, warm) | tens of ms | about 100–200 ms |
 | Use it when | the request is latency-sensitive | you need a custom policy or the best accuracy |
@@ -73,15 +73,18 @@ runs on the `default` Application. Always send the key.
 | `policy` | `/g1/safety` only: `id` (`glad_standard_v2b` or `custom`), the `sha256_16` fingerprint, `calibrated`. The policy text is never returned or stored |
 | `models`, `latency_ms`, `schema_version`, `endpoint` | as elsewhere |
 
+!!! note "Identifiers in the response"
+    The reader called **G1-Safety** in this documentation appears in some response identifiers under its technical id (`d3_p`, the `rule` values `d3_solo_l0.0` and `d3_risposta_*`, `models.d3`). They are stable names to parse, not a different model.
+
 ### Which rule decides
 
 | Section | `/g1/safety-fast` | `/g1/safety`, standard policy | `/g1/safety`, custom policy |
 |---|---|---|---|
-| prompt | `G84_solo`, score > 1.8545 | fusion `G84+d3_l0.0_b-w0.8`, score > 0.2195 | **d3 alone** `d3_solo_l0.0`, score > 0.4248 |
-| answer, with prompt (`cp`) | G84 answer score > −0.37 | d3 score ≥ 0.6241 | same |
-| answer, alone (`sr`) | G84 answer score > −1.0287 | d3 score ≥ 0.3224 | same |
+| prompt | `G84_solo`, score > 1.8545 | fusion `G84+d3_l0.0_b-w0.8`, score > 0.2195 | **G1-Safety alone** `d3_solo_l0.0`, score > 0.4248 |
+| answer, with prompt (`cp`) | G84 answer score > −0.37 | G1-Safety score ≥ 0.6241 | same |
+| answer, alone (`sr`) | G84 answer score > −1.0287 | G1-Safety score ≥ 0.3224 | same |
 
-**Custom policies.** G84 only knows the standard policy, so with a custom policy the prompt is decided by d3 alone and G84
+**Custom policies.** G84 only knows the standard policy, so with a custom policy the prompt is decided by G1-Safety alone and G84
 stays visible as `g84_z`. The thresholds were calibrated on the standard policy, so every section carries
 `calibrated: false` — it **still decides**. Test a custom policy on 10–20 real examples of each kind before relying on it.
 

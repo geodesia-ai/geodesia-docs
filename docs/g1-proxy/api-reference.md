@@ -238,8 +238,8 @@ Served directly by the gateway port (`8800` by default), no `/gw` prefix. Authen
 | Method | Path | What it does | Page |
 |---|---|---|---|
 | `POST` | `/g1/safety-fast` | safety of a prompt and/or an answer with G84 | [Safety API](safety-api.md) |
-| `POST` | `/g1/safety` | safety with G84 + d3 and an optional custom policy | [Safety API](safety-api.md) |
-| `GET` | `/g1/safety/health` | G84 and d3 servers | [Safety API](safety-api.md) |
+| `POST` | `/g1/safety` | safety with G84 + G1-Safety and an optional custom policy | [Safety API](safety-api.md) |
+| `GET` | `/g1/safety/health` | G84 and G1-Safety servers | [Safety API](safety-api.md) |
 | `POST` | `/g1/hallucination-context` | answer supported by the context? sentences, words | [Hallucination API](hallucination-api.md) |
 | `POST` | `/g1/sufficiency` | is the context enough? missing claims and RAG queries | [Hallucination API](hallucination-api.md) |
 | `POST` | `/g1/hallucination-closedbook` | 2–8 answers, no documents | [Hallucination API](hallucination-api.md) |

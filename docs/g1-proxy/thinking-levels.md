@@ -206,8 +206,8 @@ In the 2.0 line the models run on vLLM in FP8 ([the stack](vllm-stack.md)) and *
 | Level | Models | Used by | Decision |
 |---|---|---|---|
 | **0** | G84 (Geodesia-G) | `/g1/safety-fast`; `/g1/eval` with `thinking_level: 0` | G84 score above its threshold (1.8545) |
-| **1** | d3 | `/g1/eval` with `thinking_level: 1`; `/g1/safety` with a custom policy (prompt) | d3 score above its threshold (0.4248) |
-| **2** (default) | G84 + d3 fused | `/g1/safety`; `/g1/eval` | fused score `(1 − w)·aG·zG + w·aD·logit(d3)` above 0.2195 (`G84+d3_l0.0_b-w0.8`, w = 0.8) |
+| **1** | G1-Safety | `/g1/eval` with `thinking_level: 1`; `/g1/safety` with a custom policy (prompt) | G1-Safety score above its threshold (0.4248) |
+| **2** (default) | G84 + G1-Safety fused | `/g1/safety`; `/g1/eval` | fused score `(1 − w)·aG·zG + w·aD·logit(G1-Safety)` above 0.2195 (`G84+d3_l0.0_b-w0.8`, w = 0.8) |
 
 Hallucination (`halluc_context`, `halluc_closedbook`) is read by **G1V** at every level; see the [Hallucination API](hallucination-api.md).
 The thresholds are in [Detection Thresholds](../reference/thresholds.md#20-thresholds).
