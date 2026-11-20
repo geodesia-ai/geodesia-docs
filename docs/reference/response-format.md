@@ -240,7 +240,7 @@ Every entry of `axes` and `additional_axes` has the same shape.
 | `head_score` | `jailbreak` | Score of the base detector head before the linear-probe combination. |
 | `linear_probe_z` | `jailbreak` | Logit of the linear intent probe combined with the head. |
 | `pooled_score` | prompt axes | Score before an input guard recovered a diluted or encoded attack. |
-| `recovered_by` | prompt axes | `dilution_guard` or `decode_guard`: the guard that recovered the attack. |
+| `recovered_by` | prompt axes | `decode_guard`: the guard that recovered the attack. |
 | `flag_kept_from_level_0` | any | At thinking level ≥ 1 the fused score alone would not flag; the flag comes from the level-0 verdict (fusion can only add flags, never remove them). |
 | `verification_status` | `halluc_context_joint` | Verifier status. |
 | `leak_source` | `sysprompt_leak` | Which protected field leaked, e.g. `messages.system`, `tools.<name>.description`. |
@@ -431,7 +431,7 @@ compatibility layer.
 | `geodesia.dominant_axis`, `geodesia.brake`, `geodesia.input` | removed (use `decision` and `reason`) |
 | axis `tier` | removed: the group (`axes` / `additional_axes`) says it; still present inside the certificate |
 | `energy_unit`, `energy_dHmax_joule`, axis `delta_E_joule` / `p_energy` (debug payload, `GW_CLEAN_PAYLOAD=0`) | removed |
-| `dilution_guard` / `decode_guard` blocks, axis `dilution_recovered` / `decode_recovered` | `details.pooled_score` + `details.recovered_by` |
+| `decode_guard` blocks, axis `decode_recovered` | `details.pooled_score` + `details.recovered_by` |
 | `context_judge.flag`, `claims[].i`, `claims[].span`, `claims_truncated`, `advisory`, `score_kind` | `context_judge.flagged`, `claims[].index`, `claims[].start`/`end`, `truncated` (advisory is implied) |
 | research page `axes.{p, thr, flag}`, `dominant` | `axes.{score, threshold, flagged}`, `axis` |
 | `geodesia.sysprompt_leak` | `geodesia.axes.sysprompt_leak` (the protected text is no longer echoed) |

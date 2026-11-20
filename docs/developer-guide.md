@@ -201,18 +201,16 @@ that decided. Classifier axes (`prompt_complexity`) also carry a `label` (`simpl
   `token_surprisal[]` — per-token generator surprisal `{index, text, surprisal, start, end}`. Use these to
   highlight which answer tokens look fabricated.
 
-### If an input guard recovered an attack
+### If the decode guard recovered an attack
 
-When the dilution guard (`GW_DILUTION_GUARD=shadow|enforce`) or the decode guard recovers a camouflaged,
-diluted or encoded attack that slipped the pooled head, the affected prompt axis reports it in `details`:
+When the decode guard recovers an encoded or obfuscated attack that slipped the pooled head, the affected prompt axis reports it in `details`:
 
 ```json
 "jailbreak": { "score": 0.919, "threshold": 0.9864, "flagged": true, "available": true, "role": "enforce",
-               "details": { "pooled_score": 0.114, "recovered_by": "dilution_guard" } }
+               "details": { "pooled_score": 0.114, "recovered_by": "decode_guard" } }
 ```
 
-`pooled_score` is the whole-prompt score before the guard; `recovered_by` is `dilution_guard` or
-`decode_guard`.
+`pooled_score` is the whole-prompt score before the guard; `recovered_by` is `decode_guard`.
 
 ---
 
