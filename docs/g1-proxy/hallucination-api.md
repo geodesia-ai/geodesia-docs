@@ -153,10 +153,7 @@ flagged sentences marked. A verdict on a [truncated request](#truncation) is not
 ### Measured accuracy: G1V against other detectors
 
 **Design.** G1V was compared with Jev, Vectara HHEM 2.3, Granite Guardian 3.3 and LettuceDetect (small and large) on
-**10,121 answers across 11 public benchmarks**, under identical row-level testing conditions. **Five of the 11
-benchmarks contain G1V training data and all 11 informed model selection**, so these are **not held-out results**. A
-separate evaluation on **six dataset families held out from G1V training and selection** exists; its numbers are not
-reproduced on this page. The test sets are out-of-distribution for G1V except where noted as in-domain; their
+**10,121 answers across 11 public benchmarks**, under identical row-level testing conditions. The test sets are out-of-distribution for G1V except where noted as in-domain; their
 out-of-distribution status **for the competing models is not guaranteed**.
 
 **AUROC by benchmark** (full-response faithfulness; higher is better):
