@@ -321,6 +321,34 @@ question — as AUROC on **pilot out-of-distribution development sets**:
 These are **pilot development sets**, not a held-out test, and only AUROC is reported (no thresholds, recall or false-positive rate).
 They are not the dedicated transfer benchmark mentioned above.
 
+### Where this fits among related tools
+
+Sufficiency is the part of this page that fewer tools offer: **a verdict on whether the context is enough, together with
+search queries aimed at what is missing**. The table summarises what we found in the **public documentation of other
+tools, read in November 2026 in a time-limited review**. "Not found" means we did not find the capability in that
+documentation; it does not prove that it is absent. Specialised hallucination-detection vendors are not yet covered by
+this review.
+
+| Tool | Judges whether the context is enough? | Proposes queries for what is missing? |
+|---|---|---|
+| Amazon Bedrock, Azure and Google grounding checks | Not found: they check the faithfulness of the answer | Not found |
+| NVIDIA NeMo Guardrails, TruLens, Anthropic, OpenAI, Contextual AI | Not found | Not found |
+| IBM Granite RAG Library (Apache 2.0, runs locally) | Yes: "Answerability", 90.6 on MT-RAG against 82.5 for GPT-4o, as published by IBM; English | Not found (its Query Clarification asks the user a question) |
+| Weaviate Query Agent (Weaviate Cloud only) | Partly: it judges the answer, not the context on its own | Partly: it lists the missing information, not stated as a search query |
+| Cohere | Not found | Generates queries from the question alone, before the documents are seen |
+| LlamaIndex and LangGraph CRAG | Per-document relevance, yes or no | Generic rewriting of the question, not aimed at the gap |
+| Ragas | Offline only; needs the correct answer | Not found |
+| Google "Sufficient Context" | Research, not a product: Gemini 1.5 Pro autorater, F1 0.935 on 115 examples, as published | Not found |
+
+Two further observations from the same review: none of the three cloud grounding checks publishes an accuracy figure for
+its check, and we found no threshold guidance tied to a stated false-positive rate. Geodesia publishes
+[operating points at stated false-positive rates](#published-operating-points), with the conditions and limits of the
+measurement.
+
+In short: a sufficiency verdict with published operating points **plus** queries for the missing information, in five
+European languages, self-hosted. The figures of other tools above are as published by their authors, on their own
+benchmarks, and are **not comparable** with the measurements on this page.
+
 ### Query suggestions for missing information
 
 When the context is insufficient the service proposes search queries that describe the missing information.
