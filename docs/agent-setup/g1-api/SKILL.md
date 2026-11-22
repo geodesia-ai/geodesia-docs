@@ -124,7 +124,7 @@ Pick the integration points from this table; do not add checks "everywhere".
 | has its own security rules (children's app, bank, medical…) | as above | `/g1/safety` with `policy` | `policy.calibrated == false` is expected with a custom policy; the sections still decide |
 | answers questions from retrieved documents (RAG) | **after** generation | `/g1/hallucination-context` | `hallucinated` → regenerate, or show the flagged `sentences` to the user |
 | must know if retrieval was good enough | after retrieval + generation | `/g1/sufficiency` | `sufficient == false` → run the returned `queries` on your RAG, add the passages, regenerate |
-| samples several answers from an LLM with no documents | after sampling | `/g1/hallucination-closedbook` | high `probability` → treat the answer as unreliable (a **signal, not a block**: held-out AUROC 0.66 with 2 answers, 0.75 with 5 or more; false positives 11–16%) |
+| samples several answers from an LLM with no documents | after sampling | `/g1/hallucination-closedbook` | high `probability` → treat the answer as unreliable (accuracy depends on the stability of the LLM that produced the answers; a **signal, not a block**; see the Hallucination API page for the measurements) |
 | runs on OpenRouter | everywhere above | chat completions facade `/g1/v1/chat/completions` or Decisions `/g1/v1/systemone` | the JSON in `choices[0].message.content` |
 
 Placement rules:

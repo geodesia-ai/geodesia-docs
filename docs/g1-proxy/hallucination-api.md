@@ -222,10 +222,16 @@ All rows: calibration set above, cross-validated by document group (5×20), thre
 (0.989–0.998). At the 1% threshold: observed FPR 0.0%, recall 0.408 (0.347–0.497). At the 2% threshold: observed FPR
 0.17%, recall 0.642.
 
+!!! note "Relation to the served build"
+    In the 2.0.0 build as served today, the `sufficient` field is decided by claim-level support (a sentence of the answer
+    that the context does not support because information is missing), **not** by the thresholds in this table. The table
+    is the reference for the sufficiency score it was measured on; wiring those thresholds into the served verdict is not
+    done yet, so the profile names do not select these thresholds today.
+
 Read these numbers with the following in mind:
 
 - **Recall is a conservative lower bound.** In a blind read of 60 cases, about **8%** of the "insufficient" labels were actually answerable.
-- **Profiles.** `low_false_positives`, `balanced` and `high_recall` are thresholds on this score. Their **precision, recall and false-positive rate per profile are not yet measured** — use the table above as the reference, and do not read profile names as guarantees.
+- **Profiles.** `low_false_positives`, `balanced` and `high_recall` are named operating points; their **precision, recall and false-positive rate on the sufficiency verdict are not yet measured**. Use the table above as the reference, and do not read profile names as guarantees.
 - **Calibrate on your own sample** (a few hundred labelled examples) before you gate anything ([checklist](#how-to-validate-on-your-data)).
 - **Latency (P95) is not yet measured.**
 - **New document domains.** Accuracy on other domains is being measured on a dedicated transfer benchmark (software specifications, API descriptions, coding-agent traces, contracts, regulations, patents) and will be added when it is finished. **Transfer is not claimed.**
