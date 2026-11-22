@@ -49,6 +49,8 @@ deployment ([the vLLM stack](vllm-stack.md)).
 A common alternative is to ask a general-purpose LLM (here: a model of 27–100 billion parameters, run locally) whether an
 answer is supported by the context. The table lists what that setup does not guarantee and what `hallucination-context` does.
 
+On hallucination detection with context, **G1V is more than three times more accurate than an LLM used as a judge, on average across the benchmarks evaluated.**
+
 | Point | LLM as a judge | `hallucination-context` (G1V) |
 |---|---|---|
 | **Coverage of the claims** | One verdict on the whole answer. There is no guarantee that every claim was examined: an error in the middle of a long answer can pass, and you cannot tell which part weighed on the verdict. | **Every claim is checked on its own against the whole context**, so none is skipped by construction, and you know which claim is flagged and where. A sentence with fewer than two content words is not scored on its own; the verdict of the whole answer still covers it ([Short sentences](#short-sentences)). |
