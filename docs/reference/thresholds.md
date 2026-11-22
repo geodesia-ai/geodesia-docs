@@ -215,9 +215,11 @@ The decision thresholds come from a Neyman–Pearson rule (a fixed false-positiv
 |---|---|
 | grounded, context up to 7,000 characters | 0.5195 (profile `balanced`) |
 | grounded, longer context | 0.2735 (profile `balanced`) |
-| closed-book, 2 answers | 0.9923 |
-| closed-book, 3–4 answers | 0.9888 |
-| closed-book, 5 or more answers | 0.9859 |
+| closed-book, 2 answers | 0.9923 (held-out AUROC 0.66) |
+| closed-book, 3–4 answers | 0.9888 (held-out AUROC 0.70) |
+| closed-book, 5 or more answers | 0.9859 (held-out AUROC 0.75) |
+
+Closed-book figures: held-out bank of 411 rows in 9 languages; false-positive rate 11–16% across the three readings. It is a **signal, not an automatic block** — an AUROC of 0.66–0.75 is far from the grounded check. Details in the [Hallucination API](../g1-proxy/hallucination-api.md#closed-book).
 
 `low_false_positives` and `high_recall` move the grounded thresholds to fewer or more detections.
 
