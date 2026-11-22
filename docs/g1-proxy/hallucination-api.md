@@ -321,7 +321,7 @@ Read these numbers with the following in mind:
 - **Recall is a conservative lower bound.** In a blind read of 60 cases, about **8%** of the "insufficient" labels were actually answerable.
 - **Profiles.** `low_false_positives`, `balanced` and `high_recall` are named operating points; their **precision, recall and false-positive rate on the sufficiency verdict are not yet measured**. Use the table above as the reference, and do not read profile names as guarantees.
 - **Calibrate on your own sample** (a few hundred labelled examples) before you gate anything ([checklist](#how-to-validate-on-your-data)).
-- **Latency:** medians on a shared H200 are in [Latency](#latency); **P95 is not yet measured**.
+- **Latency (P95) is not yet measured.**
 - **New document domains.** Accuracy on other domains is being measured on a dedicated transfer benchmark (software specifications, API descriptions, coding-agent traces, contracts, regulations, patents) and will be added when it is finished. **Transfer is not claimed.**
 - **Languages.** Per-language accuracy is not yet published ([Languages](#languages)).
 - The numbers hold for requests that were **not truncated** ([Truncation](#truncation)).
@@ -421,21 +421,6 @@ Errors: `400 invalid_answers`, `400 not_enough_answers`, `413 too_many_answers`,
 [`/g1/eval`](eval.md) returns the same verdicts as axes: `halluc_context` (context + answer) and `halluc_closedbook` (the `answers` field), with the per-sentence
 details in `axes.<name>.details`. Use the dedicated endpoints when you need the words, the queries or the sufficiency verdict.
 
-## Latency
-
-Measured on a **shared H200, one request at a time**:
-
-| Case | Measurement |
-|---|---|
-| Answer only, about 1k tokens | median 0.076 s |
-| Answer only, 16k tokens and 64 claims | median 1.096 s |
-| Full cascade, 16k tokens, one flagged claim | 4.225 s |
-| Full cascade, 16k tokens, 64 flagged claims | 98.014 s |
-
-An estimate for the 64-claim cascade on an **A100 was 291 s; it is an estimate, not a measurement.** These figures are
-measurements under the stated conditions only: GPU scheduling, network and production load are **not captured**, and
-**P95 is not yet measured**.
-
 ## Versioning
 
 Behaviour is **tied to a named model version**: the thresholds and numbers on this page belong to the model that was
@@ -469,6 +454,4 @@ Do this before any of these endpoints blocks production traffic.
 - **Closed-book** is a signal whose accuracy depends on the stability of the LLM (false positives 11–16% on the held-out bank); only the first answer is judged; it costs 2–8 times the generation cost.
 - **Words** carry relative weights, not independent probabilities; sentences shorter than two content words are not scored on their own.
 - Passage objects `{text, title?, label?}` and the **detector version string** in responses are **to be added**.
-- The comparison with other detectors is on public benchmarks, **five of which contain G1V training data and all of which informed model selection**; the competing models' exposure to them is not guaranteed. The 64-claim full cascade took 98 s on a shared H200; an A100 figure is an estimate only.
-
-*Sources: Salesforce AI Research brief, November 2026; G1V vs Jev per-benchmark report; G1V threshold-profile report; real-answer sufficiency report; definitive MVP latency and parity reports.*
+- The comparison with other detectors is on public benchmarks, **five of which contain G1V training data and all of which informed model selection**; the competing models' exposure to them is not guaranteed.
