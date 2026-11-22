@@ -44,6 +44,23 @@ the search queries of `sufficiency`. The grounded thresholds are calibrated and 
 length; the sufficiency operating points were fixed on a measured set at stated false-positive rates. Both run in your own
 deployment ([the vLLM stack](vllm-stack.md)).
 
+## Against a general-purpose LLM used as a judge
+
+A common alternative is to ask a general-purpose LLM (here: a model of 27–100 billion parameters, run locally) whether an
+answer is supported by the context. The table lists what that setup does not guarantee and what `hallucination-context` does.
+
+| Point | LLM as a judge | `hallucination-context` (G1V) |
+|---|---|---|
+| **Coverage of the claims** | One verdict on the whole answer. There is no guarantee that every claim was examined: an error in the middle of a long answer can pass, and you cannot tell which part weighed on the verdict. | **Every claim is checked on its own against the whole context**, so none is skipped by construction, and you know which claim is flagged and where. A sentence with fewer than two content words is not scored on its own; the verdict of the whole answer still covers it ([Short sentences](#short-sentences)). |
+| **Repeatability** | The answer can change from one run to the next and the JSON format can break. Even at temperature 0, how requests are batched together can change the result. | A **numeric score per claim**. It also varies slightly with batching: up to 0.025 depending on the padding. For this reason the reader is kept stable, and the verdict changes in 1–2% of cases on vLLM. |
+| **Threshold** | A yes/no with no calibration: you do not know how many false alarms it produces. | A **continuous score** with a threshold chosen at a declared false-positive rate (for sufficiency, the 1–10% table in [Published operating points](#published-operating-points)). |
+| **Explanation** | Usually one free-form sentence. | The **flagged claims and words, with their position** in your answer. |
+
+**Checking claim by claim with an LLM.** An LLM can also do the check claim by claim, with several calls: extract the
+claims, then make one call per claim. That multiplies the cost and the time by the number of claims, because each call is
+a call to the large model; the result is **not repeatable**; and the quality of the extraction step is **not verified**.
+G1V does the same claim-level check with a **small, calibrated model, in a repeatable way**, in one request.
+
 ## Health and readiness
 
 `GET /g1/hallucination/health` → `200 {"status":"ok"}` when the G1V servers answer.
