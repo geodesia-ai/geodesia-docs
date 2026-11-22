@@ -150,6 +150,70 @@ no single sentence could be isolated.
 `hallucinated: true` → do not show the answer as it is. Regenerate with the passages and an instruction to cite them, or show the answer with the
 flagged sentences marked. A verdict on a [truncated request](#truncation) is not a verdict.
 
+### Measured accuracy: G1V against other detectors
+
+**Design.** G1V was compared with Jev, Vectara HHEM 2.3, Granite Guardian 3.3 and LettuceDetect (small and large) on
+**10,121 answers across 11 public benchmarks**, under identical row-level testing conditions. **Five of the 11
+benchmarks contain G1V training data and all 11 informed model selection**, so these are **not held-out results**. A
+separate evaluation on **six dataset families held out from G1V training and selection** exists; its numbers are not
+reproduced on this page. The test sets are out-of-distribution for G1V except where noted as in-domain; their
+out-of-distribution status **for the competing models is not guaranteed**.
+
+**AUROC by benchmark** (full-response faithfulness; higher is better):
+
+| Benchmark | Responses | G1V | Jev | Vectara HHEM 2.3 | Granite Guardian 3.3 | LettuceDetect mmBERT | LettuceDetect Qwen 2B |
+|---|---|---|---|---|---|---|---|
+| ANLI-R3 | 1,200 | 0.897 | 0.885 | 0.777 | 0.809 | 0.523 | 0.668 |
+| CovidFact | 316 | 0.928 | 0.908 | 0.872 | 0.897 | 0.728 | 0.776 |
+| FaithBench | 750 | 0.707 | 0.726 | 0.610 | 0.611 | 0.642 | 0.668 |
+| FaithDial | 800 | 0.967 | 0.899 | 0.813 | 0.866 | 0.764 | 0.712 |
+| FinQA | 1,657 | 0.823 | 0.680 | 0.423 | 0.423 | 0.406 | 0.457 |
+| PlaceboBench | 482 | 0.788 | 0.656 | 0.543 | 0.493 | 0.587 | 0.608 |
+| RAGTruth++ | 408 | 0.867 | 0.864 | 0.725 | 0.688 | 0.714 | 0.708 |
+| RAGTruth test | 2,700 | 0.926 | 0.940 | 0.873 | 0.844 | 0.880 | 0.905 |
+| SciFact | 209 | 0.963 | 0.954 | 0.862 | 0.908 | 0.789 | 0.892 |
+| HalluDial | 799 | 0.789 | 0.776 | 0.687 | 0.702 | 0.728 | 0.700 |
+| TabFact | 800 | 0.971 | 0.955 | 0.704 | 0.787 | 0.616 | 0.717 |
+| **Benchmark average** | 10,121 | **0.875** | 0.840 | 0.717 | 0.730 | 0.671 | 0.710 |
+
+G1V has a higher AUROC than Vectara HHEM 2.3 on all 11 benchmarks and a higher numerical AUROC than Jev on 9 of 11
+(Jev is higher on FaithBench and RAGTruth test). Some of these differences are small (for example RAGTruth++, 0.867 against 0.864);
+the paired bootstrap intervals are in the underlying report and are not reproduced here.
+
+**Macro-average over the same 11 benchmarks, all configurations.** AUROC does not depend on a threshold; F1,
+recall and false-positive rate **depend on the operating threshold calibrated for each model**. F1 is for the hallucination class.
+
+| Model configuration | Mean AUROC | Mean F1 | Mean recall | Mean false positives |
+|---|---|---|---|---|
+| G1V | 0.875 | 0.678 | 0.652 | 14.0% |
+| Jev | 0.840 | 0.673 | 0.711 | 26.0% |
+| Granite Guardian 3.3 8B | 0.730 | 0.593 | 0.701 | 42.2% |
+| Granite 4.0 Micro (unfaithful only) | 0.724 | 0.520 | 0.539 | 27.0% |
+| Granite 4.0 Micro (unfaithful or partial) | 0.721 | 0.549 | 0.578 | 30.2% |
+| Vectara HHEM 2.3 | 0.717 | 0.590 | 0.649 | 33.8% |
+| LettuceDetect v2 Qwen 2B | 0.710 | 0.578 | 0.771 | 63.8% |
+| Granite 4.1 3B (unfaithful only) | 0.692 | 0.481 | 0.458 | 23.6% |
+| Granite 4.1 3B (unfaithful or partial) | 0.687 | 0.514 | 0.523 | 29.4% |
+| LettuceDetect v2 mmBERT | 0.671 | 0.454 | 0.439 | 24.8% |
+| Granite 4.1 8B (unfaithful or partial) | 0.664 | 0.505 | 0.609 | 29.3% |
+| Granite 4.1 8B (unfaithful only) | 0.662 | 0.459 | 0.410 | 16.7% |
+
+The pooled false-positive rate and the per-benchmark false-positive rates are different aggregates; the table reports the macro-average of the per-benchmark rates.
+
+**PlaceboBench against Claude Opus 5.5.** On an identical **balanced sample of 450 answers**. Claude Opus 5.5 received the
+**full document**; G1V reads **up to 16,384 tokens**. Each model is at its own operating point.
+
+| Model | AUROC | Hallucination F1 | Precision | Recall | False positives |
+|---|---|---|---|---|---|
+| G1V | 0.790 | 0.487 | 0.904 | 0.333 | 3.6% |
+| Claude Opus 5.5 | 0.782 | 0.623 | 0.809 | 0.507 | 12.0% |
+| Jev | 0.650 | 0.284 | 0.780 | 0.173 | 4.9% |
+
+G1V has the highest AUROC, the highest precision and the lowest false-positive rate of the three on this sample; Claude
+Opus 5.5 has the higher recall and F1. The AUROC difference between G1V and Claude Opus 5.5 (0.790 against 0.782) is small, and the balanced
+sample (450) is not the 482-answer PlaceboBench set of the table above (0.788). G1V's recall of 0.333 at this operating
+point means most hallucinated answers on this benchmark are **not** flagged.
+
 ---
 
 ## `sufficiency`
@@ -233,10 +297,24 @@ Read these numbers with the following in mind:
 - **Recall is a conservative lower bound.** In a blind read of 60 cases, about **8%** of the "insufficient" labels were actually answerable.
 - **Profiles.** `low_false_positives`, `balanced` and `high_recall` are named operating points; their **precision, recall and false-positive rate on the sufficiency verdict are not yet measured**. Use the table above as the reference, and do not read profile names as guarantees.
 - **Calibrate on your own sample** (a few hundred labelled examples) before you gate anything ([checklist](#how-to-validate-on-your-data)).
-- **Latency (P95) is not yet measured.**
+- **Latency:** medians on a shared H200 are in [Latency](#latency); **P95 is not yet measured**.
 - **New document domains.** Accuracy on other domains is being measured on a dedicated transfer benchmark (software specifications, API descriptions, coding-agent traces, contracts, regulations, patents) and will be added when it is finished. **Transfer is not claimed.**
 - **Languages.** Per-language accuracy is not yet published ([Languages](#languages)).
 - The numbers hold for requests that were **not truncated** ([Truncation](#truncation)).
+
+### Zero-shot against Lacuna v1 (pilot sets)
+
+Context sufficiency measured **without an answer** — does the context contain enough information to answer the
+question — as AUROC on **pilot out-of-distribution development sets**:
+
+| Dataset | G1V zero-shot | Lacuna v1 |
+|---|---|---|
+| Housing QA | 0.951 | 0.882 |
+| PubMedQA | 0.951 | 0.843 |
+| SQuAD2 | 0.935 | 0.925 |
+
+These are **pilot development sets**, not a held-out test, and only AUROC is reported (no thresholds, recall or false-positive rate).
+They are not the dedicated transfer benchmark mentioned above.
 
 ### Query suggestions for missing information
 
@@ -290,6 +368,21 @@ Errors: `400 invalid_answers`, `400 not_enough_answers`, `413 too_many_answers`,
 [`/g1/eval`](eval.md) returns the same verdicts as axes: `halluc_context` (context + answer) and `halluc_closedbook` (the `answers` field), with the per-sentence
 details in `axes.<name>.details`. Use the dedicated endpoints when you need the words, the queries or the sufficiency verdict.
 
+## Latency
+
+Measured on a **shared H200, one request at a time**:
+
+| Case | Measurement |
+|---|---|
+| Answer only, about 1k tokens | median 0.076 s |
+| Answer only, 16k tokens and 64 claims | median 1.096 s |
+| Full cascade, 16k tokens, one flagged claim | 4.225 s |
+| Full cascade, 16k tokens, 64 flagged claims | 98.014 s |
+
+An estimate for the 64-claim cascade on an **A100 was 291 s; it is an estimate, not a measurement.** These figures are
+measurements under the stated conditions only: GPU scheduling, network and production load are **not captured**, and
+**P95 is not yet measured**.
+
 ## Versioning
 
 Behaviour is **tied to a named model version**: the thresholds and numbers on this page belong to the model that was
@@ -315,9 +408,12 @@ Do this before any of these endpoints blocks production traffic.
 - It judges support by the **passages you sent**, not truth in the world; there is no external fact-checking.
 - **Truncated requests** (16,384 tokens) give unreliable verdicts; treat them as not measurable.
 - **Languages**: English, Italian, German, French and Spanish only; per-language accuracy and the error profile of sentence splitting outside English are **not yet published**. Polish, Dutch and Portuguese are unsupported; Russian and Chinese are best effort.
-- **Sufficiency**: the table is **calibration, not a held-out test**; recall is a conservative lower bound (about 8% of "insufficient" labels were answerable in a blind read of 60 cases); per-profile precision, recall and FPR, the P95 latency and the accuracy on new document domains are **not yet measured**.
+- **Sufficiency**: the table is **calibration, not a held-out test**; recall is a conservative lower bound (about 8% of "insufficient" labels were answerable in a blind read of 60 cases); per-profile precision, recall and FPR, the P95 latency and the accuracy on new document domains (beyond the pilot sets above) are **not yet measured**.
 - `insufficiency.probability` is **not a calibrated probability**.
 - **Query suggestions** are anchored hypotheses; retrieval-gain figures are **not published**; the service does not retrieve.
 - **Closed-book** is a weaker signal (AUROC 0.66–0.75, false positives 11–16% on the held-out bank); only the first answer is judged; it costs 2–8 times the generation cost.
 - **Words** carry relative weights, not independent probabilities; sentences shorter than two content words are not scored on their own.
 - Passage objects `{text, title?, label?}` and the **detector version string** in responses are **to be added**.
+- The comparison with other detectors is on public benchmarks, **five of which contain G1V training data and all of which informed model selection**; the competing models' exposure to them is not guaranteed. The 64-claim full cascade took 98 s on a shared H200; an A100 figure is an estimate only.
+
+*Sources: Salesforce AI Research brief, November 2026; G1V vs Jev per-benchmark report; G1V threshold-profile report; real-answer sufficiency report; definitive MVP latency and parity reports.*
