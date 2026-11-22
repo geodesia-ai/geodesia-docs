@@ -362,10 +362,7 @@ They are not the dedicated transfer benchmark mentioned above.
 ### Where this fits among related tools
 
 Sufficiency is the part of this page that fewer tools offer: **a verdict on whether the context is enough, together with
-search queries aimed at what is missing**. The table summarises what we found in the **public documentation of other
-tools, read in November 2026 in a time-limited review**. "Not found" means we did not find the capability in that
-documentation; it does not prove that it is absent. Specialised hallucination-detection vendors are not yet covered by
-this review.
+search queries aimed at what is missing**. Specialised hallucination-detection vendors are not yet covered.
 
 | Tool | Judges whether the context is enough? | Proposes queries for what is missing? |
 |---|---|---|
