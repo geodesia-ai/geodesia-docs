@@ -397,8 +397,8 @@ Judges an answer **without any document**, by reading each answer against the ot
 | `hallucinated`, `probability`, `threshold` | the decision is **for `answers[0]` only** |
 | `answers` | one object per input: `{index, role: "judged" \| "reference", probability, flagged}` — the references are read too (an odd one out shows up) but only the first is decided |
 | `n_answers`, `method` | how many answers were read and how |
-| `calibrated`, `validation` | the threshold depends on the number of answers (2 → 0.9923, 3–4 → 0.9888, 5 or more → 0.9859); `validation` reports false-positive rate, recall and AUROC measured on a held-out bank of 411 rows in 9 languages |
-| `warnings` | `closedbook_low_auroc` while the held-out AUROC is below 0.80 |
+| `calibrated`, `use` | the threshold depends on the number of answers (2 → 0.9923, 3–4 → 0.9888, 5 or more → 0.9859); `use` states that the result is a signal, not an automatic block |
+| `warnings` | none specific to closed-book |
 
 Accuracy depends on the stability of the LLM that produced the answers, and it improves with the number of independent answers.
 
@@ -451,6 +451,6 @@ Do this before any of these endpoints blocks production traffic.
 - **Sufficiency**: the table is **calibration, not a held-out test**; recall is a conservative lower bound (about 8% of "insufficient" labels were answerable in a blind read of 60 cases); per-profile precision, recall and FPR, the P95 latency and the accuracy on new document domains (beyond the pilot sets above) are **not yet measured**.
 - `insufficiency.probability` is **not a calibrated probability**.
 - **Query suggestions** are anchored hypotheses; retrieval-gain figures are **not published**; the service does not retrieve.
-- **Closed-book** is a signal whose accuracy depends on the stability of the LLM (false positives 11–16% on the held-out bank); only the first answer is judged; it costs 2–8 times the generation cost.
+- **Closed-book** is a signal whose accuracy depends on the stability of the LLM that produced the answers; only the first answer is judged; it costs 2–8 times the generation cost.
 - **Words** carry relative weights, not independent probabilities; sentences shorter than two content words are not scored on their own.
 - Passage objects `{text, title?, label?}` and the **detector version string** in responses are **to be added**.
