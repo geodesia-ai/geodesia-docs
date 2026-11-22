@@ -348,7 +348,7 @@ Judges an answer **without any document**, by reading each answer against the ot
 | `calibrated`, `validation` | the threshold depends on the number of answers (2 → 0.9923, 3–4 → 0.9888, 5 or more → 0.9859); `validation` reports false-positive rate, recall and AUROC measured on a held-out bank of 411 rows in 9 languages |
 | `warnings` | `closedbook_low_auroc` while the held-out AUROC is below 0.80 |
 
-Measured on that held-out bank (411 rows, 9 languages): false-positive rate **11–16%**. Accuracy depends on the stability of the LLM that produced the answers, and it improves with the number of independent answers.
+Accuracy depends on the stability of the LLM that produced the answers, and it improves with the number of independent answers.
 
 - **Signal, not an automatic block.** Disagreement between answers does not prove that one is wrong, and two identical wrong answers are not flagged. More independent answers make it more reliable.
 - **Only the first answer receives the verdict.** The others are read as references.
