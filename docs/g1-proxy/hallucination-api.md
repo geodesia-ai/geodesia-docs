@@ -219,6 +219,14 @@ Given a question and the retrieved context, the service says whether the context
 if it is not, proposes search queries that describe the missing information. It **does not retrieve anything** and contains
 no retriever: your own retriever consumes the queries.
 
+### What the sufficiency endpoint gives you
+
+- **A verdict and a next step in one call.** It tells you whether the context is enough, which sentences of the answer the context does not support, and proposes search queries for the missing information.
+- **Queries that fit your own retriever.** They are plain text, anchored on your question and on the answer, so any search backend can consume them; nothing is retrieved on your behalf and nothing is sent to an external service.
+- **Published operating points.** A table at fixed false-positive targets (1% to 10%) with confidence intervals, so you can choose the false-block rate you can tolerate. The conditions and the limits of the measurement are stated next to it.
+- **Five European languages:** English, Italian, German, French and Spanish ([Languages](#languages)).
+- **Self-hosted.** The models run in your own deployment, in FP8, on one GPU ([the vLLM stack](vllm-stack.md)).
+
 Same request as above, with these differences: `prompt` is **required** (the queries depend on the question), `answer` is required for now, plus
 
 | Field | Default | Meaning |
