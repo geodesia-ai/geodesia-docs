@@ -454,4 +454,3 @@ Do this before any of these endpoints blocks production traffic.
 - **Closed-book** is a signal whose accuracy depends on the stability of the LLM (false positives 11–16% on the held-out bank); only the first answer is judged; it costs 2–8 times the generation cost.
 - **Words** carry relative weights, not independent probabilities; sentences shorter than two content words are not scored on their own.
 - Passage objects `{text, title?, label?}` and the **detector version string** in responses are **to be added**.
-- The comparison with other detectors is on public benchmarks, **five of which contain G1V training data and all of which informed model selection**; the competing models' exposure to them is not guaranteed.
