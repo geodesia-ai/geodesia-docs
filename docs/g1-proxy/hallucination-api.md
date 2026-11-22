@@ -117,6 +117,9 @@ the warning `claim_rules_english`. Where a sentence cannot be isolated, rely on 
     3. Shorten or select the passages before the call (retrieve fewer, rank and keep the best) so that the request fits.
     4. Never extract a pass verdict from a truncated request.
 
+!!! info "Longer contexts in the next release"
+    The next release will support a context of **256k tokens**. The limits on this page describe the current build (16,384 tokens).
+
 How the limits work together:
 
 | Limit | What happens | Where you see it |
@@ -462,7 +465,7 @@ Do this before any of these endpoints blocks production traffic.
 ## Known limitations
 
 - It judges support by the **passages you sent**, not truth in the world; there is no external fact-checking.
-- **Truncated requests** (16,384 tokens) give unreliable verdicts; treat them as not measurable.
+- **Truncated requests** (16,384 tokens) give unreliable verdicts; treat them as not measurable. The next release will support a 256k-token context.
 - **Languages**: English, Italian, German, French and Spanish only; per-language accuracy and the error profile of sentence splitting outside English are **not yet published**. Polish, Dutch and Portuguese are unsupported; Russian and Chinese are best effort.
 - **Sufficiency**: the table is **calibration, not a held-out test**; recall is a conservative lower bound (about 8% of "insufficient" labels were answerable in a blind read of 60 cases); per-profile precision, recall and FPR, the P95 latency and the accuracy on new document domains (beyond the pilot sets above) are **not yet measured**.
 - `insufficiency.probability` is **not a calibrated probability**.
