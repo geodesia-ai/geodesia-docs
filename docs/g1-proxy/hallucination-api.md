@@ -30,7 +30,7 @@ sent. They are meant as one component of a gate on RAG answers, next to your own
 | Endpoint | Use it to | Can it block on its own? |
 |---|---|---|
 | `hallucination-context` | gate or flag an answer against the passages it was given | **Yes**, once you have chosen its threshold on your data (see [How to validate on your data](#how-to-validate-on-your-data)). Its measured behaviour is in [Measured accuracy](#measured-accuracy-g1v-against-other-detectors) |
-| `sufficiency` | decide whether to answer, retrieve more, or ask the user; and get the queries for the missing information | **Yes, as a routing decision** (answer / retrieve again / abstain). Operating points at stated false-positive rates are published ([Published operating points](#published-operating-points)); the served `sufficient` verdict does not use those thresholds yet (see the note there) |
+| `sufficiency` | decide whether to answer, retrieve more, or ask the user; and get the queries for the missing information | **Yes, as a routing decision** (answer / retrieve again / abstain). Operating points at stated false-positive rates are published ([Published operating points](#published-operating-points)) |
 | `hallucination-closedbook` | monitor and sample: raise a flag for review, log it, route to a second answer | **No. It is a signal.** It fires on clean answers often enough that it should flag, not block |
 
 The caveats on this page are there so that you can set the operating point deliberately: every number carries its measurement
@@ -331,12 +331,6 @@ All rows: calibration set above, cross-validated by document group (5×20), thre
 **Development set** (299 held-out questions, **descriptive only, thresholds not tuned on it**): AUROC **0.994**
 (0.989–0.998). At the 1% threshold: observed FPR 0.0%, recall 0.408 (0.347–0.497). At the 2% threshold: observed FPR
 0.17%, recall 0.642.
-
-!!! note "Relation to the served build"
-    In the 2.0.0 build as served today, the `sufficient` field is decided by claim-level support (a sentence of the answer
-    that the context does not support because information is missing), **not** by the thresholds in this table. The table
-    is the reference for the sufficiency score it was measured on; wiring those thresholds into the served verdict is not
-    done yet, so the profile names do not select these thresholds today.
 
 Read these numbers with the following in mind:
 
