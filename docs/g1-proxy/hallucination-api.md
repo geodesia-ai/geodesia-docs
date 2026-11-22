@@ -25,6 +25,25 @@ sent. They are meant as one component of a gate on RAG answers, next to your own
 - They do not retrieve documents. `sufficiency` proposes search queries; your own retriever runs them.
 - Every verdict depends on a threshold. Choose and validate it on your own data before you block traffic ([How to validate on your data](#how-to-validate-on-your-data)).
 
+## Which endpoint can gate, and which only informs
+
+| Endpoint | Use it to | Can it block on its own? |
+|---|---|---|
+| `hallucination-context` | gate or flag an answer against the passages it was given | **Yes**, once you have chosen its threshold on your data (see [How to validate on your data](#how-to-validate-on-your-data)). Its measured behaviour is in [Measured accuracy](#measured-accuracy-g1v-against-other-detectors) |
+| `sufficiency` | decide whether to answer, retrieve more, or ask the user; and get the queries for the missing information | **Yes, as a routing decision** (answer / retrieve again / abstain). Operating points at stated false-positive rates are published ([Published operating points](#published-operating-points)); the served `sufficient` verdict does not use those thresholds yet (see the note there) |
+| `hallucination-closedbook` | monitor and sample: raise a flag for review, log it, route to a second answer | **No. It is a signal.** It fires on clean answers often enough that it should flag, not block |
+
+The caveats on this page are there so that you can set the operating point deliberately: every number carries its measurement
+condition, and where something has not been measured the page says so.
+
+## What is behind the endpoints
+
+The endpoints are served by **trained models**, not by a prompt around a general-purpose LLM: **G1V**, a fine-tuned reader that
+produces the verdict, the flagged sentences and the word weights, and a generation adapter on the same model that writes
+the search queries of `sufficiency`. The grounded thresholds are calibrated and depend on the context
+length; the sufficiency operating points were fixed on a measured set at stated false-positive rates. Both run in your own
+deployment ([the vLLM stack](vllm-stack.md)).
+
 ## Health and readiness
 
 `GET /g1/hallucination/health` → `200 {"status":"ok"}` when the G1V servers answer.
@@ -383,6 +402,7 @@ Judges an answer **without any document**, by reading each answer against the ot
 
 Accuracy depends on the stability of the LLM that produced the answers, and it improves with the number of independent answers.
 
+- **How to use it.** Log the flag, sample the flagged answers for review, or route them to a second generation. Do not use it as the only reason to block an answer.
 - **Signal, not an automatic block.** Disagreement between answers does not prove that one is wrong, and two identical wrong answers are not flagged. More independent answers make it more reliable.
 - **Only the first answer receives the verdict.** The others are read as references.
 - **Cost.** Consistency needs 2–8 answers, so it costs **2–8 times the generation cost** of a single answer, plus the check itself.
@@ -421,6 +441,7 @@ measurements under the stated conditions only: GPU scheduling, network and produ
 Behaviour is **tied to a named model version**: the thresholds and numbers on this page belong to the model that was
 measured, and a different model version can change them.
 
+- **Pin your own operating point.** Every response returns the `threshold` it used. Send `threshold` in the request to fix the operating point yourself: a change to the default thresholds then does not move yours (the response adds the warning `custom_threshold`).
 - Today each response carries `schema_version` (`"2.0"`) and the `models` block.
 - A **detector version string in the response is to be added.** Until it is present, pin the image tag you deploy (`glad-vllm:2.0.0`) and record it with your results.
 - Changes to the detector, its thresholds or the tables on this page will be listed in the [release notes](../reference/release-notes.md); re-run your own validation after any such change.
@@ -432,7 +453,8 @@ Do this before any of these endpoints blocks production traffic.
 1. **Label a few hundred of your own examples** for the check you will gate on (supported or not, sufficient or not), with the same prompts, contexts and answers your application produces.
 2. **Pick the threshold for your tolerable false-block rate**: measure the false-block rate on your sufficient and supported examples at several thresholds, and choose the lowest false-block rate you can accept. The table above is a starting point, not a substitute.
 3. **Run in audit-only (shadow) mode first**: call the endpoint, log the verdict and `limits`, do not act on it, and review the flagged cases with a person.
-4. **Compare against your own baseline** (no check, or the check you use today) on the same traffic.
+4. **Compare against baselines on the same labelled sample**, at the same false-block rate: (a) no check, or the check you use today; (b) a cross-encoder or NLI entailment checker; (c) a plain prompt to a general-purpose LLM that asks whether the answer is supported. Measure precision and recall at the false-block rate you tolerate, not accuracy at a default threshold.
+   **Adopt the endpoint where it beats these at your false-block rate**, or where its other properties (self-hosted, queries for the missing information, sentence and word detail) are what you need. 300–500 labelled pairs is a practical size to start with; at that size the confidence interval on recall at a 1–2% false-positive rate is wide, so read small differences with care.
 5. **Handle the non-answers**: `limits.context_truncated: true`, `503`, `404`, timeouts. Decide in advance what each one does (fail closed for anything that protects users).
 6. **Re-run the validation** after a change of model version, of document domain, or of language.
 
