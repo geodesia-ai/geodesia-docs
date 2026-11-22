@@ -324,7 +324,7 @@ Per-axis object: `score` (probability in [0, 1], or `null`), `threshold`, `flagg
 | `jailbreak` | enforce | the request tries to override the assistant's rules / injection |
 | `answer_safety` | enforce | the answer is harmful |
 | `halluc_context` | enforce | the answer is not supported by the context (read by G1V; for words and sufficiency use `/g1/hallucination-context` and `/g1/sufficiency`) |
-| `halluc_closedbook` | advisory | the first answer disagrees with the other answers you sent in `answers` (a weaker signal: AUROC about 0.70; never a block) |
+| `halluc_closedbook` | advisory | the first answer disagrees with the other answers you sent in `answers` (accuracy depends on the stability of the LLM that produced the answers; never a block) |
 | `rag_jailbreak` | advisory | injection inside a retrieved document (**off** in 2.0: `available: false`) |
 | `profanity` | advisory | offensive language |
 | `prompt_complexity` | classifier | routing hint: `label` `"simple"`/`"complex"`; never a risk |

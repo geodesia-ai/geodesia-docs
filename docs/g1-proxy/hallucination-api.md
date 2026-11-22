@@ -348,7 +348,7 @@ Judges an answer **without any document**, by reading each answer against the ot
 | `calibrated`, `validation` | the threshold depends on the number of answers (2 → 0.9923, 3–4 → 0.9888, 5 or more → 0.9859); `validation` reports false-positive rate, recall and AUROC measured on a held-out bank of 411 rows in 9 languages |
 | `warnings` | `closedbook_low_auroc` while the held-out AUROC is below 0.80 |
 
-Measured on that held-out bank (411 rows, 9 languages): AUROC **0.66** with 2 answers, 0.70 with 3–4, **0.75** with 5 or more; false-positive rate **11–16%**.
+Measured on that held-out bank (411 rows, 9 languages): false-positive rate **11–16%**. Accuracy depends on the stability of the LLM that produced the answers, and it improves with the number of independent answers.
 
 - **Signal, not an automatic block.** Disagreement between answers does not prove that one is wrong, and two identical wrong answers are not flagged. More independent answers make it more reliable.
 - **Only the first answer receives the verdict.** The others are read as references.
@@ -411,7 +411,7 @@ Do this before any of these endpoints blocks production traffic.
 - **Sufficiency**: the table is **calibration, not a held-out test**; recall is a conservative lower bound (about 8% of "insufficient" labels were answerable in a blind read of 60 cases); per-profile precision, recall and FPR, the P95 latency and the accuracy on new document domains (beyond the pilot sets above) are **not yet measured**.
 - `insufficiency.probability` is **not a calibrated probability**.
 - **Query suggestions** are anchored hypotheses; retrieval-gain figures are **not published**; the service does not retrieve.
-- **Closed-book** is a weaker signal (AUROC 0.66–0.75, false positives 11–16% on the held-out bank); only the first answer is judged; it costs 2–8 times the generation cost.
+- **Closed-book** is a signal whose accuracy depends on the stability of the LLM (false positives 11–16% on the held-out bank); only the first answer is judged; it costs 2–8 times the generation cost.
 - **Words** carry relative weights, not independent probabilities; sentences shorter than two content words are not scored on their own.
 - Passage objects `{text, title?, label?}` and the **detector version string** in responses are **to be added**.
 - The comparison with other detectors is on public benchmarks, **five of which contain G1V training data and all of which informed model selection**; the competing models' exposure to them is not guaranteed. The 64-claim full cascade took 98 s on a shared H200; an A100 figure is an estimate only.

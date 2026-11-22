@@ -38,7 +38,7 @@ A new architecture and three new groups of endpoints. The 1.x line is unchanged 
 
 - The knowledge base (RAG), the reference check and the other accessories of the 1.x proxy are **not ported to vLLM yet**; `g1-proxy` 2.0 is the light engine with the full profile.
 - `rag_jailbreak` is off; the safety routes do not read documents (`400 context_not_supported`).
-- Closed-book is a weak signal (held-out AUROC 0.66–0.75): do not use it to block.
+- Closed-book is a signal, not a block: its accuracy depends on the stability of the LLM that produced the answers.
 - The insufficiency probability of `/g1/sufficiency` is not calibrated.
 
 ---
