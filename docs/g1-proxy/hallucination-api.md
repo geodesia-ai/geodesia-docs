@@ -84,16 +84,10 @@ stop routing on `503`. The first start can take 10–40 minutes (see [the vLLM s
 | **Not supported** | Polish, Dutch, Portuguese: no training data and no evaluation; behaviour is undefined, **do not rely on it** |
 | **Best effort, no guarantees** | Russian, Chinese: not part of the supported set |
 
-**Per-language accuracy is not yet published.** A per-language breakdown will be added when it has been measured.
-
-Sentence splitting and the claim rules behind the `sentences` list are tuned for English. For the other four supported
-languages sentence splitting is a **separate path** and its error profile is **not yet published**; those requests carry
-the warning `claim_rules_english`. Where a sentence cannot be isolated, rely on the verdict of the whole answer.
-
 ## Shared rules (grounded and sufficiency)
 
 - `context` is a string or an array of strings (each passage separately). At least one non-empty passage; up to 256 passages and 200,000 characters.
-- **Input limit: 16,384 tokens** (instructions + question + context + answer). When it does not fit, the end of the context is cut — see the **warning below**.
+- **Input limit: 16,384 tokens** (instructions + question + context + answer). When it does not fit, the end of the context is cut — see the **warning below**. It has been expanded up to 256k tokens, but this will be included in the next release.
 - `profile`: `balanced` (default), `low_false_positives` (fewer false alarms, fewer detections) or `high_recall` (the opposite).
 - `threshold` (optional, in [0, 1]) applies to the **calibrated probability**. Setting it changes the operating point; the response adds the warning `custom_threshold`.
 - The decision threshold of `hallucination-context` depends on the context length: contexts of up to 7,000 characters (`context_group: "short"`, 0.5195 in the balanced profile) and longer ones (`"long"`, 0.2735).
@@ -126,10 +120,6 @@ How the limits work together:
 |---|---|---|
 | 16,384 tokens (what the model reads) | the request is accepted, the **end of the context is cut** | `limits.context_truncated: true`, `limits.context_tokens_read`, warning `context_truncated` |
 | 200,000 characters of context, 256 passages | the request is **rejected before reading** | `413 context_too_long`, `413 too_many_passages` |
-
-The **token limit is the one that binds first** for ordinary text: 16,384 tokens correspond to far fewer than 200,000
-characters, so a long context is cut by the token limit and the character limit is only a request-size guard. The exact
-number of characters that fit depends on the tokenizer and the language and is not fixed.
 
 On the calibration set of the sufficiency verdict (see below) **no context was truncated** (median full-context length
 about 7,400 tokens). Real RAG contexts can be longer than that set, so do not assume the same behaviour in production.
