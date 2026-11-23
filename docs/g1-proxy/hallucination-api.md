@@ -378,7 +378,6 @@ When the context is insufficient the service proposes search queries that descri
 - The model usually produces two or three queries by itself. Asking for more (`k_queries` up to 50) adds **sampled variants**, filtered by the same anchoring rule, and the response carries the warning `queries_beyond_greedy_sampled`. Queries are never invented to reach `k_queries`.
 - Queries are **hypotheses anchored on the answer**, not evidence: they preserve the entities of the question and of the answer, and the answer's own claims are still unverified.
 - An empty `queries` with `queries_status` `timeout` or `error` does **not** mean that nothing is missing.
-- **Retrieval-gain figures are not published**: how much the queries improve retrieval has not been independently confirmed, so there is no number to quote.
 
 **Retrieval loop.** `sufficient == false` → run each `queries[].text` on your retriever → append the passages to `context` → regenerate →
 call `hallucination-context` again. Stop after **at most two rounds** and tell the user if it is still unsupported. Check
@@ -445,15 +444,3 @@ Do this before any of these endpoints blocks production traffic.
    **Adopt the endpoint where it beats these at your false-block rate**, or where its other properties (self-hosted, queries for the missing information, sentence and word detail) are what you need. 300–500 labelled pairs is a practical size to start with; at that size the confidence interval on recall at a 1–2% false-positive rate is wide, so read small differences with care.
 5. **Handle the non-answers**: `limits.context_truncated: true`, `503`, `404`, timeouts. Decide in advance what each one does (fail closed for anything that protects users).
 6. **Re-run the validation** after a change of model version, of document domain, or of language.
-
-## Known limitations
-
-- It judges support by the **passages you sent**, not truth in the world; there is no external fact-checking.
-- **Truncated requests** (16,384 tokens) give unreliable verdicts; treat them as not measurable. The next release will support a 256k-token context.
-- **Languages**: English, Italian, German, French and Spanish only; per-language accuracy and the error profile of sentence splitting outside English are **not yet published**. Polish, Dutch and Portuguese are unsupported; Russian and Chinese are best effort.
-- **Sufficiency**: the table is **calibration, not a held-out test**; recall is a conservative lower bound (about 8% of "insufficient" labels were answerable in a blind read of 60 cases); per-profile precision, recall and FPR, the P95 latency and the accuracy on new document domains (beyond the pilot sets above) are **not yet measured**.
-- `insufficiency.probability` is **not a calibrated probability**.
-- **Query suggestions** are anchored hypotheses; retrieval-gain figures are **not published**; the service does not retrieve.
-- **Closed-book** is a signal whose accuracy depends on the stability of the LLM that produced the answers; only the first answer is judged; it costs 2–8 times the generation cost.
-- **Words** carry relative weights, not independent probabilities; sentences shorter than two content words are not scored on their own.
-- Passage objects `{text, title?, label?}` and the **detector version string** in responses are **to be added**.
