@@ -1,6 +1,6 @@
 # Hallucination API — grounded, sufficiency and closed-book (2.1)
 
-Three endpoints, served by the **G1V** and **dpo9** models on vLLM, in FP8 ([the vLLM stack](vllm-stack.md)). They judge whether an answer is
+Three endpoints, served by the **G1V** and **qwery-builder** models on vLLM, in FP8 ([the vLLM stack](vllm-stack.md)). They judge whether an answer is
 **supported by the documents it was given** — not whether it is true in the world.
 
 **What is new in 2.1**
@@ -46,7 +46,7 @@ condition, and where something has not been measured the page says so.
 ## What is behind the endpoints
 
 The endpoints are served by **trained models**, not by a prompt around a general-purpose LLM: **G1V**, a fine-tuned reader that
-produces the verdict, the flagged sentences and the word weights (one instance serves all three), and **dpo9**, a 2-billion-parameter
+produces the verdict, the flagged sentences and the word weights (one instance serves all three), and **qwery-builder**, a 2-billion-parameter
 model that writes the search queries and the missing facts of `sufficiency`. The grounded thresholds are calibrated and depend on the context
 length; the sufficiency decision uses a single measured threshold. Both models run in FP8 in your own deployment ([the vLLM stack](vllm-stack.md)) and
 fit together with the safety models in a 24 GB GPU.
@@ -72,7 +72,7 @@ G1V does the same claim-level check with a **small, calibrated model, in a repea
 
 ## Health and readiness
 
-`GET /g1/hallucination/health` → `200 {"status":"ok"}` when the verification service and its G1V and dpo9 servers answer.
+`GET /g1/hallucination/health` → `200 {"status":"ok"}` when the verification service and its G1V and qwery-builder servers answer.
 
 | Status | Meaning | What to do |
 |---|---|---|
@@ -277,7 +277,7 @@ Same request as above, with these differences: `prompt` is **required** (the ver
 | `sufficient` | **the decision**: `true` if the context is enough to answer the question; `false` when the question cannot be answered from it |
 | `insufficiency.probability`, `insufficiency.threshold` | the score the decision is made on, and its threshold (**0.402**). `insufficiency.calibrated: false`: compare it with the threshold, do not present it as a probability |
 | `missing_facts` | what the context lacks, in plain words (only when `sufficient` is `false`) |
-| `queries` | search queries for **your own retriever**: `{text, language, anchored, origin}`, at most `k_queries`; `origin` is `dpo9` |
+| `queries` | search queries for **your own retriever**: `{text, language, anchored, origin}`, at most `k_queries`; `origin` is `qwery-builder` |
 | `queries_found`, `queries_returned` | produced vs returned |
 | `queries_status` | `generated`, `not_needed` (sufficient), `writer_found_none`, `timeout`, `error`, `off` |
 | `hallucinated`, `missing` | with an `answer`: the grounded verdict and the answer sentences the context does not support (`{sentence_id, text, probability}`). Without an answer `hallucinated` is `null` and `missing` is empty |
@@ -293,7 +293,7 @@ curl -sS http://localhost:8800/g1/sufficiency \
 {"sufficient": false,
  "insufficiency": {"probability": 0.7522, "threshold": 0.402, "calibrated": false},
  "missing_facts": ["Number of visitors to the Eiffel Tower in 2019"],
- "queries": [{"text": "Eiffel Tower visitors 2019", "language": "en", "anchored": true, "origin": "dpo9"}],
+ "queries": [{"text": "Eiffel Tower visitors 2019", "language": "en", "anchored": true, "origin": "qwery-builder"}],
  "queries_found": 1, "queries_returned": 1, "queries_status": "generated", "hallucinated": null, "missing": []}
 ```
 
@@ -370,7 +370,7 @@ benchmarks, and are **not comparable** with the measurements on this page.
 
 ### Query suggestions for missing information
 
-When the context is insufficient, **dpo9** writes up to three search queries that describe the missing information, and the list of missing facts.
+When the context is insufficient, **qwery-builder** writes up to three search queries that describe the missing information, and the list of missing facts.
 
 - Queries are anchored on the question: they keep its entities, and they are written in the language of the question.
 - They are hypotheses for your retriever: run them, then check what comes back.
