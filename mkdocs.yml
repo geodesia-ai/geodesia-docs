@@ -151,7 +151,7 @@ nav:
     - Complete API Map: g1-proxy/api-reference.md
     - 2.0 Architecture (vLLM stack): g1-proxy/vllm-stack.md
     - Safety API (2.0): g1-proxy/safety-api.md
-    - Hallucination API (2.0): g1-proxy/hallucination-api.md
+    - Hallucination API (2.1): g1-proxy/hallucination-api.md
     - Configuration: g1-proxy/configuration.md
     - Upstream Backends: g1-proxy/backends.md
     - Framework Compatibility: g1-proxy/compatibility.md

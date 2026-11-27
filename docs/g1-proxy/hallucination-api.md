@@ -1,12 +1,19 @@
-# Hallucination API — grounded, sufficiency and closed-book (2.0)
+# Hallucination API — grounded, sufficiency and closed-book (2.1)
 
-Three endpoints, served by the **G1V** model on vLLM ([the vLLM stack](vllm-stack.md)). They judge whether an answer is
+Three endpoints, served by the **G1V** and **dpo9** models on vLLM, in FP8 ([the vLLM stack](vllm-stack.md)). They judge whether an answer is
 **supported by the documents it was given** — not whether it is true in the world.
+
+**What is new in 2.1**
+
+- **Contexts up to 1,048,576 tokens (1M)** in `hallucination-context` and `sufficiency`. A long context is read in overlapping windows and every claim is checked against the passages that matter for it ([Long contexts](#long-contexts-up-to-1m-tokens)).
+- **`sufficiency` works without an answer**: send only the question and the context and get the verdict and the search queries before any answer exists ([sufficiency](#sufficiency)).
+- **Faster.** A grounded check answers in about 0.3 s and a sufficiency check with its search queries in about 0.5 s on typical inputs (one RTX A6000, FP8); sufficiency with queries used to take several seconds.
+- Passages can carry a **title and a label** (`{text, title, label}`), and `sufficiency` also returns the **missing facts** in plain words.
 
 | Endpoint | Question it answers | You send |
 |---|---|---|
 | [`POST /g1/hallucination-context`](#hallucination-context) | Is the answer supported by the context? Which sentences and words are not? | question, context, answer |
-| [`POST /g1/sufficiency`](#sufficiency) | Is the context **enough** to answer? If not, what should I search for? | question, context, answer |
+| [`POST /g1/sufficiency`](#sufficiency) | Is the context **enough** to answer? If not, what should I search for? | question, context (the answer is optional) |
 | [`POST /g1/hallucination-closedbook`](#closed-book) | Do independent answers to the same question disagree, with no documents at all? | 2–8 answers |
 
 Authentication is the same as the [Safety API](safety-api.md#authentication).
@@ -30,7 +37,7 @@ sent. They are meant as one component of a gate on RAG answers, next to your own
 | Endpoint | Use it to | Can it block on its own? |
 |---|---|---|
 | `hallucination-context` | gate or flag an answer against the passages it was given | **Yes**, once you have chosen its threshold on your data (see [How to validate on your data](#how-to-validate-on-your-data)). Its measured behaviour is in [Measured accuracy](#measured-accuracy-g1v-against-other-detectors) |
-| `sufficiency` | decide whether to answer, retrieve more, or ask the user; and get the queries for the missing information | **Yes, as a routing decision** (answer / retrieve again / abstain). Operating points at stated false-positive rates are published ([Published operating points](#published-operating-points)) |
+| `sufficiency` | decide whether to answer, retrieve more, or ask the user; and get the queries for the missing information | **Yes, as a routing decision** (answer / retrieve again / abstain). The false-alarm rate and the recall are published, up to 256k-token contexts ([Published operating points](#published-operating-points)) |
 | `hallucination-closedbook` | monitor and sample: raise a flag for review, log it, route to a second answer | **No. It is a signal.** It fires on clean answers often enough that it should flag, not block |
 
 The caveats on this page are there so that you can set the operating point deliberately: every number carries its measurement
@@ -39,10 +46,10 @@ condition, and where something has not been measured the page says so.
 ## What is behind the endpoints
 
 The endpoints are served by **trained models**, not by a prompt around a general-purpose LLM: **G1V**, a fine-tuned reader that
-produces the verdict, the flagged sentences and the word weights, and a generation adapter on the same model that writes
-the search queries of `sufficiency`. The grounded thresholds are calibrated and depend on the context
-length; the sufficiency operating points were fixed on a measured set at stated false-positive rates. Both run in your own
-deployment ([the vLLM stack](vllm-stack.md)).
+produces the verdict, the flagged sentences and the word weights (one instance serves all three), and **dpo9**, a 2-billion-parameter
+model that writes the search queries and the missing facts of `sufficiency`. The grounded thresholds are calibrated and depend on the context
+length; the sufficiency decision uses a single measured threshold. Both models run in FP8 in your own deployment ([the vLLM stack](vllm-stack.md)) and
+fit together with the safety models in a 24 GB GPU.
 
 ## Against a general-purpose LLM used as a judge
 
@@ -55,7 +62,7 @@ On hallucination detection with context, **G1V is more than three times more acc
 |---|---|---|
 | **Coverage of the claims** | One verdict on the whole answer. There is no guarantee that every claim was examined: an error in the middle of a long answer can pass, and you cannot tell which part weighed on the verdict. | **Every claim is checked on its own against the whole context**, so none is skipped by construction, and you know which claim is flagged and where. A sentence with fewer than two content words is not scored on its own; the verdict of the whole answer still covers it ([Short sentences](#short-sentences)). |
 | **Repeatability** | The answer can change from one run to the next and the JSON format can break. Even at temperature 0, how requests are batched together can change the result. | A **numeric score per claim**. It also varies slightly with batching: up to 0.025 depending on the padding. For this reason the reader is kept stable, and the verdict changes in 1–2% of cases on vLLM. |
-| **Threshold** | A yes/no with no calibration: you do not know how many false alarms it produces. | A **continuous score** with a threshold chosen at a declared false-positive rate (for sufficiency, the 1–10% table in [Published operating points](#published-operating-points)). |
+| **Threshold** | A yes/no with no calibration: you do not know how many false alarms it produces. | A **continuous score** with a threshold chosen at a declared false-positive rate (for sufficiency, the measured false-alarm rate and recall in [Published operating points](#published-operating-points)). |
 | **Explanation** | Usually one free-form sentence. | The **flagged claims and words, with their position** in your answer. |
 
 **Checking claim by claim with an LLM.** An LLM can also do the check claim by claim, with several calls: extract the
@@ -65,7 +72,7 @@ G1V does the same claim-level check with a **small, calibrated model, in a repea
 
 ## Health and readiness
 
-`GET /g1/hallucination/health` → `200 {"status":"ok"}` when the G1V servers answer.
+`GET /g1/hallucination/health` → `200 {"status":"ok"}` when the verification service and its G1V and dpo9 servers answer.
 
 | Status | Meaning | What to do |
 |---|---|---|
@@ -86,43 +93,37 @@ stop routing on `503`. The first start can take 10–40 minutes (see [the vLLM s
 
 ## Shared rules (grounded and sufficiency)
 
-- `context` is a string or an array of strings (each passage separately). At least one non-empty passage; up to 256 passages and 200,000 characters.
-- **Input limit: 16,384 tokens** (instructions + question + context + answer). When it does not fit, the end of the context is cut — see the **warning below**. It has been expanded up to 256k tokens, but this will be included in the next release.
+- `context` is a string or an array of passages: each passage is a string or an object `{text, title, label}` (title and label are optional). At least one non-empty passage; up to 256 passages.
+- **Context up to 1,048,576 tokens (1M).** A context that does not fit one 16,384-token reading is read in overlapping windows ([Long contexts](#long-contexts-up-to-1m-tokens)). The question and the answer together are read in one 16,384-token window.
 - `profile`: `balanced` (default), `low_false_positives` (fewer false alarms, fewer detections) or `high_recall` (the opposite).
 - `threshold` (optional, in [0, 1]) applies to the **calibrated probability**. Setting it changes the operating point; the response adds the warning `custom_threshold`.
 - The decision threshold of `hallucination-context` depends on the context length: contexts of up to 7,000 characters (`context_group: "short"`, 0.5195 in the balanced profile) and longer ones (`"long"`, 0.2735).
-- Errors: `400 missing_answer`, `400 empty_context`, `400 invalid_context`, `400 invalid_profile`, `400 invalid_threshold`, `413 too_many_passages`, `413 context_too_long`, `413 answer_too_long`, `413 input_too_long`, `401 unauthorized`, `503 model_unavailable`.
+- Errors: `400 missing_answer` (`hallucination-context`), `400 empty_context`, `400 invalid_context`, `400 invalid_profile`, `400 invalid_threshold`, `413 too_many_passages`, `413 context_too_long` (more than 1M tokens), `413 answer_too_long`, `413 input_too_long`, `401 unauthorized`, `503 model_unavailable`.
 
-### Truncation
+### Long contexts, up to 1M tokens
 
-!!! warning "A truncated request has no reliable verdict"
-    The checker reads **at most 16,384 input tokens** and cuts the context **from the end**. When that happens,
-    `limits.context_truncated` is `true`, `limits.context_tokens_read` says how much was read, and the response carries
-    the warning `context_truncated`.
+Send the whole context: up to **1,048,576 tokens** are read, with no cut and no rewriting on your side.
 
-    **A verdict on a truncated request is unreliable**: the evidence for a claim may sit in the part that was cut, so a
-    **supported answer can be marked unsupported**. A clean-looking verdict (`hallucinated: false`, `sufficient: true`)
-    on a truncated request must not be read as a pass.
+- A context that fits one 16,384-token reading is read at once, as before.
+- A longer context is read in **windows of 16,384 tokens with a 2,048-token overlap**. For each sentence of the answer the checker keeps the **four windows most relevant to it** (ranked by BM25; all of them when there are five or fewer) plus a window built from the passages that match it best, and the sentence gets the lowest score among them; the verdict of the whole answer combines the answer-level reading with its weakest sentence.
+- `sufficiency` reads the question against the same windows.
+- The response carries a `reading` block: `band` (`short`, `long_single_window`, `long_windows`), `windows`, `readings` and `estimated_seconds`. The warning `long_context_windows` marks a request read in windows.
 
-    Recommended handling:
+| Context | Result |
+|---|---|
+| up to 16,384 tokens | one reading, about a third of a second for a typical answer |
+| 64k and 256k tokens | grounded verdict: AUROC within 0.01 of the single reading of the same answers (RAGTruth test +0.005, FaithBench −0.010 at 256k); sufficiency: see [Published operating points](#published-operating-points) |
+| up to 1M tokens | grounded verdict: AUROC within 0.002 of the 256k reading on 50 answers lengthened with real passages; a context of roughly 50,000 tokens is checked in about 25 seconds (one RTX A6000) |
+| more than 1M tokens | `413 context_too_long` |
 
-    1. Read `limits.context_truncated` on **every** response.
-    2. If it is `true`, treat the request as **not measurable** and **fail closed**: block, hold for review, or retry with a shorter context.
-    3. Shorten or select the passages before the call (retrieve fewer, rank and keep the best) so that the request fits.
-    4. Never extract a pass verdict from a truncated request.
+Cost grows with the number of sentences and windows (`reading.estimated_seconds` tells you before you decide to send more). `limits.context_tokens_read` says how many tokens were read, and `limits.context_truncated` is `false` when the whole context was read.
 
-!!! info "Longer contexts in the next release"
-    The next release will support a context of **256k tokens**. The limits on this page describe the current build (16,384 tokens).
-
-How the limits work together:
+Limits at a glance:
 
 | Limit | What happens | Where you see it |
 |---|---|---|
-| 16,384 tokens (what the model reads) | the request is accepted, the **end of the context is cut** | `limits.context_truncated: true`, `limits.context_tokens_read`, warning `context_truncated` |
-| 200,000 characters of context, 256 passages | the request is **rejected before reading** | `413 context_too_long`, `413 too_many_passages` |
-
-On the calibration set of the sufficiency verdict (see below) **no context was truncated** (median full-context length
-about 7,400 tokens). Real RAG contexts can be longer than that set, so do not assume the same behaviour in production.
+| more than 1,048,576 tokens of context, or more than 256 passages | the request is **rejected before reading** | `413 context_too_long`, `413 too_many_passages` |
+| question + answer longer than one 16,384-token window | the request is rejected | `413 input_too_long` |
 
 ---
 
@@ -131,7 +132,7 @@ about 7,400 tokens). Real RAG contexts can be longer than that set, so do not as
 | Field | Type | Required | Meaning |
 |---|---|---|---|
 | `prompt` | string | no (recommended) | the user question; `messages` is also accepted (last user turn) |
-| `context` | string \| string[] | yes | the passages the answer must rely on |
+| `context` | string \| array | yes | the passages the answer must rely on: strings or `{text, title, label}` objects; up to 1M tokens |
 | `answer` | string | yes | the answer to verify |
 | `token_level` | boolean | no, `false` | also return the unsupported **words** |
 | `profile`, `threshold` | | no | see above |
@@ -144,7 +145,8 @@ about 7,400 tokens). Real RAG contexts can be longer than that set, so do not as
 | `sentences` | the **flagged** sentences: `{id, text, start, end, probability, flagged, type}`. `type` is **`unsupported`** (the context does not say it) or **`contradicted`** (the context says the opposite). Offsets are Unicode code points in your `answer` |
 | `sentences_total` | how many sentences the answer was split into |
 | `words` | only with `token_level: true`; see below |
-| `limits`, `warnings`, `models`, `latency_ms` | `context_truncated`, `sentences_omitted`, …; typical warnings `context_truncated`, `custom_threshold`, `claim_rules_english` |
+| `reading` | how the context was read: `band`, `windows`, `readings`, `estimated_seconds` ([Long contexts](#long-contexts-up-to-1m-tokens)) |
+| `limits`, `warnings`, `models`, `latency_ms` | `context_tokens_read`, `sentences_omitted`, …; typical warnings `long_context_windows`, `custom_threshold`, `claim_rules_english`. Keep `warnings` with your logs |
 
 ```bash
 curl -sS http://localhost:8800/g1/hallucination-context \
@@ -160,7 +162,7 @@ curl -sS http://localhost:8800/g1/hallucination-context \
                 "probability": 0.999651, "flagged": true, "type": "contradicted"}],
  "words": [{"text": "completed", "start": 21, "end": 30, "probability": 0.07735, "sentence_id": 0},
            {"text": "1925", "start": 34, "end": 38, "probability": 0.262916, "sentence_id": 0}],
- "limits": {"context_truncated": false}, "warnings": []}
+ "reading": {"band": "short", "windows": null, "readings": 3}, "limits": {"context_truncated": false}, "warnings": []}
 ```
 The answer is flagged; the second sentence is supported and is **not** listed.
 
@@ -179,7 +181,7 @@ no single sentence could be isolated.
 ### What to do with a verdict
 
 `hallucinated: true` → do not show the answer as it is. Regenerate with the passages and an instruction to cite them, or show the answer with the
-flagged sentences marked. A verdict on a [truncated request](#truncation) is not a verdict.
+flagged sentences marked.
 
 ### Measured accuracy: G1V against other detectors
 
@@ -246,91 +248,86 @@ point means most hallucinated answers on this benchmark are **not** flagged.
 
 ## `sufficiency`
 
-Given a question and the retrieved context, the service says whether the context is **sufficient** to support the answer and,
-if it is not, proposes search queries that describe the missing information. It **does not retrieve anything** and contains
+Given a question and the retrieved context, the service says whether the context is **sufficient** to answer the question and,
+if it is not, says **what is missing** and proposes search queries for it. It **does not retrieve anything** and contains
 no retriever: your own retriever consumes the queries.
+
+**You do not need an answer.** Send the question and the context alone to decide, *before* generating, whether to answer, retrieve more or ask the user. If you send an answer too, the same call also returns the grounded verdict on it.
 
 ### What the sufficiency endpoint gives you
 
-- **A verdict and a next step in one call.** It tells you whether the context is enough, which sentences of the answer the context does not support, and proposes search queries for the missing information.
-- **Queries that fit your own retriever.** They are plain text, anchored on your question and on the answer, so any search backend can consume them; nothing is retrieved on your behalf and nothing is sent to an external service.
-- **Published operating points.** A table at fixed false-positive targets (1% to 10%) with confidence intervals, so you can choose the false-block rate you can tolerate. The conditions and the limits of the measurement are stated next to it.
+- **A verdict and a next step in one call.** It tells you whether the context is enough for the question, what is missing, and up to three search queries for it.
+- **Question and context only.** The verdict is decided from the question read against the context, so it is available as soon as retrieval ends. Send the answer when you have it and you also get `hallucinated` and the unsupported sentences.
+- **Contexts up to 1M tokens** ([Long contexts](#long-contexts-up-to-1m-tokens)).
+- **Fast.** About 0.5 s with the search queries on typical inputs (one RTX A6000, FP8); the verdict alone is faster still.
+- **Queries that fit your own retriever.** They are plain text, anchored on your question, so any search backend can consume them; nothing is retrieved on your behalf and nothing is sent to an external service.
+- **Missing facts in plain words** (`missing_facts`), to show to the user or to log.
 - **Five European languages:** English, Italian, German, French and Spanish ([Languages](#languages)).
-- **Self-hosted.** The models run in your own deployment, in FP8, on one GPU ([the vLLM stack](vllm-stack.md)).
+- **Self-hosted.** The models run in your own deployment, in FP8, on one 24 GB GPU together with the safety models ([the vLLM stack](vllm-stack.md)).
 
-Same request as above, with these differences: `prompt` is **required** (the queries depend on the question), `answer` is required for now, plus
+Same request as above, with these differences: `prompt` is **required** (the verdict is decided from the question), `answer` is **optional**, plus
 
 | Field | Default | Meaning |
 |---|---|---|
 | `queries` | `true` | `false` returns only the verdict |
-| `k_queries` | **10** | the **maximum** number of queries to return (1–50). **You choose it.** The model may produce fewer; the response never pads |
+| `k_queries` | **3** | the **maximum** number of queries to return (1–3 are produced; larger values are accepted and return the three). The model may produce fewer; the response never pads |
 
 | Response field | Meaning |
 |---|---|
-| `sufficient` | **the decision**: `true` if the context is enough; `false` when at least one claim in the answer lacks support **because information is missing** |
-| `insufficiency.probability` | confidence that the context is insufficient. **Not a calibrated probability** (`insufficiency.calibrated: false`): use it only against a threshold you have validated, never present it as a probability |
-| `missing` | the answer sentences the context does not support: `{sentence_id, text, probability}` |
-| `queries` | search queries for **your own retriever**: `{text, language, anchored, origin}`, at most `k_queries` |
+| `sufficient` | **the decision**: `true` if the context is enough to answer the question; `false` when the question cannot be answered from it |
+| `insufficiency.probability`, `insufficiency.threshold` | the score the decision is made on, and its threshold (**0.402**). `insufficiency.calibrated: false`: compare it with the threshold, do not present it as a probability |
+| `missing_facts` | what the context lacks, in plain words (only when `sufficient` is `false`) |
+| `queries` | search queries for **your own retriever**: `{text, language, anchored, origin}`, at most `k_queries`; `origin` is `dpo9` |
 | `queries_found`, `queries_returned` | produced vs returned |
-| `queries_status` | `generated`, `not_needed` (sufficient), `need_question`, `timeout`, `error`, `off` |
-| `limits` | as above plus `query_passages_omitted`, `query_input_tokens` |
+| `queries_status` | `generated`, `not_needed` (sufficient), `writer_found_none`, `timeout`, `error`, `off` |
+| `hallucinated`, `missing` | with an `answer`: the grounded verdict and the answer sentences the context does not support (`{sentence_id, text, probability}`). Without an answer `hallucinated` is `null` and `missing` is empty |
+| `reading`, `limits` | as in [Long contexts](#long-contexts-up-to-1m-tokens), plus `query_passages_omitted`, `query_input_tokens` |
 
+```bash
+curl -sS http://localhost:8800/g1/sufficiency \
+  -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" -d '{
+  "prompt": "How many visitors did the Eiffel Tower receive in 2019?",
+  "context": [{"title": "Eiffel Tower", "label": "History", "text": "The Eiffel Tower was completed in 1889 for the Exposition Universelle in Paris. It is 330 metres tall."}]}'
+```
 ```json
 {"sufficient": false,
- "insufficiency": {"probability": 0.9834, "calibrated": false},
- "missing": [{"sentence_id": 0, "text": "Acme was founded by Wile in 1949.", "probability": 0.9994}],
- "queries": [{"text": "who founded Acme", "language": "en", "anchored": true, "origin": "greedy"},
-             {"text": "Acme founding date", "language": "en", "anchored": true, "origin": "greedy"},
-             {"text": "Acme company founder", "language": "en", "anchored": true, "origin": "greedy"}],
- "queries_found": 3, "queries_returned": 3, "queries_status": "generated"}
+ "insufficiency": {"probability": 0.7522, "threshold": 0.402, "calibrated": false},
+ "missing_facts": ["Number of visitors to the Eiffel Tower in 2019"],
+ "queries": [{"text": "Eiffel Tower visitors 2019", "language": "en", "anchored": true, "origin": "dpo9"}],
+ "queries_found": 1, "queries_returned": 1, "queries_status": "generated", "hallucinated": null, "missing": []}
 ```
 
 ### How the model reads the passages
 
-The model reads **each passage with its title and label in front**, in the form `title\nlabel\ntext`. This is part of how
-the verdict was calibrated, so give titles when you have them.
+The model reads **each passage with its title and label in front**. Send them as `{text, title, label}`: a question that cites "Article 19" or "section 4.2" usually finds that reference in the retriever's metadata, not in the passage text. A plain string works too.
 
 | Passage form | Status |
 |---|---|
-| string (`"…"`) | accepted today |
-| object `{text, title?, label?}` | **to be added**. The 2.0.0 build as served today accepts strings only and answers `400 invalid_context` for objects. Until then put the title and label in the passage text yourself, in the form `title\nlabel\ntext` |
+| string (`"…"`) | accepted |
+| object `{text, title?, label?}` | accepted: the service puts the title and the label in front of the text |
+
+On questions that cite an article or a section number, false alarms drop from 61% without title and label to 2.6% with them, so send them when your retriever has them.
 
 ### Published operating points
 
-The verdict was measured and calibrated on a set built from **real documents**: **3,169 questions**, each in three
-versions — the **full context**, the context with the **key passage removed**, and the context with the key passage
-**replaced by an unrelated one**.
+Sufficiency is decided with **one threshold (0.402)** on the score of the question read against the context. Measured on two development benchmarks of questions over real documents (BT: 2,361 rows; BR: 897 rows; passages with title and label), with answers or without:
 
-- **Positives** (context is insufficient) = the removed-passage version.
-- **Negatives** = the full and the replaced versions: **6,338** rows.
-- A **false positive** is a sufficient context flagged as insufficient.
-
-The thresholds were chosen **on this set**, cross-validated by document group (5×20), so these are
-**calibration numbers, not a held-out test**. AUROC **0.982** (95% CI 0.978–0.986).
-
-| False-positive rate target | Threshold | Recall of insufficient contexts (95% CI) | Cross-validated FPR |
+| Benchmark | False alarms (sufficient contexts flagged) | Recall of insufficient contexts | F1 |
 |---|---|---|---|
-| 1% | 0.920 | 0.444 (0.413–0.481) | 1.01% |
-| 2% | 0.825 | 0.664 (0.634–0.696) | 2.04% |
-| 3% | 0.679 | 0.847 (0.826–0.867) | 3.03% |
-| 5% | 0.339 | 0.961 (0.951–0.970) | 5.03% |
-| 10% | 0.175 | 0.990 (0.985–0.994) | 10.0% |
+| BT | 3.4% | 97.8% | 0.956 |
+| BR | 1.7% | 96.0% | 0.963 |
 
-All rows: calibration set above, cross-validated by document group (5×20), thresholds applied to the sufficiency score.
+The same decision on **long contexts**, built by adding real distractor passages in the same language (300 BT and 299 BR items):
 
-**Development set** (299 held-out questions, **descriptive only, thresholds not tuned on it**): AUROC **0.994**
-(0.989–0.998). At the 1% threshold: observed FPR 0.0%, recall 0.408 (0.347–0.497). At the 2% threshold: observed FPR
-0.17%, recall 0.642.
+| Context | BT: false alarms / recall | BR: false alarms / recall |
+|---|---|---|
+| original length | 3.5% / 99.3% | 1.7% / 96.0% |
+| 64k tokens | 2.8% / 97.7% | 1.5% / 94.7% |
+| 256k tokens | 3.2% / 97.3% | 1.3% / 94.0% |
 
-Read these numbers with the following in mind:
+AUROC stays at 0.994–0.997 from the original length to 256k tokens. Recall measures the labelled "insufficient" contexts; in a blind read of 60 cases about 8% of those labels were actually answerable, so recall is a conservative figure.
 
-- **Recall is a conservative lower bound.** In a blind read of 60 cases, about **8%** of the "insufficient" labels were actually answerable.
-- **Profiles.** `low_false_positives`, `balanced` and `high_recall` are named operating points; their **precision, recall and false-positive rate on the sufficiency verdict are not yet measured**. Use the table above as the reference, and do not read profile names as guarantees.
-- **Calibrate on your own sample** (a few hundred labelled examples) before you gate anything ([checklist](#how-to-validate-on-your-data)).
-- **Latency (P95) is not yet measured.**
-- **New document domains.** Accuracy on other domains is being measured on a dedicated transfer benchmark (software specifications, API descriptions, coding-agent traces, contracts, regulations, patents) and will be added when it is finished. **Transfer is not claimed.**
-- **Languages.** Per-language accuracy is not yet published ([Languages](#languages)).
-- The numbers hold for requests that were **not truncated** ([Truncation](#truncation)).
+To choose your own operating point, send `threshold` in the request, or calibrate on a few hundred labelled examples from your own domain ([checklist](#how-to-validate-on-your-data)).
 
 ### Zero-shot against Lacuna v1 (pilot sets)
 
@@ -364,7 +361,7 @@ search queries aimed at what is missing**. Specialised hallucination-detection v
 
 Two further observations from the same review: none of the three cloud grounding checks publishes an accuracy figure for
 its check, and we found no threshold guidance tied to a stated false-positive rate. Geodesia publishes
-[operating points at stated false-positive rates](#published-operating-points), with the conditions and limits of the
+[the false-alarm rate and the recall of the sufficiency decision](#published-operating-points), with the conditions of the
 measurement.
 
 In short: a sufficiency verdict with published operating points **plus** queries for the missing information, in five
@@ -373,15 +370,13 @@ benchmarks, and are **not comparable** with the measurements on this page.
 
 ### Query suggestions for missing information
 
-When the context is insufficient the service proposes search queries that describe the missing information.
+When the context is insufficient, **dpo9** writes up to three search queries that describe the missing information, and the list of missing facts.
 
-- The model usually produces two or three queries by itself. Asking for more (`k_queries` up to 50) adds **sampled variants**, filtered by the same anchoring rule, and the response carries the warning `queries_beyond_greedy_sampled`. Queries are never invented to reach `k_queries`.
-- Queries are **hypotheses anchored on the answer**, not evidence: they preserve the entities of the question and of the answer, and the answer's own claims are still unverified.
-- An empty `queries` with `queries_status` `timeout` or `error` does **not** mean that nothing is missing.
+- Queries are anchored on the question: they keep its entities, and they are written in the language of the question.
+- They are hypotheses for your retriever: run them, then check what comes back.
+- An empty `queries` with `queries_status` `timeout` or `error` means the writer did not finish, not that nothing is missing.
 
-**Retrieval loop.** `sufficient == false` → run each `queries[].text` on your retriever → append the passages to `context` → regenerate →
-call `hallucination-context` again. Stop after **at most two rounds** and tell the user if it is still unsupported. Check
-[`limits.context_truncated`](#truncation) after every round: adding passages is what makes a request exceed the limit.
+**Retrieval loop.** `sufficient == false` → run each `queries[].text` on your retriever → append the passages to `context` → call `sufficiency` again → when `sufficient` is `true`, generate the answer and call `hallucination-context`. Stop after **at most two rounds** and tell the user if the context is still insufficient. The context can grow up to 1M tokens, so you can keep every retrieved passage.
 
 ---
 
@@ -429,8 +424,8 @@ Behaviour is **tied to a named model version**: the thresholds and numbers on th
 measured, and a different model version can change them.
 
 - **Pin your own operating point.** Every response returns the `threshold` it used. Send `threshold` in the request to fix the operating point yourself: a change to the default thresholds then does not move yours (the response adds the warning `custom_threshold`).
-- Today each response carries `schema_version` (`"2.0"`) and the `models` block.
-- A **detector version string in the response is to be added.** Until it is present, pin the image tag you deploy (`glad-vllm:2.0.0`) and record it with your results.
+- Today each response carries `schema_version` (`"2.1"`) and the `models` block.
+- A **detector version string in the response is to be added.** Until it is present, pin the image tag you deploy (`glad-vllm:2.1.0`) and record it with your results.
 - Changes to the detector, its thresholds or the tables on this page will be listed in the [release notes](../reference/release-notes.md); re-run your own validation after any such change.
 
 ## How to validate on your data
